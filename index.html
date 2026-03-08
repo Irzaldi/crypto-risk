@@ -1,33 +1,214 @@
-<script>
-const WORKER = 'https://crypto-proxy.irzaldi.workers.dev';
+<!-- FULL LIVE CRYPTO RISK DASHBOARD - COPY THIS ENTIRE CODE -->
 
-async function fetch_data() {
-  const sym = document.getElementById('sym').value.toUpperCase().trim();
-  if (!sym) { alert('Enter a symbol'); return; }
-  
-  try {
-    const api_url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`;
-    const worker_url = `${WORKER}?url=${encodeURIComponent(api_url)}`;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Crypto Risk — Multi-Proxy</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg:#03070d; --panel:#060c14; --border:#0d1f30;
+    --accent:#00e5ff; --green:#00ff88; --red:#ff2d55;
+    --warn:#ffb800; --text:#b8ccd8; --muted:#3a5060;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-serif; min-height:100vh; background-image:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(0,229,255,0.05) 0%,transparent 60%); }
+  body::after { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(0,229,255,0.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.02) 1px,transparent 1px); background-size:36px 36px; pointer-events:none; z-index:0; }
+  .wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:20px 16px 50px; }
+
+  header { display:flex; align-items:center; gap:14px; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .logo-box { width:46px; height:46px; border:1.5px solid var(--accent); border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:22px; animation:glow 2.5s ease-in-out infinite; flex-shrink:0; }
+  @keyframes glow { 0%,100%{box-shadow:0 0 10px rgba(0,229,255,.25)} 50%{box-shadow:0 0 28px rgba(0,229,255,.6)} }
+  h1 { font-family:'Orbitron',monospace; font-size:1.15rem; font-weight:900; color:var(--accent); letter-spacing:3px; text-transform:uppercase; }
+  .tagline { font-family:'Share Tech Mono',monospace; font-size:0.58rem; color:var(--muted); letter-spacing:3px; margin-top:3px; text-transform:uppercase; }
+  .source-badge { margin-left:auto; display:flex; align-items:center; gap:6px; background:rgba(0,229,255,.06); border:1px solid rgba(0,229,255,.2); border-radius:20px; padding:5px 12px; font-family:'Share Tech Mono',monospace; font-size:0.62rem; color:var(--accent); letter-spacing:2px; text-transform:uppercase; white-space:nowrap; }
+  .live-dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green); animation:blink 1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
+
+  .conn-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+  .conn-panel { background:rgba(0,0,0,.3); border:1px solid var(--border); border-radius:8px; padding:10px 14px; }
+  .conn-title { font-family:'Share Tech Mono',monospace; font-size:0.56rem; color:var(--muted); text-transform:uppercase; letter-spacing:2px; margin-bottom:8px; }
+  .pill-row { display:flex; gap:6px; flex-wrap:wrap; }
+  .pill { padding:3px 10px; border-radius:20px; font-family:'Share Tech Mono',monospace; font-size:0.58rem; letter-spacing:1px; text-transform:uppercase; border:1px solid var(--border); color:var(--muted); background:rgba(255,255,255,.03); display:flex; align-items:center; gap:4px; transition:all .3s; }
+  .pill.active { border-color:var(--accent); color:var(--accent); background:rgba(0,229,255,.1); box-shadow:0 0 8px rgba(0,229,255,.2); }
+  .pill-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+
+  .search-row { display:flex; gap:10px; margin-bottom:10px; }
+  .search-wrap { flex:1; position:relative; }
+  .search-wrap input { width:100%; background:var(--panel); border:1px solid var(--border); color:var(--accent); padding:11px 14px 11px 36px; border-radius:8px; font-family:'Orbitron',monospace; font-size:.95rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; outline:none; }
+  .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted); font-size:13px; }
+  .fetch-btn { padding:11px 24px; background:linear-gradient(135deg,rgba(0,229,255,.15),rgba(0,229,255,.05)); border:1px solid var(--accent); color:var(--accent); border-radius:8px; font-family:'Orbitron',monospace; font-size:.68rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .25s; }
+  .fetch-btn:hover { background:linear-gradient(135deg,rgba(0,229,255,.25),rgba(0,229,255,.1)); box-shadow:0 0 20px rgba(0,229,255,.3); }
+
+  .pairs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .pair-btn { padding:4px 12px; border-radius:20px; background:rgba(0,229,255,.04); border:1px solid var(--border); color:var(--muted); font-family:'Share Tech Mono',monospace; font-size:.62rem; cursor:pointer; transition:all .2s; }
+  .pair-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(0,229,255,.1); }
+
+  .tf-row { display:flex; gap:6px; margin-bottom:12px; align-items:center; flex-wrap:wrap; }
+  .tf-btn { padding:4px 10px; border-radius:6px; background:rgba(255,255,255,.03); border:1px solid var(--border); color:var(--muted); font-family:'Share Tech Mono',monospace; font-size:.6rem; cursor:pointer; transition:all .2s; }
+  .tf-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(0,229,255,.08); }
+
+  .status-bar { font-family:'Share Tech Mono',monospace; font-size:.65rem; color:var(--muted); margin-bottom:6px; }
+  .status-bar.success { color:var(--green); }
+  .status-bar.error { color:var(--red); }
+
+  .price-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:14px; }
+  .pcard { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .pcard-label { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--muted); margin-bottom:6px; }
+  .pcard-value { font-family:'Orbitron',monospace; font-size:1.05rem; font-weight:700; color:var(--accent); }
+  .pcard-sub { font-family:'Share Tech Mono',monospace; font-size:.58rem; color:var(--muted); margin-top:3px; }
+
+  @media(max-width:720px){ .price-row { grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo-box">📡</div>
+    <div>
+      <h1>Live Crypto Risk System</h1>
+      <div class="tagline">Multi-Exchange Analysis</div>
+    </div>
+    <div class="source-badge"><div class="live-dot"></div><span id="sourceLabel">READY</span></div>
+  </header>
+
+  <div class="conn-grid">
+    <div class="conn-panel">
+      <div class="conn-title">🔀 CORS Proxies</div>
+      <div class="pill-row">
+        <div class="pill" id="px-allorigins"><div class="pill-dot"></div>allorigins</div>
+        <div class="pill" id="px-corsproxy"><div class="pill-dot"></div>corsproxy</div>
+        <div class="pill" id="px-codetabs"><div class="pill-dot"></div>codetabs</div>
+      </div>
+    </div>
+    <div class="conn-panel">
+      <div class="conn-title">📊 Exchanges</div>
+      <div class="pill-row">
+        <div class="pill" id="ex-binance"><div class="pill-dot"></div>Binance</div>
+        <div class="pill" id="ex-okx"><div class="pill-dot"></div>OKX</div>
+        <div class="pill" id="ex-bybit"><div class="pill-dot"></div>Bybit</div>
+        <div class="pill" id="ex-mexc"><div class="pill-dot"></div>MEXC</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="search-row">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="symbolInput" placeholder="BTC, ETH, SOL..." value="BTC" onkeydown="if(event.key==='Enter')fetchData()">
+    </div>
+    <button class="fetch-btn" onclick="fetchData()">⚡ FETCH LIVE DATA</button>
+  </div>
+
+  <div class="pairs">
+    <button class="pair-btn active" onclick="quickPair('BTC')">BTC</button>
+    <button class="pair-btn" onclick="quickPair('ETH')">ETH</button>
+    <button class="pair-btn" onclick="quickPair('SOL')">SOL</button>
+    <button class="pair-btn" onclick="quickPair('XRP')">XRP</button>
+    <button class="pair-btn" onclick="quickPair('BNB')">BNB</button>
+    <button class="pair-btn" onclick="quickPair('DOGE')">DOGE</button>
+  </div>
+
+  <div class="tf-row">
+    <span style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:2px">TF:</span>
+    <button class="tf-btn active" onclick="setTF('1h',this)">1H</button>
+    <button class="tf-btn" onclick="setTF('4h',this)">4H</button>
+    <button class="tf-btn" onclick="setTF('1d',this)">1D</button>
+  </div>
+
+  <div class="status-bar" id="statusBar">⬡ Click FETCH to start</div>
+
+  <div class="price-row">
+    <div class="pcard"><div class="pcard-label">💵 Price</div><div class="pcard-value" id="pcPrice">—</div><div class="pcard-sub" id="pcPair">waiting</div></div>
+    <div class="pcard"><div class="pcard-label">📊 24h %</div><div class="pcard-value" id="pc24h">—</div><div class="pcard-sub" id="pc24hAbs">—</div></div>
+    <div class="pcard"><div class="pcard-label">📈 High</div><div class="pcard-value" id="pcHigh" style="color:var(--green)">—</div><div class="pcard-sub">24h high</div></div>
+    <div class="pcard"><div class="pcard-label">📉 Low</div><div class="pcard-value" id="pcLow" style="color:var(--red)">—</div><div class="pcard-sub">24h low</div></div>
+  </div>
+
+</div>
+
+<script>
+  const WORKER_URL = 'https://crypto-proxy.irzaldi.workers.dev';
+  let currentTF = '1h';
+
+  async function smartFetch(url) {
+    try {
+      const res = await fetch(`${WORKER_URL}?url=${encodeURIComponent(url)}`);
+      const text = await res.text();
+      return JSON.parse(text);
+    } catch(e) {
+      console.error('Fetch error:', e);
+      return null;
+    }
+  }
+
+  async function fetchFromBinance(sym) {
+    const pair = sym + 'USDT';
+    const data = await smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${pair}`);
+    if (!data || data.code) return null;
+    return {
+      price: +data.lastPrice,
+      high24: +data.highPrice,
+      low24: +data.lowPrice,
+      open24: +data.openPrice,
+      change: +data.priceChangePercent,
+      source: 'Binance',
+      pair
+    };
+  }
+
+  function setStatus(msg, type='') {
+    const el = document.getElementById('statusBar');
+    el.textContent = msg;
+    el.className = 'status-bar ' + type;
+  }
+
+  function fmtP(n) {
+    if (n === null || isNaN(n)) return '—';
+    return '$' + (n >= 1 ? n.toFixed(2) : n.toFixed(8));
+  }
+
+  async function fetchData() {
+    const sym = document.getElementById('symbolInput').value.toUpperCase().trim();
+    if (!sym) return;
+
+    setStatus('⟳ Fetching...', '');
+    const data = await fetchFromBinance(sym);
     
-    console.log('Fetching from:', worker_url);
-    const res = await fetch(worker_url);
-    const text = await res.text();
-    console.log('Response:', text);
-    const data = JSON.parse(text);
-    
-    if (data.code) {
-      alert('Error: ' + data.msg);
+    if (!data) {
+      setStatus('✗ Error fetching data', 'error');
       return;
     }
+
+    document.getElementById('pcPrice').textContent = fmtP(data.price);
+    document.getElementById('pcPair').textContent = data.pair;
     
-    document.getElementById('price').innerText = '$' + parseFloat(data.lastPrice).toFixed(2);
-    document.getElementById('change').innerText = parseFloat(data.priceChangePercent).toFixed(2) + '%';
-    document.getElementById('change').style.color = data.priceChangePercent >= 0 ? '#00ff88' : '#ff2d55';
-    document.getElementById('high').innerText = '$' + parseFloat(data.highPrice).toFixed(2);
-    document.getElementById('low').innerText = '$' + parseFloat(data.lowPrice).toFixed(2);
-  } catch(e) {
-    console.error('Full error:', e);
-    alert('Error: ' + e.message);
+    const ce = document.getElementById('pc24h');
+    ce.textContent = (data.change >= 0 ? '+' : '') + data.change.toFixed(2) + '%';
+    ce.style.color = data.change >= 0 ? 'var(--green)' : 'var(--red)';
+    
+    document.getElementById('pc24hAbs').textContent = fmtP(data.price - data.open24);
+    document.getElementById('pcHigh').textContent = fmtP(data.high24);
+    document.getElementById('pcLow').textContent = fmtP(data.low24);
+    
+    setStatus(`✓ ${data.source} - ${data.pair} @ ${fmtP(data.price)}`, 'success');
   }
-}
+
+  function quickPair(sym) {
+    document.querySelectorAll('.pair-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('symbolInput').value = sym;
+    fetchData();
+  }
+
+  function setTF(tf, el) {
+    currentTF = tf;
+    document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+  }
 </script>
+</body>
+</html>
