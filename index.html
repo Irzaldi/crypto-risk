@@ -3,9 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live Crypto Risk — Multi-Proxy</title>
+<meta name="description" content="Live crypto trading risk analysis tool — multi-timeframe signals, EMA strategy, prediction AI, trade journal and risk management for Indonesia traders.">
+<title>Live Crypto Risk System — Multi-Timeframe Analysis</title>
+<!-- Non-blocking Google Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap"></noscript>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap');
+  /* Font fallbacks while Google Fonts loads */
+  body { font-family: 'Rajdhani', system-ui, sans-serif; }
+  h1, .logo-box { font-family: 'Orbitron', monospace; }
+  .tagline, .source-badge, .pill { font-family: 'Share Tech Mono', monospace; }
 
   :root {
     --bg:#03070d; --panel:#060c14; --border:#0d1f30;
@@ -50,11 +59,11 @@
   .fetch-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
 
   .pairs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-  .pair-btn { padding:4px 12px; border-radius:20px; background:rgba(0,229,255,.04); border:1px solid var(--border); color:var(--muted); font-family:'Share Tech Mono',monospace; font-size:.62rem; letter-spacing:1px; cursor:pointer; transition:all .2s; text-transform:uppercase; }
+  .pair-btn { padding:4px 12px; min-height:36px; border-radius:20px; background:rgba(0,229,255,.04); border:1px solid var(--border); color:var(--muted); font-family:'Share Tech Mono',monospace; font-size:.62rem; letter-spacing:1px; cursor:pointer; transition:all .2s; text-transform:uppercase; }
   .pair-btn:hover,.pair-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(0,229,255,.1); }
 
   .tf-row { display:flex; gap:6px; margin-bottom:12px; align-items:center; flex-wrap:wrap; }
-  .tf-btn { padding:4px 10px; border-radius:6px; background:rgba(255,255,255,.03); border:1px solid var(--border); color:var(--muted); font-family:'Share Tech Mono',monospace; font-size:.6rem; letter-spacing:1px; cursor:pointer; transition:all .2s; }
+  .tf-btn { padding:4px 10px; min-height:36px; border-radius:6px; background:rgba(255,255,255,.03); border:1px solid var(--border); color:var(--muted); font-family:'Share Tech Mono',monospace; font-size:.6rem; letter-spacing:1px; cursor:pointer; transition:all .2s; }
   .tf-btn:hover,.tf-btn.active { border-color:var(--accent); color:var(--accent); background:rgba(0,229,255,.08); }
 
   .status-bar { font-family:'Share Tech Mono',monospace; font-size:.65rem; color:var(--muted); margin-bottom:6px; min-height:18px; line-height:1.5; }
@@ -232,7 +241,7 @@
 
   /* ── Market Overview ── */
   .mkt-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:14px; }
-  .mkt-card { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; cursor:pointer; transition:all .2s; }
+  .mkt-card { background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; cursor:pointer; transition:all .2s; min-height:70px; }
   .mkt-card:hover { border-color:var(--accent); transform:translateY(-1px); }
   .mkt-sym { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--muted); letter-spacing:2px; margin-bottom:4px; }
   .mkt-price { font-family:'Orbitron',monospace; font-size:.78rem; font-weight:700; color:var(--accent); }
@@ -302,7 +311,7 @@
 <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
 <body>
-<div class="wrap">
+<main class="wrap">
 
   <header>
     <div class="logo-box">📡</div>
@@ -353,18 +362,18 @@
   <div class="panel" id="settingsPanel" style="margin-bottom:14px;display:none;border-color:rgba(255,184,0,.3)">
     <div class="ptitle" style="color:var(--warn)">⚙️ Settings &amp; Customization</div>
     <div class="settings-grid">
-      <div class="setting-item"><label class="setting-label">Default Symbol</label><input class="setting-input" id="cfg-defaultSym" value="BTC" placeholder="BTC"></div>
-      <div class="setting-item"><label class="setting-label">Default Timeframe</label>
+      <div class="setting-item"><label class="setting-label" for="cfg-defaultSym">Default Symbol</label><input class="setting-input" id="cfg-defaultSym" value="BTC" placeholder="BTC"></div>
+      <div class="setting-item"><label class="setting-label" for="cfg-defaultTF">Default Timeframe</label>
         <select class="setting-input" id="cfg-defaultTF">
           <option value="15m">15m</option><option value="30m">30m</option><option value="1h" selected>1H</option><option value="4h">4H</option><option value="1d">1D</option><option value="1w">1W</option><option value="1M">1M</option>
         </select>
       </div>
-      <div class="setting-item"><label class="setting-label">SuperTrend Period</label><input class="setting-input" type="number" id="cfg-stPeriod" value="10" min="5" max="50"></div>
-      <div class="setting-item"><label class="setting-label">SuperTrend Multiplier</label><input class="setting-input" type="number" id="cfg-stMult" value="3" min="1" max="10" step="0.5"></div>
-      <div class="setting-item"><label class="setting-label">ATR Period</label><input class="setting-input" type="number" id="cfg-atrPeriod" value="14" min="5" max="50"></div>
-      <div class="setting-item"><label class="setting-label">RSI Period</label><input class="setting-input" type="number" id="cfg-rsiPeriod" value="14" min="5" max="30"></div>
-      <div class="setting-item"><label class="setting-label">Auto-Refresh Interval (sec)</label><input class="setting-input" type="number" id="cfg-refreshSec" value="30" min="10" max="300"></div>
-      <div class="setting-item"><label class="setting-label">Chart Candles</label><input class="setting-input" type="number" id="cfg-chartCandles" value="60" min="20" max="200"></div>
+      <div class="setting-item"><label class="setting-label" for="cfg-stPeriod">SuperTrend Period</label><input class="setting-input" type="number" id="cfg-stPeriod" value="10" min="5" max="50"></div>
+      <div class="setting-item"><label class="setting-label" for="cfg-stMult">SuperTrend Multiplier</label><input class="setting-input" type="number" id="cfg-stMult" value="3" min="1" max="10" step="0.5"></div>
+      <div class="setting-item"><label class="setting-label" for="cfg-atrPeriod">ATR Period</label><input class="setting-input" type="number" id="cfg-atrPeriod" value="14" min="5" max="50"></div>
+      <div class="setting-item"><label class="setting-label" for="cfg-rsiPeriod">RSI Period</label><input class="setting-input" type="number" id="cfg-rsiPeriod" value="14" min="5" max="30"></div>
+      <div class="setting-item"><label class="setting-label" for="cfg-refreshSec">Auto-Refresh Interval (sec)</label><input class="setting-input" type="number" id="cfg-refreshSec" value="30" min="10" max="300"></div>
+      <div class="setting-item"><label class="setting-label" for="cfg-chartCandles">Chart Candles</label><input class="setting-input" type="number" id="cfg-chartCandles" value="60" min="20" max="200"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="settings-btn settings-save" onclick="saveSettings()">💾 SAVE SETTINGS</button>
@@ -408,7 +417,7 @@
   <div class="search-row">
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input type="text" id="symbolInput" placeholder="BTC, ETH, SOL, XRP..." value="BTC" maxlength="12" onkeydown="if(event.key==='Enter')fetchData()">
+      <input type="text" id="symbolInput" aria-label="Crypto symbol search" placeholder="BTC, ETH, SOL, XRP..." value="BTC" maxlength="12" onkeydown="if(event.key==='Enter')fetchData()">
     </div>
     <button class="fetch-btn" id="fetchBtn" onclick="fetchData()">⚡ FETCH LIVE DATA</button>
   </div>
@@ -501,7 +510,7 @@
       <button class="wl-add-btn" style="margin-left:auto;padding:4px 10px;font-size:.52rem" onclick="refreshWatchlist()">⟳ REFRESH</button>
     </div>
     <div class="wl-add-row">
-      <input class="wl-add-input" id="wlInput" placeholder="Add symbol... (e.g. LINK)" maxlength="12" onkeydown="if(event.key==='Enter')addWatchlist()">
+      <input class="wl-add-input" id="wlInput" aria-label="Add symbol to watchlist" placeholder="Add symbol... (e.g. LINK)" maxlength="12" onkeydown="if(event.key==='Enter')addWatchlist()">
       <button class="wl-add-btn" onclick="addWatchlist()">+ ADD</button>
     </div>
     <div class="wl-grid" id="wlGrid">
@@ -812,11 +821,11 @@
   <div class="panel" style="margin-top:14px">
     <div class="ptitle">🔔 Price Alerts</div>
     <div class="alert-row">
-      <select id="alertDir" style="background:rgba(0,229,255,.04);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.7rem;outline:none">
+      <select id="alertDir" aria-label="Alert direction" style="background:rgba(0,229,255,.04);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.7rem;outline:none">
         <option value="above">Price ABOVE</option>
         <option value="below">Price BELOW</option>
       </select>
-      <input type="number" id="alertPrice" placeholder="Enter price level..." class="alert-input" step="any">
+      <input type="number" id="alertPrice" aria-label="Alert price level" placeholder="Enter price level..." class="alert-input" step="any">
       <button class="alert-add-btn" onclick="addAlert()">+ ADD ALERT</button>
     </div>
     <div id="alertList"><div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">No alerts set. Add one above.</div></div>
@@ -3297,5 +3306,6 @@
   let _resizeTimer;
   window.addEventListener('resize', ()=>{ clearTimeout(_resizeTimer); _resizeTimer=setTimeout(()=>{ if(window._lastChartData){ const d=window._lastChartData; drawMiniChart(d.opens,d.closes,d.highs,d.lows,d.e8,d.e21,d.e55,d.e200,d.sym,d.tf); } },200); });
 </script>
+</main>
 </body>
 </html>
