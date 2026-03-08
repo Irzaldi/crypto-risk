@@ -1529,8 +1529,61 @@
     const{price,high24,low24,open24,vol24,opens,closes,highs,lows,volumes,source,pair}=data;
     currentPrice=price;
 
+    // ── Kick off async tasks IMMEDIATELY in parallel with indicator math ──
+    // MTF fetches start NOW while indicators are calculating below
+    const sym2 = sym;
+    const mtfTFs = ['15m','30m','1h','4h','1d','1w','1M'];
+    const mtfIds = ['15m','30m','1h','4h','1d','1w','1M'];
+
+    // Candle cache: avoid re-fetching same TF within 60s
+    window._candleCache = window._candleCache || {};
+    function getCacheKey(s, tf) { return `${s}_${tf}`; }
+    function getCached(s, tf) {
+      const entry = window._candleCache[getCacheKey(s, tf)];
+      if(entry && Date.now() - entry.ts < 60000) return entry.data;
+      return null;
+    }
+    function setCache(s, tf, d) { window._candleCache[getCacheKey(s, tf)] = { data:d, ts:Date.now() }; }
+
+    // Fetch candles for ONE timeframe — races ALL exchanges simultaneously
+    async function fetchMTFCandles(s, tf) {
+      const cached = getCached(s, tf);
+      if(cached) return cached;
+      const exOrder = ['binance','okx','bybit','mexc','gateio','kucoin'];
+      const ordered = workingExchangeId ? [workingExchangeId, ...exOrder.filter(e=>e!==workingExchangeId)] : exOrder;
+      // Try primary first
+      const primaryUrl = mtfUrl(ordered[0], s, tf);
+      if(primaryUrl) {
+        try {
+          const raw = await smartFetch(primaryUrl);
+          const parsed = mtfParse(ordered[0], raw);
+          if(parsed && parsed.c.length >= 10) { setCache(s, tf, parsed); return parsed; }
+        } catch(e) {}
+      }
+      // Race rest simultaneously
+      return new Promise(resolve => {
+        let settled=false, failures=0;
+        const fallbacks = ordered.slice(1);
+        if(!fallbacks.length) { resolve(null); return; }
+        fallbacks.forEach(exId => {
+          const url = mtfUrl(exId, s, tf);
+          if(!url) { if(++failures===fallbacks.length&&!settled){settled=true;resolve(null);} return; }
+          smartFetch(url).then(raw => {
+            const parsed = mtfParse(exId, raw);
+            if(!settled && parsed && parsed.c.length>=10) { settled=true; setCache(s,tf,parsed); resolve(parsed); }
+            else if(++failures===fallbacks.length&&!settled){settled=true;resolve(null);}
+          }).catch(()=>{ if(++failures===fallbacks.length&&!settled){settled=true;resolve(null);} });
+        });
+      });
+    }
+
+    // Start ALL MTF fetches NOW (parallel with indicators below)
+    const mtfPromisesEarly = mtfTFs.map((tf,i) => fetchMTFCandles(sym2, tf).then(parsed => ({ id: mtfIds[i], parsed })));
+
+    // Start Fear & Greed NOW too
+    fetchFearGreed();
+
     // ── PASS 1: Quick prediction immediately with just EMA + RSI + MACD ──
-    // Shows a preliminary result right away while full indicators calculate
     runQuickPrediction(price, closes, highs, lows);
 
     const pct=((price-open24)/open24*100);
@@ -1715,56 +1768,20 @@
     stepProgress('indicators','done');
     activeProgress('mtf');
 
-    // ── MTF Confirmation — ALL timeframes fetched in PARALLEL ──
-    // Uses global mtfUrl/mtfParse + working exchange first, falls back through all others
-    const mtfTFs = ['15m','30m','1h','4h','1d','1w','1M'];
-    const mtfIds = ['15m','30m','1h','4h','1d','1w','1M'];
+    // ── MTF results — use already-started promises (kicked off before indicators) ──
     const mtfResults = [];
-
-    // Fetch candles for ONE timeframe — tries working exchange first, then all others
-    async function fetchMTFCandles(sym, tf) {
-      // Build ordered exchange list: working exchange first, then rest, skip indodax
-      const exOrder = ['binance','okx','bybit','mexc','gateio','kucoin'];
-      const ordered = workingExchangeId
-        ? [workingExchangeId, ...exOrder.filter(e=>e!==workingExchangeId)]
-        : exOrder;
-
-      for(const exId of ordered) {
-        const url = mtfUrl(exId, sym, tf);
-        if(!url) continue;
-        try {
-          const raw = await smartFetch(url);
-          const parsed = mtfParse(exId, raw);
-          if(!parsed||parsed.c.length<10) continue; // not enough candles, try next exchange
-          return parsed;
-        } catch(e) { /* try next */ }
-      }
-      return null; // all exchanges failed for this TF
-    }
-
     (async () => {
-      const sym2 = (document.getElementById('symbolInput').value||'BTC').toUpperCase();
-
-      const mtfPromises = mtfTFs.map(async (tf, i) => {
-        const id = mtfIds[i];
-        try {
-          const parsed = await fetchMTFCandles(sym2, tf);
-          if(!parsed) return { id, res: { score: null, sig: 'N/A', color: 'var(--muted)', detail: 'No data for this TF' } };
-
-          // Warn if thin history (e.g. 1W/1M for newer coins)
-          const minNeeded = 55;
-          if(parsed.c.length < minNeeded) {
-            const res = calcMTFScore(parsed.c, parsed.h, parsed.l, parsed.v);
-            res.detail = `⚠️ Only ${parsed.c.length} candles — some indicators skipped`;
-            return { id, res };
-          }
-          return { id, res: calcMTFScore(parsed.c, parsed.h, parsed.l, parsed.v) };
-        } catch(e) {
-          return { id, res: { score: null, sig: 'ERR', color: 'var(--muted)', detail: 'Fetch error' } };
+      const mtfAll = await Promise.all(mtfPromisesEarly.map(async p => {
+        const { id, parsed } = await p;
+        if(!parsed) return { id, res: { score: null, sig: 'N/A', color: 'var(--muted)', detail: 'No data for this TF' } };
+        if(parsed.c.length < 55) {
+          const res = calcMTFScore(parsed.c, parsed.h, parsed.l, parsed.v);
+          res.detail = `⚠️ Only ${parsed.c.length} candles — some indicators skipped`;
+          return { id, res };
         }
-      });
+        return { id, res: calcMTFScore(parsed.c, parsed.h, parsed.l, parsed.v) };
+      }));
 
-      const mtfAll = await Promise.all(mtfPromises);
       mtfAll.forEach(({ id, res }) => {
         mtfResults.push(res);
         const sigEl = document.getElementById(`mtf-${id}-sig`);
@@ -1773,22 +1790,15 @@
         if(sigEl){ sigEl.textContent = res.sig; sigEl.style.color = res.color; }
         if(detEl){ detEl.textContent = res.detail; detEl.style.color = res.score===null?'var(--red)':res.detail.startsWith('⚠️')?'var(--warn)':'var(--muted)'; }
         if(scEl){
-          if(res.score!==null){
-            scEl.textContent = `${res.score}/100`;
-            scEl.style.color = res.score>=70?'var(--green)':res.score>=45?'var(--warn)':'var(--red)';
-          } else {
-            scEl.textContent = 'N/A';
-            scEl.style.color = 'var(--muted)';
-          }
+          if(res.score!==null){ scEl.textContent=`${res.score}/100`; scEl.style.color=res.score>=70?'var(--green)':res.score>=45?'var(--warn)':'var(--red)'; }
+          else { scEl.textContent='N/A'; scEl.style.color='var(--muted)'; }
         }
       });
 
-      // MTF panel score = average of all valid TF scores
       const validScores = mtfResults.filter(r=>r.score!==null).map(r=>r.score);
       const mtfPanelScore = validScores.length>0 ? Math.round(validScores.reduce((a,b)=>a+b,0)/validScores.length) : 50;
       window._mtfScore = mtfPanelScore;
 
-      // Consensus label — based on valid results only
       const buys    = mtfResults.filter(r=>r.color==='var(--green)').length;
       const sells   = mtfResults.filter(r=>r.color==='var(--red)').length;
       const neutral = mtfResults.filter(r=>r.color==='var(--warn)').length;
@@ -1804,11 +1814,11 @@
       else if(sells>buys)                  {consEl.textContent=`🟡 LEANING SELL — ${mtfPanelScore}/100`; consDetail.textContent=`${sells} SELL / ${buys} BUY / ${neutral} NEUTRAL — caution`;}
       else                                 {consEl.textContent=`⬡ MIXED — ${mtfPanelScore}/100`;          consDetail.textContent=`${buys} BUY / ${sells} SELL / ${neutral} NEUTRAL — no consensus`;}
 
-      // Update score breakdown MTF row
       const mtfBkEl = document.getElementById('bkMTF');
       if(mtfBkEl){mtfBkEl.textContent=(valid>0?mtfPanelScore:'—')+'/100'; mtfBkEl.style.color=consColor;}
       stepProgress('mtf','done');
     })();
+
 
     // ── EMA 8, 13, 21, 55 (The Strategy EMAs) ──
     const ema8  = calcEMA(closes, 8);
@@ -2064,8 +2074,7 @@
     // ── Save snapshot for export ──
     saveSnapshot({pair,source,price,tf:currentTF,rsi:rsi?.toFixed(2),macd:macdV?.toFixed(4),ema55:ema55?.toFixed(4),ema200:ema200?.toFixed(4),adx:adxData?.adx?.toFixed(1),atr:atr?.toFixed(4),volR:volR?.toFixed(1),score:overall,strategy:isBUY?'BUY':isSELL?'SELL':'NEUTRAL',prediction:document.getElementById('pred-direction')?.textContent,confidence:document.getElementById('pred-confidence')?.textContent,entry:document.getElementById('pred-entry')?.textContent,sl:document.getElementById('pred-sl')?.textContent,tp1:document.getElementById('pred-tp1')?.textContent,tp2:document.getElementById('pred-tp2')?.textContent});
 
-    // ── Async: Fear & Greed + BTC Correlation (non-blocking) ──
-    fetchFearGreed();
+    // ── Async: BTC Correlation (non-blocking, Fear & Greed already started early) ──
     calcBTCCorrelation(sym, closes);
 
     setStatus(`✓ ${pair} — ${source} via ${_workingProxy?.id||'proxy'} — Price: ${fmtP(price)} | RSI: ${rsi?.toFixed(1)||'—'} | Score: ${overall}/100`,'success');
