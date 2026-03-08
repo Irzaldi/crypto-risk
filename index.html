@@ -1,14 +1,68 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crypto Risk</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Risk Dashboard</title>
+<style>
+body { background: #0a0e27; color: #fff; font-family: Arial; margin: 0; padding: 20px; }
+.container { max-width: 1000px; margin: auto; }
+h1 { text-align: center; color: #00d4ff; }
+input, button { padding: 10px; margin: 5px; border: 1px solid #00d4ff; background: #1a1f3a; color: #fff; border-radius: 5px; }
+button { cursor: pointer; background: #00d4ff; color: #000; font-weight: bold; }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-top: 20px; }
+.card { background: #1a1f3a; padding: 20px; border: 1px solid #00d4ff; border-radius: 8px; text-align: center; }
+.card-label { font-size: 0.9em; opacity: 0.7; }
+.card-value { font-size: 1.5em; font-weight: bold; color: #00ff88; margin-top: 10px; }
+</style>
 </head>
 <body>
-    <script>
-        const WORKER_URL = 'https://crypto-proxy.irzaldi.workers.dev';
-        // Additional logic for using worker URL can go here
-    </script>
+<div class="container">
+  <h1>📡 Live Crypto Risk Dashboard</h1>
+  <input type="text" id="sym" placeholder="Symbol (BTC)" value="BTC">
+  <button onclick="fetch_data()">FETCH DATA</button>
+  
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Price</div>
+      <div class="card-value" id="price">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">24h Change</div>
+      <div class="card-value" id="change">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">24h High</div>
+      <div class="card-value" id="high">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">24h Low</div>
+      <div class="card-value" id="low">—</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORKER = 'https://crypto-proxy.irzaldi.workers.dev';
+
+async function fetch_data() {
+  const sym = document.getElementById('sym').value.toUpperCase();
+  
+  try {
+    const url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`;
+    const worker_url = `${WORKER}/proxy?url=${encodeURIComponent(url)}`;
+    
+    const res = await fetch(worker_url);
+    const data = await res.json();
+    
+    document.getElementById('price').innerText = '$' + (+data.lastPrice).toFixed(2);
+    document.getElementById('change').innerText = (+data.priceChangePercent).toFixed(2) + '%';
+    document.getElementById('high').innerText = '$' + (+data.highPrice).toFixed(2);
+    document.getElementById('low').innerText = '$' + (+data.lowPrice).toFixed(2);
+  } catch(e) {
+    alert('Error: ' + e.message);
+  }
+}
+</script>
 </body>
 </html>
