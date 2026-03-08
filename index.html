@@ -2020,6 +2020,11 @@
 
     const rm=calcRisk();
 
+    // ── Run heavy tasks async — yield to browser between each so UI stays responsive ──
+    function yieldThen(fn) { return new Promise(resolve => setTimeout(() => { fn(); resolve(); }, 0)); }
+
+    // Score runs first (fast — just math on already-computed indicators)
+    await yieldThen(() => {
     activeProgress('score');
     // ── MOMENTUM SCORE (20%) ── RSI, MACD, Stoch RSI, Williams %R, Bollinger %B, Divergence
     let momS=0, momMax=0;
@@ -2113,39 +2118,43 @@
     setChk(7,rm&&rm.riskPct<=2?'pass':rm&&rm.riskPct<=3?'warn':'fail',rm?`Risking ${rm.riskPct}% ${rm.riskPct<=1?'(Conservative ✓)':rm.riskPct<=2?'(Acceptable ✓)':'(Aggressive!)'}` :'—');
 
     stepProgress('score','done');
+    }); // end score yield
+
+    // Prediction — yield so browser can paint score first
+    await yieldThen(() => {
     activeProgress('predict');
-    // ── Run Prediction ──
     runPrediction(price, closes, highs, lows, volumes, atr, rsi, macdV, ema8, ema13, ema21, ema55, ema200, adxData, ichi, stoch, willR, bbP, obvData, isBUY, isSELL, piv, st, div);
     stepProgress('predict','done');
+    }); // end prediction yield
 
-    // ── Candle Patterns ──
+    // ── Candle Patterns + Key Levels + Alerts (fast) ──
     if(opens) detectCandlePatterns(opens, highs, lows, closes);
-
-    // ── Key Levels ──
     detectKeyLevels(price, highs, lows, closes, atr);
-
-    // ── Check Alerts ──
     checkAlerts(price, sym);
 
-    // ── Mini Chart ──
-    const e8s  = calcEMASeries(closes, 8);
-    const e21s = calcEMASeries(closes, 21);
-    const e55s = calcEMASeries(closes, 55);
-    const e200s= calcEMASeries(closes, 200);
-    drawMiniChart(opens||closes, closes, highs, lows, e8s, e21s, e55s, e200s, sym, currentTF);
-    window._lastChartData = {opens:opens||closes,closes,highs,lows,e8:e8s,e21:e21s,e55:e55s,e200:e200s,sym,tf:currentTF};
+    // ── Mini Chart — yield so browser paints prediction first ──
+    yieldThen(() => {
+      const e8s  = calcEMASeries(closes, 8);
+      const e21s = calcEMASeries(closes, 21);
+      const e55s = calcEMASeries(closes, 55);
+      const e200s= calcEMASeries(closes, 200);
+      drawMiniChart(opens||closes, closes, highs, lows, e8s, e21s, e55s, e200s, sym, currentTF);
+      window._lastChartData = {opens:opens||closes,closes,highs,lows,e8:e8s,e21:e21s,e55:e55s,e200:e200s,sym,tf:currentTF};
+    });
 
-    // ── Backtest ──
-    runBacktest(closes, highs, lows);
+    // ── Backtest — yield separately so chart renders first ──
+    yieldThen(() => { runBacktest(closes, highs, lows); });
 
-    // ── Volume Profile ──
-    buildVolumeProfile(closes, highs, lows, volumes);
+    // ── Volume Profile — yield separately ──
+    yieldThen(() => { buildVolumeProfile(closes, highs, lows, volumes); });
 
-    // ── R:R Ladder — read from prediction panel ──
-    const slVal  = parseFloat(document.getElementById('pred-sl')?.textContent?.replace(/[$,]/g,'')||'0');
-    const tp1Val = parseFloat(document.getElementById('pred-tp1')?.textContent?.replace(/[$,]/g,'')||'0');
-    const tp2Val = parseFloat(document.getElementById('pred-tp2')?.textContent?.replace(/[$,]/g,'')||'0');
-    if(slVal&&tp1Val) renderRRLadder(price, slVal, tp1Val, tp2Val, isBUY||(!isSELL));
+    // ── R:R Ladder ──
+    yieldThen(() => {
+      const slVal  = parseFloat(document.getElementById('pred-sl')?.textContent?.replace(/[$,]/g,'')||'0');
+      const tp1Val = parseFloat(document.getElementById('pred-tp1')?.textContent?.replace(/[$,]/g,'')||'0');
+      const tp2Val = parseFloat(document.getElementById('pred-tp2')?.textContent?.replace(/[$,]/g,'')||'0');
+      if(slVal&&tp1Val) renderRRLadder(price, slVal, tp1Val, tp2Val, isBUY||(!isSELL));
+    });
 
     // ── Session P&L ──
     updateSessionPnL();
