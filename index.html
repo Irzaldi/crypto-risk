@@ -304,6 +304,374 @@
     .settings-grid { grid-template-columns:1fr; }
     .score-section { grid-template-columns:1fr; justify-items:center; }
   }
+
+  /* ══════════════════════════════════════════════
+     MOBILE APP REDESIGN — max-width: 480px
+     ══════════════════════════════════════════════ */
+  @media(max-width:480px){
+    /* ── Base ── */
+    body { overflow-x:hidden; }
+    .wrap {
+      padding: 0 0 80px 0;
+      max-width: 100vw;
+    }
+
+    /* ── Sticky Mobile Header ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(3,7,13,0.97);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+      padding: 10px 14px;
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+    .logo-box { width:36px; height:36px; font-size:17px; flex-shrink:0; }
+    h1 { font-size:.78rem; letter-spacing:1.5px; }
+    .tagline { display:none; }
+    .source-badge { padding:4px 8px; font-size:.52rem; letter-spacing:1px; }
+    .theme-btn { display:none; }
+
+    /* ── Bottom Navigation Bar ── */
+    .mobile-nav {
+      display: flex;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 200;
+      background: rgba(6,12,20,0.98);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-top: 1px solid var(--border);
+      height: 64px;
+    }
+    .mobile-nav-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: .46rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all .2s;
+      padding: 8px 4px;
+      position: relative;
+    }
+    .mobile-nav-btn .nav-icon { font-size: 1.2rem; line-height:1; }
+    .mobile-nav-btn.active { color: var(--accent); }
+    .mobile-nav-btn.active::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 15%; right: 15%;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 0 0 3px 3px;
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .mobile-nav-btn .nav-badge {
+      position: absolute;
+      top: 6px; right: calc(50% - 16px);
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--green);
+      display: none;
+    }
+    .mobile-nav-btn .nav-badge.show { display:block; }
+
+    /* ── Tab Pages ── */
+    .mobile-page {
+      display: none;
+      padding: 12px 12px 0;
+      animation: pageIn .2s ease;
+    }
+    .mobile-page.active { display: block; }
+    @keyframes pageIn {
+      from { opacity:0; transform:translateY(6px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    /* ── Floating Fetch Button ── */
+    .mobile-fetch-fab {
+      position: fixed;
+      bottom: 76px;
+      right: 14px;
+      z-index: 150;
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      background: linear-gradient(135deg,rgba(0,229,255,.25),rgba(0,229,255,.1));
+      border: 1.5px solid var(--accent);
+      color: var(--accent);
+      font-size: 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(0,229,255,.3);
+      cursor: pointer;
+      transition: all .2s;
+      animation: fabPulse 2.5s ease-in-out infinite;
+    }
+    .mobile-fetch-fab:active { transform:scale(.93); }
+    @keyframes fabPulse {
+      0%,100% { box-shadow:0 0 20px rgba(0,229,255,.3); }
+      50%      { box-shadow:0 0 30px rgba(0,229,255,.6); }
+    }
+
+    /* ── Collapsible Section ── */
+    .mob-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .mob-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      cursor: pointer;
+      user-select: none;
+      gap: 8px;
+    }
+    .mob-section-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: .6rem;
+      color: var(--accent);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .mob-section-chevron {
+      font-size: .7rem;
+      color: var(--muted);
+      transition: transform .25s;
+      flex-shrink: 0;
+    }
+    .mob-section.open .mob-section-chevron { transform: rotate(180deg); }
+    .mob-section-body {
+      display: none;
+      padding: 0 12px 12px;
+      border-top: 1px solid var(--border);
+    }
+    .mob-section.open .mob-section-body { display: block; }
+
+    /* ── Hide desktop-only elements ── */
+    .conn-grid,
+    .ticker-strip,
+    .search-row,
+    .pairs,
+    .tf-row,
+    .refresh-row,
+    .status-bar,
+    .progress-wrap,
+    .progress-steps { display: none !important; }
+
+    /* ── Mobile Search Bar (in home tab) ── */
+    .mob-search-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      align-items: center;
+    }
+    .mob-search-input {
+      flex: 1;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--accent);
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-family: 'Orbitron', monospace;
+      font-size: .9rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      outline: none;
+    }
+    .mob-search-input:focus { border-color: var(--accent); }
+
+    /* ── Mobile TF Pills ── */
+    .mob-tf-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .mob-tf-row::-webkit-scrollbar { display:none; }
+
+    /* ── Price Cards — 2×2 grid ── */
+    .price-row {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr !important;
+      gap: 8px !important;
+      margin-bottom: 10px !important;
+    }
+    .pcard { padding: 12px; }
+    .pcard-value { font-size: .85rem; }
+
+    /* ── Market cards — 3 across ── */
+    .mkt-grid {
+      grid-template-columns: repeat(3,1fr) !important;
+      gap: 6px !important;
+      margin-bottom: 10px !important;
+    }
+    .mkt-card { padding: 8px 6px; min-height: 60px; }
+    .mkt-price { font-size:.66rem; }
+    .mkt-sym { font-size:.48rem; }
+    .mkt-chg { font-size:.5rem; }
+
+    /* ── Session P&L strip — scrollable ── */
+    .pnl-strip {
+      gap: 12px;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .pnl-strip::-webkit-scrollbar { display:none; }
+    .pnl-stat-v { font-size:.78rem; }
+
+    /* ── Pairs — scrollable row ── */
+    .mob-pairs-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .mob-pairs-row::-webkit-scrollbar { display:none; }
+    .mob-pairs-row .pair-btn { flex-shrink:0; }
+
+    /* ── Status bar in mobile ── */
+    .mob-status {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: .58rem;
+      color: var(--muted);
+      padding: 6px 10px;
+      background: rgba(0,0,0,.3);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      min-height: 28px;
+      display: flex; align-items:center; gap:6px;
+    }
+    .mob-progress {
+      height: 2px;
+      background: rgba(255,255,255,.05);
+      border-radius: 2px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+    .mob-progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg,var(--accent),var(--green));
+      transition: width .3s ease;
+    }
+
+    /* ── All grids → single column ── */
+    .main-grid,
+    .bottom-grid,
+    .vwap-grid,
+    .mtf-grid,
+    .pattern-grid {
+      grid-template-columns: 1fr !important;
+      gap: 10px !important;
+    }
+
+    /* ── Backtest/VP/RR trio → stacked ── */
+    .trio-grid {
+      display: grid !important;
+      grid-template-columns: 1fr !important;
+      gap: 10px !important;
+    }
+
+    /* ── Chart ── */
+    .chart-wrap { height: 200px !important; }
+
+    /* ── Strategy panel inner grids ── */
+    .tl-inner-grid {
+      grid-template-columns: 1fr !important;
+    }
+    .tl-rules-grid {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* ── Ichimoku 5-col → 2-col ── */
+    .ichi-grid {
+      grid-template-columns: 1fr 1fr !important;
+    }
+
+    /* ── Score section ── */
+    .score-section {
+      grid-template-columns: 1fr !important;
+      justify-items: center !important;
+    }
+
+    /* ── Settings ── */
+    .settings-grid { grid-template-columns: 1fr !important; }
+
+    /* ── Watchlist grid ── */
+    .wl-grid { grid-template-columns: 1fr 1fr !important; }
+
+    /* ── Panel padding ── */
+    .panel { padding: 12px !important; }
+    .ptitle { font-size: .56rem !important; }
+
+    /* ── Indicator tabs — scrollable ── */
+    .ind-tabs {
+      overflow-x: auto;
+      flex-wrap: nowrap !important;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding-bottom: 4px;
+    }
+    .ind-tabs::-webkit-scrollbar { display:none; }
+    .ind-tab { flex-shrink: 0; }
+
+    /* ── MTF grid ── */
+    .mtf-grid { grid-template-columns: 1fr 1fr !important; }
+
+    /* ── Prediction panel text ── */
+    #predPanel { font-size: .85rem !important; }
+
+    /* ── Fear & Greed ── */
+    .fg-ring-wrap { flex-direction: column; align-items: center; }
+
+    /* ── Journal table — scrollable ── */
+    #journalList { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tj-row { min-width: 500px; }
+
+    /* ── Touch feedback ── */
+    .pair-btn:active, .tf-btn:active, .ind-tab:active,
+    .mob-section-header:active { opacity: .7; }
+
+    /* ── Auto-refresh row in mobile ── */
+    .mob-auto-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 0;
+      margin-bottom: 6px;
+    }
+  }
 </style>
 <!-- Vercel Web Analytics -->
 <script defer src="/_vercel/insights/script.js"></script>
@@ -3305,7 +3673,336 @@
   // Redraw chart on resize
   let _resizeTimer;
   window.addEventListener('resize', ()=>{ clearTimeout(_resizeTimer); _resizeTimer=setTimeout(()=>{ if(window._lastChartData){ const d=window._lastChartData; drawMiniChart(d.opens,d.closes,d.highs,d.lows,d.e8,d.e21,d.e55,d.e200,d.sym,d.tf); } },200); });
-</script>
+
+  // ══════════════════════════════════════════
+  // MOBILE APP LOGIC
+  // ══════════════════════════════════════════
+  const IS_MOBILE = () => window.innerWidth <= 480;
+
+  function initMobile() {
+    if (!IS_MOBILE()) return;
+
+    // Show mobile nav + FAB
+    document.getElementById('mobileNav').style.display = 'flex';
+    document.getElementById('mobileFab').style.display = 'flex';
+
+    // Build mobile tab pages if not already built
+    if (document.getElementById('mob-page-home')) return;
+    buildMobileLayout();
+    mobNav('home');
+  }
+
+  function buildMobileLayout() {
+    const wrap = document.querySelector('.wrap');
+
+    // ── Tab container ──
+    const tabContainer = document.createElement('div');
+    tabContainer.id = 'mob-tabs';
+
+    function makeTab(id, active) {
+      const t = document.createElement('div');
+      t.id = 'mob-page-' + id;
+      t.className = 'mobile-page' + (active ? ' active' : '');
+      return t;
+    }
+
+    const homeTab     = makeTab('home', true);
+    const analysisTab = makeTab('analysis', false);
+    const scoreTab    = makeTab('score', false);
+    const journalTab  = makeTab('journal', false);
+    const moreTab     = makeTab('more', false);
+
+    // ════ HOME TAB — search, TF, pairs, status, market overview, price cards, session P&L ════
+    homeTab.innerHTML = `
+      <div class="mob-search-row">
+        <input class="mob-search-input" placeholder="BTC, ETH, SOL..." aria-label="Symbol search"
+          value="${document.getElementById('symbolInput').value}"
+          maxlength="12"
+          oninput="document.getElementById('symbolInput').value=this.value"
+          onkeydown="if(event.key==='Enter'){document.getElementById('symbolInput').value=this.value;fetchData()}">
+      </div>
+      <div class="mob-tf-row" id="mob-tf-row"></div>
+      <div class="mob-pairs-row" id="mob-pairs-row"></div>
+      <div class="mob-auto-row">
+        <label class="auto-label" style="font-size:.58rem">
+          <input type="checkbox" id="mob-autoRefresh" onchange="document.getElementById('autoRefresh').checked=this.checked;toggleAuto()">
+          AUTO-REFRESH
+        </label>
+        <span class="countdown" id="mob-countdown"></span>
+      </div>
+      <div class="mob-status" id="mob-statusBar">⬡ Ready — tap ⚡ to fetch</div>
+      <div class="mob-progress"><div class="mob-progress-bar" id="mob-progressBar"></div></div>`;
+
+    // TF buttons
+    const mobTfRow = homeTab.querySelector('#mob-tf-row');
+    document.querySelectorAll('.tf-btn').forEach(btn => {
+      const cl = btn.cloneNode(true);
+      const tf = (btn.getAttribute('onclick')||'').match(/'([^']+)'/)?.[1];
+      if(tf) cl.onclick = () => {
+        setTF(tf, btn);
+        document.querySelectorAll('#mob-tf-row .tf-btn, .tf-row .tf-btn').forEach(b=>b.classList.remove('active'));
+        cl.classList.add('active'); btn.classList.add('active');
+      };
+      if(btn.classList.contains('active')) cl.classList.add('active');
+      mobTfRow.appendChild(cl);
+    });
+
+    // Pairs
+    const mobPairsRow = homeTab.querySelector('#mob-pairs-row');
+    document.querySelectorAll('.pairs .pair-btn').forEach(btn => {
+      const cl = btn.cloneNode(true);
+      cl.setAttribute('onclick', btn.getAttribute('onclick'));
+      if(btn.classList.contains('active')) cl.classList.add('active');
+      mobPairsRow.appendChild(cl);
+    });
+
+    // Move market grid into home
+    const mktGridEl = wrap.querySelector('.mkt-grid');
+    if(mktGridEl) {
+      const lbl = document.createElement('div');
+      lbl.style.cssText = "font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin:8px 0 6px";
+      lbl.textContent = '📈 MARKET OVERVIEW';
+      homeTab.appendChild(lbl);
+      homeTab.appendChild(mktGridEl); // MOVE (not clone)
+    }
+
+    // Move price row into home
+    const priceRowEl = wrap.querySelector('.price-row');
+    if(priceRowEl) {
+      const sec = makeMobSection('💵 PRICE', true);
+      sec.body.appendChild(priceRowEl); // MOVE
+      homeTab.appendChild(sec.wrap);
+    }
+
+    // Move session P&L panel into home
+    const pnlPanelEl = wrap.querySelector('.pnl-strip')?.closest('.panel');
+    if(pnlPanelEl) {
+      const sec = makeMobSection('📊 SESSION P&L', false);
+      sec.body.appendChild(pnlPanelEl); // MOVE
+      homeTab.appendChild(sec.wrap);
+    }
+
+    // ════ ANALYSIS TAB ════
+    const chartPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#miniChart'));
+    if(chartPanelEl) analysisTab.appendChild(chartPanelEl); // MOVE — canvas stays live
+
+    const mainGridEl = wrap.querySelector('.main-grid');
+    if(mainGridEl) {
+      const sec = makeMobSection('📡 INDICATORS', true);
+      sec.body.appendChild(mainGridEl); // MOVE
+      analysisTab.appendChild(sec.wrap);
+    }
+
+    const tlPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.textContent.includes('TradingLab Strategy'));
+    if(tlPanelEl) {
+      const sec = makeMobSection('🎓 TRADINGLAB STRATEGY', true);
+      sec.body.appendChild(tlPanelEl); // MOVE
+      analysisTab.appendChild(sec.wrap);
+    }
+
+    const mtfPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#mtfPanel'));
+    if(mtfPanelEl) {
+      const sec = makeMobSection('🌐 MULTI-TIMEFRAME', false);
+      sec.body.appendChild(mtfPanelEl); // MOVE
+      analysisTab.appendChild(sec.wrap);
+    }
+
+    const ichiPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.textContent.includes('Ichimoku'));
+    if(ichiPanelEl) {
+      const sec = makeMobSection('☁️ ICHIMOKU', false);
+      sec.body.appendChild(ichiPanelEl); // MOVE
+      analysisTab.appendChild(sec.wrap);
+    }
+
+    // Backtest/VP/RR trio
+    const trioEl = wrap.querySelector('[style*="grid-template-columns:1fr 1fr 1fr"]');
+    if(trioEl) {
+      const sec = makeMobSection('🔬 BACKTEST & RISK', false);
+      trioEl.style.cssText = 'display:grid;grid-template-columns:1fr;gap:10px';
+      sec.body.appendChild(trioEl); // MOVE
+      analysisTab.appendChild(sec.wrap);
+    }
+
+    const bottomGridEl = wrap.querySelector('.bottom-grid');
+    if(bottomGridEl) {
+      const sec = makeMobSection('🕯️ KEY LEVELS & PATTERNS', false);
+      bottomGridEl.style.gridTemplateColumns = '1fr';
+      sec.body.appendChild(bottomGridEl); // MOVE
+      analysisTab.appendChild(sec.wrap);
+    }
+
+    // ════ SCORE TAB ════
+    const scorePanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#scoreRing'));
+    if(scorePanelEl) scoreTab.appendChild(scorePanelEl); // MOVE
+
+    const predPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#predPanel'));
+    if(predPanelEl) {
+      const sec = makeMobSection('🤖 AI PREDICTION', true);
+      sec.body.appendChild(predPanelEl); // MOVE
+      scoreTab.appendChild(sec.wrap);
+    }
+
+    const riskPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#rmAccount'));
+    if(riskPanelEl) {
+      const sec = makeMobSection('⚖️ RISK MANAGER', false);
+      sec.body.appendChild(riskPanelEl); // MOVE — sliders now work!
+      scoreTab.appendChild(sec.wrap);
+    }
+
+    const fgPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#fgRing'));
+    if(fgPanelEl) {
+      const sec = makeMobSection('😱 FEAR & GREED', false);
+      sec.body.appendChild(fgPanelEl); // MOVE
+      scoreTab.appendChild(sec.wrap);
+    }
+
+    // ════ JOURNAL TAB ════
+    const wlPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#wlGrid'));
+    if(wlPanelEl) {
+      const sec = makeMobSection('⭐ WATCHLIST', true);
+      sec.body.appendChild(wlPanelEl); // MOVE
+      journalTab.appendChild(sec.wrap);
+    }
+
+    const alertPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#alertList'));
+    if(alertPanelEl) {
+      const sec = makeMobSection('🔔 PRICE ALERTS', false);
+      sec.body.appendChild(alertPanelEl); // MOVE
+      journalTab.appendChild(sec.wrap);
+    }
+
+    const journalPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#journalList'));
+    if(journalPanelEl) {
+      const sec = makeMobSection('📓 TRADE JOURNAL', true);
+      journalPanelEl.style.overflowX = 'auto';
+      sec.body.appendChild(journalPanelEl); // MOVE
+      journalTab.appendChild(sec.wrap);
+    }
+
+    // ════ MORE TAB ════
+    const settingsPanelEl = document.getElementById('settingsPanel');
+    if(settingsPanelEl) {
+      settingsPanelEl.style.display = 'block'; // was hidden
+      const sec = makeMobSection('⚙️ SETTINGS', true);
+      sec.body.appendChild(settingsPanelEl); // MOVE
+      moreTab.appendChild(sec.wrap);
+    }
+
+    const connGridEl = wrap.querySelector('.conn-grid');
+    if(connGridEl) {
+      const sec = makeMobSection('🔀 CONNECTION STATUS', false);
+      sec.body.appendChild(connGridEl); // MOVE
+      moreTab.appendChild(sec.wrap);
+    }
+
+    const aboutDiv = document.createElement('div');
+    aboutDiv.style.cssText = "font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);padding:16px;text-align:center;line-height:2.2";
+    aboutDiv.innerHTML = `Live Crypto Risk System v4<br>Indonesia Ready ✓<br><span style="color:var(--accent)">crypto-risk.vercel.app</span>`;
+    moreTab.appendChild(aboutDiv);
+
+    // ── Assemble ──
+    tabContainer.appendChild(homeTab);
+    tabContainer.appendChild(analysisTab);
+    tabContainer.appendChild(scoreTab);
+    tabContainer.appendChild(journalTab);
+    tabContainer.appendChild(moreTab);
+    wrap.appendChild(tabContainer);
+
+    syncMobStatus();
+  }
+
+  function makeMobSection(title, open=false) {
+    const wrap = document.createElement('div');
+    wrap.className = 'mob-section' + (open ? ' open' : '');
+    wrap.innerHTML = `
+      <div class="mob-section-header" onclick="this.parentElement.classList.toggle('open')">
+        <span class="mob-section-title">${title}</span>
+        <span class="mob-section-chevron">▼</span>
+      </div>
+      <div class="mob-section-body"></div>
+    `;
+    return { wrap, body: wrap.querySelector('.mob-section-body') };
+  }
+
+  function syncMobStatus() {
+    // Mirror the desktop status bar to mobile status bar
+    const desktopStatus = document.getElementById('statusBar');
+    const mobStatus     = document.getElementById('mob-statusBar');
+    const desktopProg   = document.getElementById('progressBar');
+    const mobProg       = document.getElementById('mob-progressBar');
+    const desktopCount  = document.getElementById('countdown');
+    const mobCount      = document.getElementById('mob-countdown');
+    if (!desktopStatus || !mobStatus) return;
+
+    const statusObs = new MutationObserver(() => {
+      mobStatus.textContent = desktopStatus.textContent;
+      mobStatus.style.color = desktopStatus.classList.contains('success') ? 'var(--green)' :
+                              desktopStatus.classList.contains('error')   ? 'var(--red)'   :
+                              desktopStatus.classList.contains('loading') ? 'var(--warn)'  : 'var(--muted)';
+    });
+    statusObs.observe(desktopStatus, { childList:true, characterData:true, subtree:true });
+
+    const progObs = new MutationObserver(() => {
+      if(mobProg) mobProg.style.width = desktopProg.style.width;
+    });
+    if(desktopProg) progObs.observe(desktopProg, { attributes:true, attributeFilter:['style'] });
+
+    const countObs = new MutationObserver(() => {
+      if(mobCount) mobCount.textContent = desktopCount.textContent;
+    });
+    if(desktopCount) countObs.observe(desktopCount, { childList:true, characterData:true, subtree:true });
+  }
+
+  function mobNav(tab) {
+    if (!IS_MOBILE()) return;
+    // Update nav buttons
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    const activeBtn = document.getElementById('mnav-' + tab);
+    if(activeBtn) activeBtn.classList.add('active');
+    // Show/hide pages
+    document.querySelectorAll('.mobile-page').forEach(p => p.classList.remove('active'));
+    const activePage = document.getElementById('mob-page-' + tab);
+    if(activePage) activePage.classList.add('active');
+    // Scroll to top
+    window.scrollTo(0, 0);
+    // Redraw chart if switching to analysis
+    if(tab==='analysis' && window._lastChartData) {
+      setTimeout(()=>{
+        const d=window._lastChartData;
+        drawMiniChart(d.opens,d.closes,d.highs,d.lows,d.e8,d.e21,d.e55,d.e200,d.sym,d.tf);
+      },100);
+    }
+  }
+
+  // Init on load and on resize
+  window.addEventListener('load', initMobile);
+  window.addEventListener('resize', ()=>{
+    clearTimeout(window._mobileResizeTimer);
+    window._mobileResizeTimer = setTimeout(initMobile, 200);
+  });
+</script><!-- ══ MOBILE BOTTOM NAV ══ -->
+<nav class="mobile-nav" id="mobileNav" style="display:none">
+  <button class="mobile-nav-btn active" id="mnav-home"   onclick="mobNav('home')"    aria-label="Home">
+    <span class="nav-icon">🏠</span><span>HOME</span>
+    <span class="nav-badge show" id="mnav-home-badge"></span>
+  </button>
+  <button class="mobile-nav-btn" id="mnav-analysis" onclick="mobNav('analysis')" aria-label="Analysis">
+    <span class="nav-icon">📊</span><span>ANALYSIS</span>
+  </button>
+  <button class="mobile-nav-btn" id="mnav-score"    onclick="mobNav('score')"    aria-label="Score">
+    <span class="nav-icon">🎯</span><span>SCORE</span>
+  </button>
+  <button class="mobile-nav-btn" id="mnav-journal"  onclick="mobNav('journal')"  aria-label="Journal">
+    <span class="nav-icon">📓</span><span>JOURNAL</span>
+  </button>
+  <button class="mobile-nav-btn" id="mnav-more"     onclick="mobNav('more')"     aria-label="More">
+    <span class="nav-icon">⚙️</span><span>MORE</span>
+  </button>
+</nav>
+
+<!-- ══ FAB FETCH BUTTON (mobile only) ══ -->
+<button class="mobile-fetch-fab" id="mobileFab" style="display:none" onclick="fetchData()" aria-label="Fetch live data">⚡</button>
+
 </main>
 </body>
 </html>
