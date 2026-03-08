@@ -969,35 +969,68 @@
   // ─── SET YOUR WORKER URL HERE after deploying ───────
   // Leave as null to use CORS proxy fallback (current behaviour)
   // After deploying, replace with: 'https://crypto-proxy.YOUR-NAME.workers.dev'
-  const WORKER_URL = 'https://crypto-proxy.irzaldi.workers.dev';
-  // ────────────────────────────────────────────────────
-
+  // ── 3 Cloudflare Workers — raced simultaneously, fastest wins ──
+  const WORKERS = [
+    'https://crypto-proxy.irzaldi.workers.dev',
+    'https://crypto-proxy2.irzaldi.workers.dev',
+    'https://crypto-proxy3.irzaldi.workers.dev',
+  ];
+  const WORKER_URL = WORKERS[0]; // used for batch fallback reference
   let _workerFailed = false;
+  let _bestWorker = null; // cache the fastest worker
 
-  // Single fetch via Worker
+  // Race all 3 workers — first to respond wins and gets cached
   async function workerFetch(url) {
-    const res = await fetch(`${WORKER_URL}/proxy?url=${encodeURIComponent(url)}`, {
-      signal: AbortSignal.timeout(8000),
+    // If we know the fastest worker, try it first
+    if(_bestWorker) {
+      try {
+        const res = await fetch(`${_bestWorker}/proxy?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(5000) });
+        if(res.ok) return JSON.parse(await res.text());
+      } catch(e) { _bestWorker = null; }
+    }
+    // Race all workers
+    return new Promise((resolve, reject) => {
+      let settled = false, failures = 0;
+      WORKERS.forEach(w => {
+        fetch(`${w}/proxy?url=${encodeURIComponent(url)}`, { signal: AbortSignal.timeout(8000) })
+          .then(async res => {
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = JSON.parse(await res.text());
+            if(!settled) { settled = true; _bestWorker = w; resolve(data); }
+          })
+          .catch(() => { if(++failures === WORKERS.length && !settled) { settled = true; reject(new Error('All workers failed')); } });
+      });
     });
-    if(!res.ok) throw new Error(`Worker HTTP ${res.status}`);
-    return JSON.parse(await res.text());
   }
 
-  // Batch fetch via Worker — sends ALL urls in ONE request, Worker fetches them in parallel
-  // Returns array of parsed JSON results (null for failed ones)
+  // Batch fetch — races all 3 workers, uses fastest one
   async function workerBatch(urls) {
-    const res = await fetch(`${WORKER_URL}/batch`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if(!res.ok) throw new Error(`Batch HTTP ${res.status}`);
-    const data = await res.json();
-    // Return array in same order as input urls
-    return data.results.map(r => {
-      if(r.error || !r.text) return null;
-      try { return JSON.parse(r.text); } catch(e) { return null; }
+    const body = JSON.stringify({ urls });
+    // Try best worker first
+    if(_bestWorker) {
+      try {
+        const res = await fetch(`${_bestWorker}/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body, signal: AbortSignal.timeout(12000) });
+        if(res.ok) {
+          const data = await res.json();
+          return data.results.map(r => { if(r.error||!r.text) return null; try{return JSON.parse(r.text);}catch(e){return null;} });
+        }
+      } catch(e) { _bestWorker = null; }
+    }
+    // Race all workers for batch
+    return new Promise((resolve, reject) => {
+      let settled = false, failures = 0;
+      WORKERS.forEach(w => {
+        fetch(`${w}/batch`, { method:'POST', headers:{'Content-Type':'application/json'}, body, signal: AbortSignal.timeout(12000) })
+          .then(async res => {
+            if(!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            if(!settled) {
+              settled = true; _bestWorker = w;
+              resolve(data.results.map(r => { if(r.error||!r.text) return null; try{return JSON.parse(r.text);}catch(e){return null;} }));
+            }
+          })
+          .catch(() => { if(++failures === WORKERS.length && !settled) { settled = true; reject(new Error('All workers failed')); } });
+      });
     });
   }
 
