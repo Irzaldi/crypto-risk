@@ -968,17 +968,33 @@
   const WORKER_URL = 'https://crypto-proxy.irzaldi.workers.dev';
   // ────────────────────────────────────────────────────
 
-  let _workerFailed = false; // if worker fails, fall back for this session
+  let _workerFailed = false;
 
-  // Fetch via your Cloudflare Worker — direct, ~200-400ms
+  // Single fetch via Worker
   async function workerFetch(url) {
-    const workerUrl = `${WORKER_URL}/proxy?url=${encodeURIComponent(url)}`;
-    const res = await fetch(workerUrl, {
+    const res = await fetch(`${WORKER_URL}/proxy?url=${encodeURIComponent(url)}`, {
       signal: AbortSignal.timeout(8000),
     });
     if(!res.ok) throw new Error(`Worker HTTP ${res.status}`);
-    const text = await res.text();
-    return JSON.parse(text);
+    return JSON.parse(await res.text());
+  }
+
+  // Batch fetch via Worker — sends ALL urls in ONE request, Worker fetches them in parallel
+  // Returns array of parsed JSON results (null for failed ones)
+  async function workerBatch(urls) {
+    const res = await fetch(`${WORKER_URL}/batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if(!res.ok) throw new Error(`Batch HTTP ${res.status}`);
+    const data = await res.json();
+    // Return array in same order as input urls
+    return data.results.map(r => {
+      if(r.error || !r.text) return null;
+      try { return JSON.parse(r.text); } catch(e) { return null; }
+    });
   }
 
   // ── Fallback: 8 CORS Proxies (used when Worker not deployed) ──
@@ -1578,7 +1594,33 @@
     }
 
     // Start ALL MTF fetches NOW (parallel with indicators below)
-    const mtfPromisesEarly = mtfTFs.map((tf,i) => fetchMTFCandles(sym2, tf).then(parsed => ({ id: mtfIds[i], parsed })));
+    // If Worker available: ONE batch request fetches all 7 TFs simultaneously server-side
+    // Fallback: 7 parallel individual requests via CORS proxies
+    let mtfPromisesEarly;
+    if(WORKER_URL && !_workerFailed) {
+      // Build all 7 URLs for the working exchange
+      const exId = workingExchangeId || 'binance';
+      const batchUrls = mtfTFs.map(tf => mtfUrl(exId, sym2, tf)).filter(Boolean);
+      mtfPromisesEarly = (async () => {
+        try {
+          const batchResults = await workerBatch(batchUrls);
+          return mtfTFs.map((tf, i) => {
+            const raw = batchResults[i];
+            if(!raw) return { id: mtfIds[i], parsed: null };
+            try {
+              const parsed = mtfParse(exId, raw);
+              if(parsed && parsed.c.length >= 10) { setCache(sym2, tf, parsed); }
+              return { id: mtfIds[i], parsed: parsed && parsed.c.length >= 10 ? parsed : null };
+            } catch(e) { return { id: mtfIds[i], parsed: null }; }
+          });
+        } catch(e) {
+          // Batch failed — fall back to individual fetches
+          return Promise.all(mtfTFs.map((tf, i) => fetchMTFCandles(sym2, tf).then(parsed => ({ id: mtfIds[i], parsed }))));
+        }
+      })();
+    } else {
+      mtfPromisesEarly = Promise.all(mtfTFs.map((tf, i) => fetchMTFCandles(sym2, tf).then(parsed => ({ id: mtfIds[i], parsed }))));
+    }
 
     // Start Fear & Greed NOW too
     fetchFearGreed();
@@ -1771,8 +1813,8 @@
     // ── MTF results — use already-started promises (kicked off before indicators) ──
     const mtfResults = [];
     (async () => {
-      const mtfAll = await Promise.all(mtfPromisesEarly.map(async p => {
-        const { id, parsed } = await p;
+      const earlyData = await mtfPromisesEarly;
+      const mtfAll = await Promise.all(earlyData.map(async ({ id, parsed }) => {
         if(!parsed) return { id, res: { score: null, sig: 'N/A', color: 'var(--muted)', detail: 'No data for this TF' } };
         if(parsed.c.length < 55) {
           const res = calcMTFScore(parsed.c, parsed.h, parsed.l, parsed.v);
