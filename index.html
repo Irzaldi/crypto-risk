@@ -6,54 +6,61 @@
     <title>Live Crypto Risk System — Optimized</title>
     
     <link rel="preconnect" href="https://api.binance.com">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-
+    
     <style>
-        /* PASTE ALL YOUR ORIGINAL CSS HERE */
-        /* I have optimized the font loading to prevent the "jumpy" screen */
-        body { font-family: 'Rajdhani', sans-serif; display: block; } 
+        /* PASTE YOUR ENTIRE <style> SECTION FROM THE ORIGINAL FILE HERE */
+        /* Ensure you include the :root variables and body styles */
     </style>
 </head>
 <body>
     <script>
-    /* ─── THE NEW OPTIMIZED ENGINE ─── */
+    /* ─── OPTIMIZED PERFORMANCE ENGINE ─── */
     
-    // Fix 1: Racing Parallel Fetch (Instant Data)
+    // FASTEST DATA FETCHING (RACING MIRRORS)
     async function smartFetch(url) {
-        const mirrors = [
-            url.replace('api.binance.com', 'api.binance.com'),
+        // We try all 3 Binance API endpoints at the same time
+        const targets = [
+            url,
             url.replace('api.binance.com', 'api1.binance.com'),
             url.replace('api.binance.com', 'api3.binance.com')
         ];
         try {
-            return await Promise.any(mirrors.map(u => 
+            // Promise.any takes the fastest response and ignores the slow/broken ones
+            return await Promise.any(targets.map(u => 
                 fetch(u).then(r => r.ok ? r.json() : Promise.reject())
             ));
         } catch (e) { return null; }
     }
 
-    // Fix 2: RequestAnimationFrame (Smooth Charts)
-    let _drawPending = false;
-    function requestChartDraw(data) {
-        if (_drawPending) return;
-        _drawPending = true;
+    // SMOOTH CHART RENDERING
+    function optimizedDraw(data) {
+        // Prevents the browser from lagging during window resize or fast updates
         requestAnimationFrame(() => {
-            drawMiniChart(data); // Call your original draw function
-            _drawPending = false;
+            if (typeof drawMiniChart === 'function') {
+                drawMiniChart(data); 
+            }
         });
     }
 
-    // Fix 3: Non-Blocking Analysis
-    // Instead of doing math instantly, we wait 100ms for the UI to finish rendering
-    function dispatchAnalysis(data) {
-        setTimeout(() => {
-            // Your original heavy math (RSI, EMA, etc.)
-            runAnalysis(data); 
-        }, 100);
+    /* 3. PASTE ALL YOUR ORIGINAL JAVASCRIPT FUNCTIONS BELOW THIS LINE */
+    /* Make sure you keep functions like: 
+       - calcEMA, calcRSI
+       - updateSignalsUI
+       - initMobile 
+    */
+    
+    // IMPORTANT: Update your existing fetchData function to use the new smartFetch
+    async function fetchData(sym, tf) {
+        const symbol = sym || document.getElementById('pairInput').value.toUpperCase();
+        const interval = tf || '1h';
+        const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=500`;
+        
+        const data = await smartFetch(url); // Using the new racing fetcher
+        if (!data) return;
+        
+        // Run your existing analysis logic here...
+        optimizedDraw(data);
     }
-
-    /* PASTE ALL YOUR ORIGINAL JAVASCRIPT FUNCTIONS BELOW THIS LINE */
-    /* (All 3000+ lines of indicators and logic) */
     </script>
 </body>
 </html>
