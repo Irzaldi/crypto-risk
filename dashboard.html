@@ -1,65 +1,27 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Crypto Risk Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f4f4f4;
-        }
-        .container {
-            max-width: 1200px;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            text-align: center;
-        }
-        /* Additional styles for dashboard elements */
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Live Crypto Risk Dashboard</h1>
-        <!-- Trading indicators, charts and risk management features would go here -->
-        <div id="chart-container">
-            <canvas id="cryptoChart"></canvas>
-        </div>
-        <script>
-            const ctx = document.getElementById('cryptoChart').getContext('2d');
-            const myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: ['January', 'February', 'March', 'April', 'May', 'June'],
-                    datasets: [{
-                        label: 'Crypto Prices',
-                        data: [3, 2, 2, 1, 5, 6],
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
-                }
-            });
-            // Example for making requests to the WORKER_URL
-            const WORKER_URL = 'https://crypto-proxy.irzaldi.workers.dev';
-            // Fetch data or interact with your worker here
-        </script>
-    </div>
-</body>
-</html>
+// analysisWorker.js
+self.onmessage = function(e) {
+    const { type, payload } = e.data;
+    if (type === 'ANALYZE') {
+        const { closes, highs, lows, volumes } = payload;
+        
+        // WAVE 1: FAST SIGNALS
+        const results = {
+            ema8: calcEMA(closes, 8),
+            ema21: calcEMA(closes, 21),
+            rsi: calcRSI(closes, 14),
+            // ... add your other fast indicators here ...
+        };
+        self.postMessage({ type: 'WAVE1', payload: results });
+
+        // WAVE 2: HEAVY MATH
+        setTimeout(() => {
+            const levels = detectKeyLevels(closes[closes.length-1], highs, lows, closes);
+            const backtest = runBacktest(closes); // Use your existing functions
+            self.postMessage({ type: 'WAVE2', payload: { levels, backtest } });
+        }, 50);
+    }
+};
+
+// Paste your existing indicator functions (calcEMA, calcRSI, etc.) below
+function calcEMA(data, period) { /* your code from index(4).html */ }
+function detectKeyLevels(price, highs, lows, closes) { /* your code from index(4).html */ }
