@@ -2056,7 +2056,36 @@ self.onmessage=function(e){
     mexc:   {'15m':'15m','30m':'30m','1h':'1h','4h':'4h','1d':'1d','1w':'1W','1M':'1M'},
     gateio: {'15m':'15m','30m':'30m','1h':'1h','4h':'4h','1d':'1d','1w':'7d','1M':'30d'},
     kucoin: {'15m':'15min','30m':'30min','1h':'1hour','4h':'4hour','1d':'1day','1w':'1week','1M':'1month'},
+    // Yahoo Finance intervals and matching range for sufficient candles
+    yahoo:  {'15m':'15m','30m':'30m','1h':'1h','4h':'1h','1d':'1d','1w':'1wk','1M':'1mo'},
+    yahooRange: {'15m':'5d','30m':'10d','1h':'60d','4h':'60d','1d':'2y','1w':'5y','1M':'10y'},
   };
+
+  // Forex/fiat pairs have limited interval support on crypto exchanges.
+  // Clamp to the nearest supported interval to avoid API errors.
+  const FOREX_SUPPORTED_TF = ['1h','4h','1d'];
+  function safeTF(sym, exId) {
+    if(!SPECIAL_PAIRS[sym] || !SPECIAL_PAIRS[sym].isFiat) return currentTF;
+    // Fiat pairs (IDR/JPY) — many exchanges only support 1h+ for these
+    if(['15m','30m'].includes(currentTF)) return '1h';
+    if(currentTF === '1w' || currentTF === '1M') return '1d';
+    return currentTF;
+  }
+
+  // Smart price formatter — detects fiat/forex ranges and skips $ prefix
+  let _lastPairType = 'crypto'; // 'crypto' | 'fiat' | 'eur'
+  function fmtFX(n, sym) {
+    if(n===null||n===undefined||isNaN(n)) return '—';
+    const sp = SPECIAL_PAIRS[sym];
+    if(!sp) return fmtP(n); // normal crypto
+    if(sp.isFiat) {
+      // IDR/JPY — large integers, no $ prefix
+      if(n >= 1000) return n.toLocaleString('id-ID', {maximumFractionDigits:0});
+      return n.toFixed(2);
+    }
+    // EUR/USD style — show as forex rate
+    return n.toFixed(4);
+  }
 
   async function tryBinance(sym) {
     const p=sym+'USDT',tf=TF.binance[currentTF]||'1h';
@@ -2152,7 +2181,6 @@ self.onmessage=function(e){
     {id:'gateio',  fn: sym => SPECIAL_PAIRS[sym] ? tryGateioResolved(sym)  : tryGateio(sym)},
     {id:'kucoin',  fn: sym => SPECIAL_PAIRS[sym] ? tryKuCoinResolved(sym)  : tryKuCoin(sym)},
     {id:'indodax', fn: tryIndodax},
-    {id:'yahoo',   fn: sym => sym==='ANTAM' ? tryANTAM() : Promise.reject(new Error('Yahoo: only for stocks'))},
   ];
 
   function setStatus(m,t=''){const el=document.getElementById('statusBar');el.textContent=m;el.className='status-bar '+t;}
@@ -2197,7 +2225,30 @@ self.onmessage=function(e){
   }
 
   function activeProgress(id) { stepProgress(id, 'active'); }
-  function fmtP(n){if(n===null||n===undefined||isNaN(n))return'—';if(n>=10000)return'$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});if(n>=1)return'$'+n.toFixed(4);return'$'+n.toFixed(8);}
+  // _fmtCtx: set to current sym during fetchData so fmtP auto-detects fiat
+  let _fmtCtx = null;
+  function fmtP(n){
+    if(n===null||n===undefined||isNaN(n)) return '—';
+    const sp = _fmtCtx ? SPECIAL_PAIRS[_fmtCtx] : null;
+    if(sp?.isFiat) {
+      // IDR (≥1000) or JPY (≥100) — integer, no $
+      if(n>=100) return n.toLocaleString('id-ID',{maximumFractionDigits:0});
+      return n.toFixed(2);
+    }
+    if(sp && !sp.isFiat && !sp.isStock) {
+      // EUR/USD style forex rate
+      return n.toFixed(4);
+    }
+    if(sp?.isStock) {
+      // IDX stock — IDR integer
+      if(n>=100) return n.toLocaleString('id-ID',{maximumFractionDigits:0});
+      return n.toFixed(2);
+    }
+    // Normal crypto
+    if(n>=10000) return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(n>=1) return '$'+n.toFixed(4);
+    return '$'+n.toFixed(8);
+  }
   function fmtV(n){if(!n)return'—';if(n>=1e9)return(n/1e9).toFixed(2)+'B USD';if(n>=1e6)return(n/1e6).toFixed(2)+'M USD';if(n>=1e3)return(n/1e3).toFixed(2)+'K USD';return n.toFixed(2)+' USD';}
   function setPxStatus(id,s){const el=document.getElementById('px-'+id);if(!el)return;el.className='pill'+(s==='trying'?' trying':s==='active'?' active':s==='fail'?' fail':s==='ok'?' ok':'');}
   function setExStatus(id,s){const el=document.getElementById('ex-'+id);if(!el)return;el.className='pill'+(s==='trying'?' trying':s==='active'?' active':s==='fail'?' fail':s==='ok'?' ok':'');}
@@ -2236,9 +2287,8 @@ self.onmessage=function(e){
     const ticker = resolveSymbol(sym, 'binance');
     if(!ticker) throw new Error('Binance: pair not supported');
     const sp = SPECIAL_PAIRS[sym];
-    // For fiat pairs the ticker already has the full symbol (e.g. USDTIDR)
     const fullSym = sp ? ticker : ticker + 'USDT';
-    const tf = TF.binance[currentTF] || '1h';
+    const tf = TF.binance[safeTF(sym,'binance')] || '1h';
     const [t,k] = await Promise.all([
       smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${fullSym}`),
       smartFetch(`https://api.binance.com/api/v3/klines?symbol=${fullSym}&interval=${tf}&limit=1000`)
@@ -2257,7 +2307,7 @@ self.onmessage=function(e){
     if(!ticker) throw new Error('OKX: pair not supported');
     const sp = SPECIAL_PAIRS[sym];
     const instId = sp ? ticker : ticker+'-USDT';
-    const tf = TF.okx[currentTF] || '1H';
+    const tf = TF.okx[safeTF(sym,'okx')] || '1H';
     const [tj,kj] = await Promise.all([
       smartFetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`),
       smartFetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=${tf}&limit=1000`)
@@ -2276,7 +2326,7 @@ self.onmessage=function(e){
     if(!ticker) throw new Error('Bybit: pair not supported');
     const sp = SPECIAL_PAIRS[sym];
     const fullSym = sp ? ticker : ticker+'USDT';
-    const tf = TF.bybit[currentTF] || '60';
+    const tf = TF.bybit[safeTF(sym,'bybit')] || '60';
     const [tj,kj] = await Promise.all([
       smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${fullSym}`),
       smartFetch(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${fullSym}&interval=${tf}&limit=1000`)
@@ -2296,7 +2346,7 @@ self.onmessage=function(e){
     if(!ticker) throw new Error('MEXC: pair not supported');
     const sp = SPECIAL_PAIRS[sym];
     const fullSym = sp ? ticker : ticker+'USDT';
-    const tf = TF.mexc[currentTF] || '1h';
+    const tf = TF.mexc[safeTF(sym,'mexc')] || '1h';
     const [t,k] = await Promise.all([
       smartFetch(`https://api.mexc.com/api/v3/ticker/24hr?symbol=${fullSym}`),
       smartFetch(`https://api.mexc.com/api/v3/klines?symbol=${fullSym}&interval=${tf}&limit=1000`)
@@ -2315,7 +2365,7 @@ self.onmessage=function(e){
     if(!ticker) throw new Error('Gate.io: pair not supported');
     const sp = SPECIAL_PAIRS[sym];
     const fullSym = sp ? ticker : ticker+'_USDT';
-    const tf = TF.gateio[currentTF] || '1h';
+    const tf = TF.gateio[safeTF(sym,'gateio')] || '1h';
     const [ta,k] = await Promise.all([
       smartFetch(`https://api.gateio.ws/api/v4/spot/tickers?currency_pair=${fullSym}`),
       smartFetch(`https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${fullSym}&interval=${tf}&limit=1000`)
@@ -2335,7 +2385,7 @@ self.onmessage=function(e){
     if(!ticker) throw new Error('KuCoin: pair not supported');
     const sp = SPECIAL_PAIRS[sym];
     const fullSym = sp ? ticker : ticker+'-USDT';
-    const tf = TF.kucoin[currentTF] || '1hour';
+    const tf = TF.kucoin[safeTF(sym,'kucoin')] || '1hour';
     const end = Math.floor(Date.now()/1000), start = end-500*3600;
     const [tj,kj] = await Promise.all([
       smartFetch(`https://api.kucoin.com/api/v1/market/stats?symbol=${fullSym}`),
@@ -2353,18 +2403,34 @@ self.onmessage=function(e){
 
   // For ANTAM (IDX stock, no crypto exchange) — use Yahoo Finance via proxy
   async function tryANTAM() {
-    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/ANTM.JK?interval=1h&range=60d';
+    // Yahoo Finance — map currentTF to Yahoo interval/range
+    const yInterval = TF.yahoo[currentTF] || '1d';
+    const yRange    = TF.yahooRange[currentTF] || '2y';
+    // Yahoo IDX stocks don't support intraday < 1h for long ranges
+    const safeInterval = ['15m','30m'].includes(currentTF) ? '1h' : yInterval;
+    const safeRange    = ['15m','30m'].includes(currentTF) ? '60d' : yRange;
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/ANTM.JK?interval=${safeInterval}&range=${safeRange}`;
     const d = await smartFetch(url);
     if(!d?.chart?.result?.[0]) throw new Error('ANTAM: Yahoo Finance unavailable');
     const r = d.chart.result[0], q = r.indicators.quote[0];
-    const ts = r.timestamp, closes = q.close.map(Number), opens = q.open.map(Number);
-    const highs = q.high.map(Number), lows = q.low.map(Number), volumes = q.volume.map(Number);
+    // Filter out null candles (market closed periods)
+    const valid = r.timestamp.map((_,i)=>i).filter(i=>q.close[i]!=null&&q.open[i]!=null);
+    const closes  = valid.map(i=>+q.close[i]);
+    const opens   = valid.map(i=>+q.open[i]);
+    const highs   = valid.map(i=>+q.high[i]);
+    const lows    = valid.map(i=>+q.low[i]);
+    const volumes = valid.map(i=>+(q.volume[i]||0));
+    if(closes.length < 10) throw new Error('ANTAM: not enough candle data');
     const price = closes[closes.length-1];
+    const recentC = closes.slice(-20), recentH = highs.slice(-20), recentL = lows.slice(-20);
     return {
-      price, high24:Math.max(...highs.slice(-7)), low24:Math.min(...lows.slice(-7)),
-      open24:opens[opens.length-1], vol24:volumes.slice(-1)[0]||0,
+      price,
+      high24: Math.max(...recentH),
+      low24:  Math.min(...recentL),
+      open24: opens[opens.length-1],
+      vol24:  volumes[volumes.length-1]||0,
       opens, closes, highs, lows, volumes,
-      source:'Yahoo Finance (IDX)', pair:'ANTAM/IDR'
+      source: `Yahoo Finance (IDX · ${safeInterval})`, pair:'ANTAM/IDR'
     };
   }
 
@@ -2372,6 +2438,7 @@ self.onmessage=function(e){
   async function fetchData() {
     const sym=document.getElementById('symbolInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
     if(!sym)return;
+    _fmtCtx = SPECIAL_PAIRS[sym] ? sym : null; // set fiat/forex context for fmtP
     document.querySelectorAll('.pair-btn').forEach(b=>{
       const t=b.textContent.replace('🥇 ','').replace('🥈 ','').replace('🛢️ ','');
       b.classList.toggle('active', t===sym);
@@ -2389,7 +2456,24 @@ self.onmessage=function(e){
 
     let data=null;
 
-    for(const ex of EXCHANGES){
+    // ── ANTAM: IDX stock — fetch directly from Yahoo Finance, skip crypto exchanges ──
+    if(sym === 'ANTAM') {
+      const yInt = ['15m','30m'].includes(currentTF) ? '1h' : TF.yahoo[currentTF]||'1d';
+      setStatus(`⟳ Fetching ANTAM from Yahoo Finance (IDX · ${yInt})...`,'loading');
+      activeProgress('exchange');
+      try {
+        data = await tryANTAM();
+        workingExchangeId = 'yahoo';
+        stepProgress('proxy','done');
+        stepProgress('exchange','done');
+      } catch(e) {
+        setStatus('✗ ANTAM unavailable — Yahoo Finance blocked or no data','error');
+        document.getElementById('fetchBtn').disabled=false;
+        return;
+      }
+    }
+
+    if(!data) for(const ex of EXCHANGES){
       setExStatus(ex.id,'trying');
       setStatus('⟳ Trying '+ex.id.toUpperCase()+'...','loading');
       activeProgress('exchange');
@@ -2506,7 +2590,9 @@ self.onmessage=function(e){
     const ce=document.getElementById('pc24h');
     ce.textContent=(pct>=0?'+':'')+pct.toFixed(2)+'%';
     ce.style.color=pct>=0?'var(--green)':'var(--red)';
-    document.getElementById('pc24hAbs').textContent=(price-open24>=0?'+':'')+fmtP(Math.abs(price-open24)).replace('$','')+' USD';
+    const sp=SPECIAL_PAIRS[sym];
+    const unitLabel=sp?.isFiat?pair.split('/')[1]:sp?.isStock?'IDR':'USD';
+    document.getElementById('pc24hAbs').textContent=(price-open24>=0?'+':'')+fmtP(Math.abs(price-open24))+' '+unitLabel;
     document.getElementById('pcHigh').textContent=fmtP(high24);
     document.getElementById('pcLow').textContent=fmtP(low24);
 
@@ -3824,7 +3910,18 @@ self.onmessage=function(e){
     document.getElementById('symbolInput').value=sym;
     fetchData();
   }
-  function setTF(tf,el){currentTF=tf;document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');fetchData();}
+  function setTF(tf,el){
+    currentTF=tf;
+    document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+    el.classList.add('active');
+    const sym=document.getElementById('symbolInput').value.trim().toUpperCase();
+    const sp=SPECIAL_PAIRS[sym];
+    if(sp?.isFiat && ['15m','30m'].includes(tf))
+      setStatus(`⚠️ ${sp.display}: 15m/30m not supported — using 1H candles`,'warn');
+    else if(sp?.isFiat && ['1w','1M'].includes(tf))
+      setStatus(`⚠️ ${sp.display}: ${tf} may have limited data — using 1D candles`,'warn');
+    fetchData();
+  }
   function toggleAuto(){const on=document.getElementById('autoRefresh').checked;clearInterval(autoTimer);clearInterval(cTimer);document.getElementById('countdown').textContent='';if(on){cSec=30;document.getElementById('countdown').textContent='Refresh in '+cSec+'s';autoTimer=setInterval(()=>{fetchData();cSec=30;},30000);cTimer=setInterval(()=>{cSec--;if(cSec>0)document.getElementById('countdown').textContent='Refresh in '+cSec+'s';},1000);}}
 
   const DEFAULTS = { defaultSym:'BTC', defaultTF:'1h', stPeriod:10, stMult:3, atrPeriod:14, rsiPeriod:14, refreshSec:30, chartCandles:60 };
