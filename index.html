@@ -2145,13 +2145,14 @@ self.onmessage=function(e){
   }
 
   const EXCHANGES=[
-    {id:'binance',fn:tryBinance},
-    {id:'okx',fn:tryOKX},
-    {id:'bybit',fn:tryBybit},
-    {id:'mexc',fn:tryMEXC},
-    {id:'gateio',fn:tryGateio},
-    {id:'kucoin',fn:tryKuCoin},
-    {id:'indodax',fn:tryIndodax},
+    {id:'binance', fn: sym => SPECIAL_PAIRS[sym] ? tryBinanceResolved(sym) : tryBinance(sym)},
+    {id:'okx',     fn: sym => SPECIAL_PAIRS[sym] ? tryOKXResolved(sym)     : tryOKX(sym)},
+    {id:'bybit',   fn: sym => SPECIAL_PAIRS[sym] ? tryBybitResolved(sym)   : tryBybit(sym)},
+    {id:'mexc',    fn: sym => SPECIAL_PAIRS[sym] ? tryMEXCResolved(sym)    : tryMEXC(sym)},
+    {id:'gateio',  fn: sym => SPECIAL_PAIRS[sym] ? tryGateioResolved(sym)  : tryGateio(sym)},
+    {id:'kucoin',  fn: sym => SPECIAL_PAIRS[sym] ? tryKuCoinResolved(sym)  : tryKuCoin(sym)},
+    {id:'indodax', fn: tryIndodax},
+    {id:'yahoo',   fn: sym => sym==='ANTAM' ? tryANTAM() : Promise.reject(new Error('Yahoo: only for stocks'))},
   ];
 
   function setStatus(m,t=''){const el=document.getElementById('statusBar');el.textContent=m;el.className='status-bar '+t;}
@@ -2209,6 +2210,164 @@ self.onmessage=function(e){
     document.getElementById(vId).style.color=color;
     const b=document.getElementById(bdId);b.className='badge badge-'+bType;b.textContent=bText;
   }
+
+  // ── Special pair translation: symbol → {exchange, ticker, displayPair, priceScale} ─
+  // priceScale: multiply final price by this factor (e.g. IDR pairs are in IDR, we keep as-is)
+  const SPECIAL_PAIRS = {
+    // Forex via crypto proxies (stablecoins pegged to those currencies)
+    'USDIDR': { binance:'USDTIDR', okx:'USDC-IDR', bybit:'USDTIDR', mexc:'USDTIDR', gateio:'USDT_IDR', kucoin:null,   display:'USD/IDR',  isFiat:true },
+    'USDJPY': { binance:'USDTJPY', okx:'USDC-JPY', bybit:'USDTJPY', mexc:'USDTJPY', gateio:'USDT_JPY', kucoin:null,   display:'USD/JPY',  isFiat:true },
+    'EURUSD': { binance:'EURUSDT', okx:'EUR-USDT', bybit:'EURUSDT',  mexc:'EURUSDT',  gateio:'EUR_USDT', kucoin:'EUR-USDT', display:'EUR/USD', isFiat:false },
+    'EURIDR': { binance:'EURIDR',  okx:null,        bybit:null,       mexc:'EURIDR',   gateio:'EUR_IDR',  kucoin:null,   display:'EUR/IDR',  isFiat:true },
+    'ANTAM':  { binance:null,       okx:null,        bybit:null,       mexc:null,        gateio:null,        kucoin:null,   display:'ANTAM/IDR', isStock:true },
+  };
+
+  // Resolve the actual ticker to use per exchange
+  function resolveSymbol(sym, exchangeId) {
+    const sp = SPECIAL_PAIRS[sym];
+    if(!sp) return sym; // normal crypto — no change
+    const ticker = sp[exchangeId];
+    if(ticker === null) return null; // not supported on this exchange
+    return ticker;
+  }
+
+  // Build a patched version of tryBinance/OKX/etc that handles special pairs
+  async function tryBinanceResolved(sym) {
+    const ticker = resolveSymbol(sym, 'binance');
+    if(!ticker) throw new Error('Binance: pair not supported');
+    const sp = SPECIAL_PAIRS[sym];
+    // For fiat pairs the ticker already has the full symbol (e.g. USDTIDR)
+    const fullSym = sp ? ticker : ticker + 'USDT';
+    const tf = TF.binance[currentTF] || '1h';
+    const [t,k] = await Promise.all([
+      smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${fullSym}`),
+      smartFetch(`https://api.binance.com/api/v3/klines?symbol=${fullSym}&interval=${tf}&limit=1000`)
+    ]);
+    if(t.code) throw new Error(t.msg||'Binance: not found');
+    return {
+      price:+t.lastPrice, high24:+t.highPrice, low24:+t.lowPrice,
+      open24:+t.openPrice, vol24:+t.quoteVolume,
+      opens:k.map(x=>+x[1]), closes:k.map(x=>+x[4]),
+      highs:k.map(x=>+x[2]), lows:k.map(x=>+x[3]), volumes:k.map(x=>+x[5]),
+      source:'Binance', pair:sp?sp.display:fullSym
+    };
+  }
+  async function tryOKXResolved(sym) {
+    const ticker = resolveSymbol(sym, 'okx');
+    if(!ticker) throw new Error('OKX: pair not supported');
+    const sp = SPECIAL_PAIRS[sym];
+    const instId = sp ? ticker : ticker+'-USDT';
+    const tf = TF.okx[currentTF] || '1H';
+    const [tj,kj] = await Promise.all([
+      smartFetch(`https://www.okx.com/api/v5/market/ticker?instId=${instId}`),
+      smartFetch(`https://www.okx.com/api/v5/market/candles?instId=${instId}&bar=${tf}&limit=1000`)
+    ]);
+    if(tj.code !== '0') throw new Error('OKX: not found');
+    const t = tj.data[0], c = kj.data.reverse();
+    return {
+      price:+t.last, high24:+t.high24h, low24:+t.low24h, open24:+t.open24h, vol24:+t.volCcy24h,
+      opens:c.map(x=>+x[1]), closes:c.map(x=>+x[4]),
+      highs:c.map(x=>+x[2]), lows:c.map(x=>+x[3]), volumes:c.map(x=>+x[5]),
+      source:'OKX', pair:sp?sp.display:instId
+    };
+  }
+  async function tryBybitResolved(sym) {
+    const ticker = resolveSymbol(sym, 'bybit');
+    if(!ticker) throw new Error('Bybit: pair not supported');
+    const sp = SPECIAL_PAIRS[sym];
+    const fullSym = sp ? ticker : ticker+'USDT';
+    const tf = TF.bybit[currentTF] || '60';
+    const [tj,kj] = await Promise.all([
+      smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${fullSym}`),
+      smartFetch(`https://api.bybit.com/v5/market/kline?category=spot&symbol=${fullSym}&interval=${tf}&limit=1000`)
+    ]);
+    if(tj.retCode !== 0 || !tj.result.list.length) throw new Error('Bybit: not found');
+    const t = tj.result.list[0], c = kj.result.list.reverse();
+    return {
+      price:+t.lastPrice, high24:+t.highPrice24h, low24:+t.lowPrice24h,
+      open24:+t.prevPrice24h, vol24:+t.turnover24h,
+      opens:c.map(x=>+x[1]), closes:c.map(x=>+x[4]),
+      highs:c.map(x=>+x[2]), lows:c.map(x=>+x[3]), volumes:c.map(x=>+x[5]),
+      source:'Bybit', pair:sp?sp.display:fullSym
+    };
+  }
+  async function tryMEXCResolved(sym) {
+    const ticker = resolveSymbol(sym, 'mexc');
+    if(!ticker) throw new Error('MEXC: pair not supported');
+    const sp = SPECIAL_PAIRS[sym];
+    const fullSym = sp ? ticker : ticker+'USDT';
+    const tf = TF.mexc[currentTF] || '1h';
+    const [t,k] = await Promise.all([
+      smartFetch(`https://api.mexc.com/api/v3/ticker/24hr?symbol=${fullSym}`),
+      smartFetch(`https://api.mexc.com/api/v3/klines?symbol=${fullSym}&interval=${tf}&limit=1000`)
+    ]);
+    if(t.code) throw new Error('MEXC: not found');
+    return {
+      price:+t.lastPrice, high24:+t.highPrice, low24:+t.lowPrice,
+      open24:+t.openPrice, vol24:+t.quoteVolume,
+      opens:k.map(x=>+x[1]), closes:k.map(x=>+x[4]),
+      highs:k.map(x=>+x[2]), lows:k.map(x=>+x[3]), volumes:k.map(x=>+x[5]),
+      source:'MEXC', pair:sp?sp.display:fullSym
+    };
+  }
+  async function tryGateioResolved(sym) {
+    const ticker = resolveSymbol(sym, 'gateio');
+    if(!ticker) throw new Error('Gate.io: pair not supported');
+    const sp = SPECIAL_PAIRS[sym];
+    const fullSym = sp ? ticker : ticker+'_USDT';
+    const tf = TF.gateio[currentTF] || '1h';
+    const [ta,k] = await Promise.all([
+      smartFetch(`https://api.gateio.ws/api/v4/spot/tickers?currency_pair=${fullSym}`),
+      smartFetch(`https://api.gateio.ws/api/v4/spot/candlesticks?currency_pair=${fullSym}&interval=${tf}&limit=1000`)
+    ]);
+    if(!ta.length) throw new Error('Gate.io: not found');
+    const t = ta[0];
+    return {
+      price:+t.last, high24:+t.high_24h, low24:+t.low_24h,
+      open24:+t.last*(1-+(t.change_percentage||0)/100), vol24:+t.quote_volume,
+      opens:k.map(x=>+x[5]), closes:k.map(x=>+x[2]),
+      highs:k.map(x=>+x[3]), lows:k.map(x=>+x[4]), volumes:k.map(x=>+x[1]),
+      source:'Gate.io', pair:sp?sp.display:fullSym
+    };
+  }
+  async function tryKuCoinResolved(sym) {
+    const ticker = resolveSymbol(sym, 'kucoin');
+    if(!ticker) throw new Error('KuCoin: pair not supported');
+    const sp = SPECIAL_PAIRS[sym];
+    const fullSym = sp ? ticker : ticker+'-USDT';
+    const tf = TF.kucoin[currentTF] || '1hour';
+    const end = Math.floor(Date.now()/1000), start = end-500*3600;
+    const [tj,kj] = await Promise.all([
+      smartFetch(`https://api.kucoin.com/api/v1/market/stats?symbol=${fullSym}`),
+      smartFetch(`https://api.kucoin.com/api/v1/market/candles?symbol=${fullSym}&type=${tf}&startAt=${start}&endAt=${end}`)
+    ]);
+    if(tj.code !== '200000') throw new Error('KuCoin: not found');
+    const t = tj.data, c = kj.data.reverse();
+    return {
+      price:+t.last, high24:+t.high, low24:+t.low, open24:+t.open, vol24:+t.volValue,
+      opens:c.map(x=>+x[1]), closes:c.map(x=>+x[2]),
+      highs:c.map(x=>+x[3]), lows:c.map(x=>+x[4]), volumes:c.map(x=>+x[5]),
+      source:'KuCoin', pair:sp?sp.display:fullSym
+    };
+  }
+
+  // For ANTAM (IDX stock, no crypto exchange) — use Yahoo Finance via proxy
+  async function tryANTAM() {
+    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/ANTM.JK?interval=1h&range=60d';
+    const d = await smartFetch(url);
+    if(!d?.chart?.result?.[0]) throw new Error('ANTAM: Yahoo Finance unavailable');
+    const r = d.chart.result[0], q = r.indicators.quote[0];
+    const ts = r.timestamp, closes = q.close.map(Number), opens = q.open.map(Number);
+    const highs = q.high.map(Number), lows = q.low.map(Number), volumes = q.volume.map(Number);
+    const price = closes[closes.length-1];
+    return {
+      price, high24:Math.max(...highs.slice(-7)), low24:Math.min(...lows.slice(-7)),
+      open24:opens[opens.length-1], vol24:volumes.slice(-1)[0]||0,
+      opens, closes, highs, lows, volumes,
+      source:'Yahoo Finance (IDX)', pair:'ANTAM/IDR'
+    };
+  }
+
 
   async function fetchData() {
     const sym=document.getElementById('symbolInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
