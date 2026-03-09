@@ -2403,34 +2403,89 @@ self.onmessage=function(e){
 
   // For ANTAM (IDX stock, no crypto exchange) — use Yahoo Finance via proxy
   async function tryANTAM() {
-    // Yahoo Finance — map currentTF to Yahoo interval/range
-    const yInterval = TF.yahoo[currentTF] || '1d';
-    const yRange    = TF.yahooRange[currentTF] || '2y';
-    // Yahoo IDX stocks don't support intraday < 1h for long ranges
-    const safeInterval = ['15m','30m'].includes(currentTF) ? '1h' : yInterval;
-    const safeRange    = ['15m','30m'].includes(currentTF) ? '60d' : yRange;
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/ANTM.JK?interval=${safeInterval}&range=${safeRange}`;
-    const d = await smartFetch(url);
-    if(!d?.chart?.result?.[0]) throw new Error('ANTAM: Yahoo Finance unavailable');
-    const r = d.chart.result[0], q = r.indicators.quote[0];
-    // Filter out null candles (market closed periods)
-    const valid = r.timestamp.map((_,i)=>i).filter(i=>q.close[i]!=null&&q.open[i]!=null);
-    const closes  = valid.map(i=>+q.close[i]);
-    const opens   = valid.map(i=>+q.open[i]);
-    const highs   = valid.map(i=>+q.high[i]);
-    const lows    = valid.map(i=>+q.low[i]);
-    const volumes = valid.map(i=>+(q.volume[i]||0));
-    if(closes.length < 10) throw new Error('ANTAM: not enough candle data');
+    // Map currentTF to Yahoo/Stooq compatible intervals
+    const yInterval = ['15m','30m'].includes(currentTF) ? '1h' : (TF.yahoo[currentTF]||'1d');
+    const yRange    = ['15m','30m'].includes(currentTF) ? '60d' : (TF.yahooRange[currentTF]||'2y');
+
+    // Helper: parse Yahoo chart response into OHLCV
+    function parseYahoo(d) {
+      if(!d?.chart?.result?.[0]) throw new Error('No data');
+      const r = d.chart.result[0], q = r.indicators.quote[0];
+      const valid = r.timestamp.map((_,i)=>i).filter(i=>q.close[i]!=null&&q.open[i]!=null&&q.high[i]!=null);
+      if(valid.length < 10) throw new Error('Too few candles');
+      return {
+        closes:  valid.map(i=>+q.close[i]),
+        opens:   valid.map(i=>+q.open[i]),
+        highs:   valid.map(i=>+q.high[i]),
+        lows:    valid.map(i=>+q.low[i]),
+        volumes: valid.map(i=>+(q.volume[i]||0)),
+      };
+    }
+
+    // Helper: parse Stooq CSV (columns: Date,Open,High,Low,Close,Volume)
+    function parseStooq(text) {
+      const lines = text.trim().split('\n').slice(1).filter(l=>l.trim());
+      if(lines.length < 10) throw new Error('Too few rows');
+      const rows = lines.map(l=>l.split(','));
+      return {
+        closes:  rows.map(r=>+r[4]),
+        opens:   rows.map(r=>+r[1]),
+        highs:   rows.map(r=>+r[2]),
+        lows:    rows.map(r=>+r[3]),
+        volumes: rows.map(r=>+(r[5]||0)),
+      };
+    }
+
+    let ohlcv = null, sourceLabel = '';
+
+    // Source 1: Yahoo Finance query1
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/ANTM.JK?interval=${yInterval}&range=${yRange}`;
+      const d = await smartFetch(url);
+      ohlcv = parseYahoo(d);
+      sourceLabel = `Yahoo Finance (${yInterval})`;
+    } catch(e) {}
+
+    // Source 2: Yahoo Finance query2 (different server, sometimes unblocked)
+    if(!ohlcv) try {
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/ANTM.JK?interval=${yInterval}&range=${yRange}`;
+      const d = await smartFetch(url);
+      ohlcv = parseYahoo(d);
+      sourceLabel = `Yahoo Finance q2 (${yInterval})`;
+    } catch(e) {}
+
+    // Source 3: Stooq (free historical data, works well for IDX)
+    if(!ohlcv) try {
+      // Stooq uses daily data for IDX — best we can do for a stock
+      const url = `https://stooq.com/q/d/l/?s=antm.jk&i=d`;
+      const text = await smartFetch(url);
+      // smartFetch returns parsed JSON — stooq returns CSV so we need raw text
+      throw new Error('Stooq needs raw text — skip');
+    } catch(e) {}
+
+    // Source 4: Stooq via direct fetch (CSV, bypass smartFetch)
+    if(!ohlcv) try {
+      const url = `https://stooq.com/q/d/l/?s=antm.jk&i=d`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const text = await res.text();
+      if(text.includes('Date') && text.includes(',')) {
+        ohlcv = parseStooq(text);
+        sourceLabel = 'Stooq.com (Daily)';
+      }
+    } catch(e) {}
+
+    if(!ohlcv) throw new Error('ANTAM: all sources failed (Yahoo blocked, Stooq unavailable)');
+
+    const { closes, opens, highs, lows, volumes } = ohlcv;
     const price = closes[closes.length-1];
-    const recentC = closes.slice(-20), recentH = highs.slice(-20), recentL = lows.slice(-20);
     return {
       price,
-      high24: Math.max(...recentH),
-      low24:  Math.min(...recentL),
+      high24: Math.max(...highs.slice(-5)),
+      low24:  Math.min(...lows.slice(-5)),
       open24: opens[opens.length-1],
       vol24:  volumes[volumes.length-1]||0,
       opens, closes, highs, lows, volumes,
-      source: `Yahoo Finance (IDX · ${safeInterval})`, pair:'ANTAM/IDR'
+      source: sourceLabel, pair:'ANTAM/IDR'
     };
   }
 
@@ -2459,7 +2514,7 @@ self.onmessage=function(e){
     // ── ANTAM: IDX stock — fetch directly from Yahoo Finance, skip crypto exchanges ──
     if(sym === 'ANTAM') {
       const yInt = ['15m','30m'].includes(currentTF) ? '1h' : TF.yahoo[currentTF]||'1d';
-      setStatus(`⟳ Fetching ANTAM from Yahoo Finance (IDX · ${yInt})...`,'loading');
+      setStatus(`⟳ Fetching ANTAM (IDX) — trying Yahoo Finance → Stooq...`,'loading');
       activeProgress('exchange');
       try {
         data = await tryANTAM();
@@ -2467,7 +2522,7 @@ self.onmessage=function(e){
         stepProgress('proxy','done');
         stepProgress('exchange','done');
       } catch(e) {
-        setStatus('✗ ANTAM unavailable — Yahoo Finance blocked or no data','error');
+        setStatus('✗ ANTAM unavailable — Yahoo Finance & Stooq both blocked by proxy. Try again or use TradingView for ANTM.JK','error');
         document.getElementById('fetchBtn').disabled=false;
         return;
       }
