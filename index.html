@@ -2322,9 +2322,6 @@
 
     const rm=calcRisk();
 
-    function yieldThen(fn) { return new Promise(resolve => setTimeout(() => { fn(); resolve(); }, 0)); }
-
-    await yieldThen(() => {
     activeProgress('score');
 
     let momS=0, momMax=0;
@@ -2410,37 +2407,31 @@
     setChk(7,rm&&rm.riskPct<=2?'pass':rm&&rm.riskPct<=3?'warn':'fail',rm?`Risking ${rm.riskPct}% ${rm.riskPct<=1?'(Conservative ✓)':rm.riskPct<=2?'(Acceptable ✓)':'(Aggressive!)'}` :'—');
 
     stepProgress('score','done');
-    });
 
-    await yieldThen(() => {
     activeProgress('predict');
     runPrediction(price, closes, highs, lows, volumes, atr, rsi, macdV, ema8, ema13, ema21, ema55, ema200, adxData, ichi, stoch, willR, bbP, obvData, isBUY, isSELL, piv, st, div);
     stepProgress('predict','done');
-    });
 
     if(opens) detectCandlePatterns(opens, highs, lows, closes);
     detectKeyLevels(price, highs, lows, closes, atr);
     checkAlerts(price, sym);
 
-    yieldThen(() => {
-      const e8s  = calcEMASeries(closes, 8);
-      const e21s = calcEMASeries(closes, 21);
-      const e55s = calcEMASeries(closes, 55);
-      const e200s= calcEMASeries(closes, 200);
-      drawMiniChart(opens||closes, closes, highs, lows, e8s, e21s, e55s, e200s, sym, currentTF);
-      window._lastChartData = {opens:opens||closes,closes,highs,lows,e8:e8s,e21:e21s,e55:e55s,e200:e200s,sym,tf:currentTF};
-    });
+    const e8s  = calcEMASeries(closes, 8);
+    const e21s = calcEMASeries(closes, 21);
+    const e55s = calcEMASeries(closes, 55);
+    const e200s= calcEMASeries(closes, 200);
+    drawMiniChart(opens||closes, closes, highs, lows, e8s, e21s, e55s, e200s, sym, currentTF);
+    window._lastChartData = {opens:opens||closes,closes,highs,lows,e8:e8s,e21:e21s,e55:e55s,e200:e200s,sym,tf:currentTF};
 
-    yieldThen(() => { runBacktest(closes, highs, lows); });
+    runBacktest(closes, highs, lows);
+    buildVolumeProfile(closes, highs, lows, volumes);
 
-    yieldThen(() => { buildVolumeProfile(closes, highs, lows, volumes); });
-
-    yieldThen(() => {
+    setTimeout(() => {
       const slVal  = parseFloat(document.getElementById('pred-sl')?.textContent?.replace(/[$,]/g,'')||'0');
       const tp1Val = parseFloat(document.getElementById('pred-tp1')?.textContent?.replace(/[$,]/g,'')||'0');
       const tp2Val = parseFloat(document.getElementById('pred-tp2')?.textContent?.replace(/[$,]/g,'')||'0');
       if(slVal&&tp1Val) renderRRLadder(price, slVal, tp1Val, tp2Val, isBUY||(!isSELL));
-    });
+    }, 50);
 
     updateSessionPnL();
 
