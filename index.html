@@ -3087,224 +3087,7 @@ self.onmessage=function(e){
     document.getElementById('pcHigh').textContent=fmtP(high24);
     document.getElementById('pcLow').textContent=fmtP(low24);
 
-    const rsi=calcRSI(closes),macdV=calcMACD(closes),ema20=calcEMA(closes,20),ema50=calcEMA(closes,50),bbP=calcBB(closes),stoch=calcStochRSI(closes);
-    const avgV=volumes.slice(-20).reduce((a,b)=>a+b,0)/20,volR=avgV>0?(volumes[volumes.length-1]/avgV)*100:100;
-
-    if(rsi!==null){const c=rsi<30?'var(--green)':rsi>70?'var(--red)':'var(--warn)';setInd('rsiBar','rsiVal','rsiBadge',rsi,c,rsi.toFixed(1),rsi<30?'bull':rsi>70?'bear':'neut',rsi<30?'OVERSOLD':rsi>70?'OVERBOUGHT':rsi>=50?'BULLISH':'BEARISH');}
-    if(macdV!==null){const c=macdV>=0?'var(--green)':'var(--red)';setInd('macdBar','macdVal','macdBadge',Math.min(100,50+Math.abs(macdV)/price*5000),c,(macdV>=0?'+':'')+macdV.toFixed(4),macdV>0?'bull':'bear',macdV>0?'BULLISH':'BEARISH');}
-    if(ema20!==null){const a=price>ema20;setInd('ema20Bar','ema20Val','ema20Badge',75,a?'var(--green)':'var(--red)',fmtP(ema20),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
-    if(ema50!==null){const a=price>ema50;setInd('ema50Bar','ema50Val','ema50Badge',75,a?'var(--green)':'var(--red)',fmtP(ema50),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
-    {const vc=volR>120?'var(--green)':volR<80?'var(--red)':'var(--warn)';setInd('volBar','volVal','volBadge',Math.min(100,volR/2),vc,volR.toFixed(0)+'%',volR>120?'bull':volR<80?'bear':'neut',volR>150?'VERY HIGH':volR>120?'HIGH':volR<80?'LOW':'AVERAGE');}
-    if(bbP!==null){const c=bbP>0.8?'var(--red)':bbP<0.2?'var(--green)':'var(--warn)';setInd('bbBar','bbVal','bbBadge',bbP*100,c,(bbP*100).toFixed(1)+'%',bbP>0.8?'bear':bbP<0.2?'bull':'neut',bbP>0.8?'UPPER BB':bbP<0.2?'LOWER BB':'MID BB');}
-    if(stoch!==null){const c=stoch>80?'var(--red)':stoch<20?'var(--green)':'var(--warn)';setInd('stochBar','stochVal','stochBadge',stoch,c,stoch.toFixed(1),stoch>80?'bear':stoch<20?'bull':'neut',stoch>80?'OVERBOUGHT':stoch<20?'OVERSOLD':'NEUTRAL');}
-
-    const willR = calcWilliamsR(highs, lows, closes);
-    if(willR!==null){
-      const c=willR>-20?'var(--red)':willR<-80?'var(--green)':'var(--warn)';
-      const pct=((willR+100)/100)*100;
-      setInd('willBar','willVal','willBadge',pct,c,willR.toFixed(1),
-        willR>-20?'bear':willR<-80?'bull':'neut',
-        willR>-20?'OVERBOUGHT':willR<-80?'OVERSOLD':'NEUTRAL');
-    }
-
-    const cci = calcCCI(highs, lows, closes);
-    if(cci!==null){
-      const c=cci>100?'var(--red)':cci<-100?'var(--green)':'var(--warn)';
-      const barPct=Math.min(100,Math.max(0,50+cci/4));
-      setInd('cciBar','cciVal','cciBadge',barPct,c,cci.toFixed(1),
-        cci>100?'bear':cci<-100?'bull':'neut',
-        cci>200?'EXTREME OB':cci>100?'OVERBOUGHT':cci<-200?'EXTREME OS':cci<-100?'OVERSOLD':'NEUTRAL');
-    }
-
-    const mfi = calcMFI(highs, lows, closes, volumes);
-    if(mfi!==null){
-      const c=mfi>80?'var(--red)':mfi<20?'var(--green)':'var(--warn)';
-      setInd('mfiBar','mfiVal','mfiBadge',mfi,c,mfi.toFixed(1),
-        mfi>80?'bear':mfi<20?'bull':'neut',
-        mfi>80?'OVERBOUGHT':mfi<20?'OVERSOLD':mfi>=50?'BULLISH FLOW':'BEARISH FLOW');
-    }
-
-    const roc = calcROC(closes);
-    if(roc!==null){
-      const c=roc>0?'var(--green)':'var(--red)';
-      const barPct=Math.min(100,Math.max(0,50+roc*2));
-      setInd('rocBar','rocVal','rocBadge',barPct,c,(roc>=0?'+':'')+roc.toFixed(2)+'%',
-        roc>0?'bull':'bear',
-        roc>5?'STRONG UP':roc>0?'RISING':roc>-5?'FALLING':'STRONG DOWN');
-    }
-
-    const ult = calcUltimateOscillator(highs, lows, closes);
-    if(ult!==null){
-      const c=ult>70?'var(--red)':ult<30?'var(--green)':'var(--warn)';
-      setInd('ultBar','ultVal','ultBadge',ult,c,ult.toFixed(1),
-        ult>70?'bear':ult<30?'bull':'neut',
-        ult>70?'OVERBOUGHT':ult<30?'OVERSOLD':ult>=50?'BULLISH':'BEARISH');
-    }
-
-    const psar = calcParabolicSAR(highs, lows, closes);
-    if(psar){
-      const c = psar.bull ? 'var(--green)' : 'var(--red)';
-      const barPct = psar.bull ? 75 : 25;
-      setInd('psarBar','psarVal','psarBadge', barPct, c,
-        fmtP(psar.value),
-        psar.bull?'bull':'bear',
-        psar.bull?'PRICE ABOVE SAR':'PRICE BELOW SAR');
-    }
-
-    const cmf = calcCMF(highs, lows, closes, volumes);
-    if(cmf!==null){
-      const c = cmf>0.05?'var(--green)':cmf<-0.05?'var(--red)':'var(--warn)';
-      const barPct = Math.min(100, Math.max(0, 50 + cmf*200));
-      setInd('cmfBar','cmfVal','cmfBadge', barPct, c,
-        cmf.toFixed(3),
-        cmf>0.05?'bull':cmf<-0.05?'bear':'neut',
-        cmf>0.1?'STRONG INFLOW':cmf>0.05?'INFLOW':cmf>-0.05?'NEUTRAL':cmf>-0.1?'OUTFLOW':'STRONG OUTFLOW');
-    }
-
-    const kelt = calcKeltner(highs, lows, closes);
-    if(kelt){
-      const c = kelt.pct<20?'var(--green)':kelt.pct>80?'var(--red)':'var(--warn)';
-      setInd('keltBar','keltVal','keltBadge', kelt.pct, c,
-        kelt.pct.toFixed(1)+'%',
-        kelt.pct<30?'bull':kelt.pct>70?'bear':'neut',
-        kelt.pct<20?'NEAR LOWER BAND':kelt.pct>80?'NEAR UPPER BAND':kelt.pct<50?'BELOW MID':'ABOVE MID');
-    }
-    if(ichi!==null){
-      const{tenkan,kijun,senkouA,senkouB,chikou,chikouRef,price:ip}=ichi;
-      const cloudTop=Math.max(senkouA,senkouB), cloudBot=Math.min(senkouA,senkouB);
-      const aboveCloud=ip>cloudTop, belowCloud=ip<cloudBot, inCloud=!aboveCloud&&!belowCloud;
-      const bullCross=tenkan>kijun, cloudGreen=senkouA>senkouB, chikouBull=chikou>chikouRef;
-
-      const ichiScore=[aboveCloud,bullCross,cloudGreen,chikouBull].filter(Boolean).length;
-      const ichiColor=ichiScore>=3?'var(--green)':ichiScore===2?'var(--warn)':ichiScore===1?'var(--warn)':'var(--red)';
-      const ichiLabel=ichiScore>=3?'BULLISH':ichiScore===2?'MIXED':ichiScore===1?'WEAK':'BEARISH';
-      setInd('ichiBar','ichiVal','ichiBadge', ichiScore*25, ichiColor,
-        aboveCloud?'ABOVE ☁':belowCloud?'BELOW ☁':'IN ☁',
-        ichiScore>=3?'bull':ichiScore<=1?'bear':'neut', ichiLabel);
-
-      const fp=n=>n>=1?'$'+n.toFixed(2):'$'+n.toFixed(6);
-      document.getElementById('ichi-tenkan').textContent=fp(tenkan);
-      document.getElementById('ichi-tenkan').style.color=tenkan>kijun?'var(--green)':'var(--red)';
-      document.getElementById('ichi-tenkan-sig').textContent=tenkan>kijun?'↑ Above Kijun':'↓ Below Kijun';
-      document.getElementById('ichi-tenkan-sig').style.color=tenkan>kijun?'var(--green)':'var(--red)';
-
-      document.getElementById('ichi-kijun').textContent=fp(kijun);
-      document.getElementById('ichi-kijun').style.color=ip>kijun?'var(--green)':'var(--red)';
-      document.getElementById('ichi-kijun-sig').textContent=ip>kijun?'Price above':'Price below';
-      document.getElementById('ichi-kijun-sig').style.color=ip>kijun?'var(--green)':'var(--red)';
-
-      document.getElementById('ichi-sa').textContent=fp(senkouA);
-      document.getElementById('ichi-sa').style.color=senkouA>senkouB?'var(--green)':'var(--red)';
-      document.getElementById('ichi-sa-sig').textContent=senkouA>senkouB?'Bullish cloud':'Bearish cloud';
-      document.getElementById('ichi-sa-sig').style.color=senkouA>senkouB?'var(--green)':'var(--red)';
-
-      document.getElementById('ichi-sb').textContent=fp(senkouB);
-      document.getElementById('ichi-sb').style.color=cloudGreen?'var(--muted)':'var(--muted)';
-      document.getElementById('ichi-sb-sig').textContent='Cloud bottom';
-
-      const cloudEl=document.getElementById('ichi-cloud');
-      cloudEl.textContent=aboveCloud?'ABOVE':belowCloud?'BELOW':'INSIDE';
-      cloudEl.style.color=aboveCloud?'var(--green)':belowCloud?'var(--red)':'var(--warn)';
-      document.getElementById('ichi-cloud-sig').textContent=aboveCloud?'Bullish zone':belowCloud?'Bearish zone':'Neutral zone';
-      document.getElementById('ichi-cloud-sig').style.color=aboveCloud?'var(--green)':belowCloud?'var(--red)':'var(--warn)';
-
-      let interp='';
-      if(aboveCloud&&bullCross&&cloudGreen) interp='🟢 <strong>Strong Bullish Setup</strong> — Price is above the cloud, Tenkan crossed above Kijun, and the cloud itself is green. All 3 Ichimoku conditions align for a long trade.';
-      else if(aboveCloud&&cloudGreen) interp='🟢 <strong>Bullish</strong> — Price is above the green cloud. Good long bias. Watch for a Tenkan/Kijun bullish cross to confirm entry.';
-      else if(aboveCloud&&!cloudGreen) interp='🟡 <strong>Cautiously Bullish</strong> — Price is above the cloud but the cloud is red (bearish future cloud). Proceed with caution.';
-      else if(inCloud) interp='🟡 <strong>Neutral / Consolidation</strong> — Price is inside the cloud. This is a no-trade zone in classical Ichimoku — wait for a breakout above or below.';
-      else if(belowCloud&&!cloudGreen) interp='🔴 <strong>Strong Bearish Setup</strong> — Price is below the cloud, and the cloud is red. All Ichimoku signals point down. Avoid longs.';
-      else if(belowCloud&&cloudGreen) interp='🔴 <strong>Bearish</strong> — Price is below the cloud. Even though the future cloud is green, current bias is bearish. Wait for price to reclaim the cloud.';
-      else interp='Analyzing Ichimoku signals...';
-      document.getElementById('ichi-interpretation').innerHTML=interp;
-    }
-
-    const adxData = calcADX(highs, lows, closes);
-    if(adxData!==null){
-      const{adx,diPlus,diMinus}=adxData;
-      const c=adx>40?'var(--green)':adx>25?'var(--warn)':'var(--red)';
-      const label=adx>40?'STRONG':adx>25?'TRENDING':adx>20?'WEAK':'RANGING';
-      setInd('adxBar','adxVal','adxBadge',adx,c,adx.toFixed(1),
-        adx>25?(diPlus>diMinus?'bull':'bear'):'neut',label);
-    }
-
-    const atr = calcATR(highs, lows, closes);
-    if(atr!==null){
-      const atrPct=(atr/price)*100;
-      const c=atrPct>3?'var(--red)':atrPct>1.5?'var(--warn)':'var(--green)';
-      setInd('atrBar','atrVal','atrBadge',Math.min(100,atrPct*15),c,fmtP(atr),
-        atrPct>3?'bear':'neut',atrPct>3?'HIGH VOL':atrPct>1.5?'MODERATE':'LOW VOL');
-
-      document.getElementById('tl-atr').textContent=fmtP(atr);
-      document.getElementById('tl-sl').textContent=fmtP(price-(atr*1.5))+' (−'+((atr*1.5/price)*100).toFixed(2)+'%)';
-      document.getElementById('tl-tp').textContent=fmtP(price+(atr*3))+' (+'+((atr*3/price)*100).toFixed(2)+'%)';
-      document.getElementById('tl-vol').textContent=atrPct.toFixed(2)+'% of price';
-      document.getElementById('tl-vol').style.color=c;
-    }
-
-    const obvData = calcOBV(closes, volumes);
-    if(obvData!==null){
-      const{value:obvVal,rising}=obvData;
-      const c=rising?'var(--green)':'var(--red)';
-      const label=rising?'RISING':'FALLING';
-      const absObv=Math.abs(obvVal);
-      const dispVal=absObv>=1e6?(obvVal/1e6).toFixed(2)+'M':absObv>=1e3?(obvVal/1e3).toFixed(1)+'K':obvVal.toFixed(0);
-      setInd('obvBar','obvVal','obvBadge',rising?72:28,c,dispVal,rising?'bull':'bear',label);
-    }
-
-    const st = calcSuperTrend(highs, lows, closes);
-    if(st!==null){
-      const up=st.trend==='up';
-      setInd('strendBar','strendVal','strendBadge',75,up?'var(--green)':'var(--red)',fmtP(st.value),up?'bull':'bear',up?'UPTREND ↑':'DOWNTREND ↓');
-    }
-
-    const piv = calcPivots(highs, lows, closes);
-    if(piv!==null){
-      const {pp, r1, s1} = piv;
-      const abovePP = price > pp;
-      const nearR1 = price > pp && price < r1;
-      const nearS1 = price < pp && price > s1;
-      setInd('pivPPBar','pivPPVal','pivPPBadge',75,abovePP?'var(--green)':'var(--red)',fmtP(pp),abovePP?'bull':'bear',abovePP?'ABOVE PP':'BELOW PP');
-      setInd('pivR1Bar','pivR1Val','pivR1Badge',75,nearR1?'var(--warn)':price>r1?'var(--red)':'var(--green)',fmtP(r1),'neut',price>r1?'ABOVE R1':nearR1?'NEAR R1':'BELOW R1');
-      setInd('pivS1Bar','pivS1Val','pivS1Badge',75,nearS1?'var(--warn)':price<s1?'var(--green)':'var(--red)',fmtP(s1),'neut',price<s1?'BELOW S1':nearS1?'NEAR S1':'ABOVE S1');
-    }
-
-    const div = calcDivergence(closes);
-    const divRsiColor = div.rsi==='bullish'?'var(--green)':div.rsi==='bearish'?'var(--red)':'var(--muted)';
-    const divMacdColor = div.macd==='bullish'?'var(--green)':div.macd==='bearish'?'var(--red)':'var(--muted)';
-    setInd('divRsiBar','divRsiVal','divRsiBadge',div.rsi!=='none'?80:30,divRsiColor,div.rsi.toUpperCase(),div.rsi==='bullish'?'bull':div.rsi==='bearish'?'bear':'neut',div.rsi==='bullish'?'BULL DIV':div.rsi==='bearish'?'BEAR DIV':'NONE');
-    setInd('divMacdBar','divMacdVal','divMacdBadge',div.macd!=='none'?80:30,divMacdColor,div.macd.toUpperCase(),div.macd==='bullish'?'bull':div.macd==='bearish'?'bear':'neut',div.macd==='bullish'?'BULL DIV':div.macd==='bearish'?'BEAR DIV':'NONE');
-
-    const vwap  = calcVWAP(closes, highs, lows, volumes);
-    const mvwap = calcMVWAP(closes, highs, lows, volumes, 20);
-    const fmtPct = v => (v>=0?'+':'')+v.toFixed(2)+'%';
-    if(vwap!==null){
-      const a=price>vwap, dist=((price-vwap)/vwap*100);
-      const sig=a?'🟢 Price above VWAP (Bullish)':'🔴 Price below VWAP (Bearish)';
-      setInd('vwapBar','vwapVal','vwapBadge',75,a?'var(--green)':'var(--red)',fmtP(vwap),a?'bull':'bear',a?'ABOVE':'BELOW');
-      document.getElementById('vwap-price').textContent=fmtP(vwap);
-      document.getElementById('vwap-price').style.color=a?'var(--green)':'var(--red)';
-      document.getElementById('vwap-pos').textContent=a?'Price ABOVE VWAP':'Price BELOW VWAP';
-      document.getElementById('vwap-pos').style.color=a?'var(--green)':'var(--red)';
-      document.getElementById('vwap-dist').textContent=fmtPct(dist);
-      document.getElementById('vwap-dist').style.color=a?'var(--green)':'var(--red)';
-      document.getElementById('vwap-signal').textContent=sig;
-      document.getElementById('vwap-signal').style.color=a?'var(--green)':'var(--red)';
-    }
-    if(mvwap!==null){
-      const a=price>mvwap, dist=((price-mvwap)/mvwap*100);
-      const sig=a?'🟢 Price above MVWAP (Bullish)':'🔴 Price below MVWAP (Bearish)';
-      setInd('mvwapBar','mvwapVal','mvwapBadge',75,a?'var(--green)':'var(--red)',fmtP(mvwap),a?'bull':'bear',a?'ABOVE':'BELOW');
-      document.getElementById('mvwap-price').textContent=fmtP(mvwap);
-      document.getElementById('mvwap-price').style.color=a?'var(--green)':'var(--red)';
-      document.getElementById('mvwap-pos').textContent=a?'Price ABOVE MVWAP':'Price BELOW MVWAP';
-      document.getElementById('mvwap-pos').style.color=a?'var(--green)':'var(--red)';
-      document.getElementById('mvwap-dist').textContent=fmtPct(dist);
-      document.getElementById('mvwap-dist').style.color=a?'var(--green)':'var(--red)';
-      document.getElementById('mvwap-signal').textContent=sig;
-      document.getElementById('mvwap-signal').style.color=a?'var(--green)':'var(--red)';
-    }
-
+    // All indicators rendered by _applyWave1 after worker returns
     stepProgress('indicators','done');
     activeProgress('mtf');
 
@@ -3332,6 +3115,15 @@ self.onmessage=function(e){
           if(res.score!==null){ scEl.textContent=`${res.score}/100`; scEl.style.color=res.score>=70?'var(--green)':res.score>=45?'var(--warn)':'var(--red)'; }
           else { scEl.textContent='N/A'; scEl.style.color='var(--muted)'; }
         }
+        // Update indicator panel MTF bars
+        const barId = id.replace('m','m').replace('h','h'); // e.g. '15m','1h','4h','1d','1w','1M'
+        const barMap={'15m':'mtf15Bar','30m':'mtf30mBar','1h':'mtf1hBar','4h':'mtf4hBar','1d':'mtf1dBar','1w':'mtf1wBar','1M':'mtf1MBar'};
+        const valMap={'15m':'mtf15Val','30m':'mtf30mVal','1h':'mtf1hVal','4h':'mtf4hVal','1d':'mtf1dVal','1w':'mtf1wVal','1M':'mtf1MVal'};
+        const badgeMap={'15m':'mtf15Badge','30m':'mtf30mBadge','1h':'mtf1hBadge','4h':'mtf4hBadge','1d':'mtf1dBadge','1w':'mtf1wBadge','1M':'mtf1MBadge'};
+        if(barMap[id]){
+          const sc=res.score!==null?res.score:50;
+          setInd(barMap[id],valMap[id],badgeMap[id],sc,res.color,res.score!==null?sc+'/100':'N/A',res.color==='var(--green)'?'bull':res.color==='var(--red)'?'bear':'neut',res.sig);
+        }
       });
 
       const validScores = mtfResults.filter(r=>r.score!==null).map(r=>r.score);
@@ -3358,20 +3150,11 @@ self.onmessage=function(e){
       stepProgress('mtf','done');
     })();
 
-    const ema8  = calcEMA(closes, 8);
-    const ema13 = calcEMA(closes, 13);
-    const ema21 = calcEMA(closes, 21);
-    const ema55 = calcEMA(closes, 55);
-    const ema200= calcEMA(closes, 200);
+    // EMAs already computed above via _snapIsBUY/_snapIsSELL/_snapBelowCount/_snapAboveCount
+    const ema8=calcEMA(closes,8),ema13=calcEMA(closes,13),ema21=calcEMA(closes,21),ema55=calcEMA(closes,55),ema200=calcEMA(closes,200);
+    if(ema200===null){document.getElementById('ema200indVal').textContent='Need 200+ candles';document.getElementById('ema200indBadge').textContent='N/A';}
 
-    if(ema8!==null){const a=price>ema8;setInd('ema9Bar','ema9Val','ema9Badge',a?75:75,a?'var(--green)':'var(--red)',fmtP(ema8),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
-    if(ema13!==null){const a=price>ema13;setInd('ema13Bar','ema13Val','ema13Badge',a?75:75,a?'var(--green)':'var(--red)',fmtP(ema13),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
-    if(ema21!==null){const a=price>ema21;setInd('ema21Bar','ema21Val','ema21Badge',a?75:75,a?'var(--green)':'var(--red)',fmtP(ema21),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
-    if(ema55!==null){const a=price>ema55;setInd('ema200Bar','ema200Val','ema200Badge',75,a?'var(--green)':'var(--red)',fmtP(ema55),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
-    if(ema200!==null){const a=price>ema200;setInd('ema200indBar','ema200indVal','ema200indBadge',a?72:28,a?'var(--green)':'var(--red)',fmtP(ema200),a?'bull':'bear',a?'UPTREND ↑':'DOWNTREND ↓');}
-    else{document.getElementById('ema200indVal').textContent='Need 200+ candles';document.getElementById('ema200indBadge').textContent='N/A';}
-
-    const e8=ema8||0, e13=ema13||0, e21=ema21||0, e55=ema55||0;
+    const e8=ema8||0,e13=ema13||0,e21=ema21||0,e55=ema55||0;
 
     const e55above8  = e55 > e8;
     const e55above13 = e55 > e13;
@@ -3385,10 +3168,10 @@ self.onmessage=function(e){
     const partialExitBuy  = !isBUY && !isSELL && e55BelowCount >= 1 && e55BelowCount <= 2 && e55BelowCount > e55AboveCount;
     const partialExitSell = !isBUY && !isSELL && e55AboveCount >= 1 && e55AboveCount <= 2 && e55AboveCount > e55BelowCount;
 
-    const macdBull  = macdV !== null && macdV > 0;
-    const obvBull   = obvData !== null && obvData.rising;
-    const adxStrong = adxData !== null && adxData.adx > 25;
-    const rsiOk     = rsi !== null && rsi > 40 && rsi < 70;
+    const macdBull  = _macdV !== null && _macdV > 0;
+    const obvBull   = calcOBV(closes,volumes)?.rising === true;
+    const adxStrong = (calcADX(highs,lows,closes)?.adx||0) > 25;
+    const rsiOk     = _rsi !== null && _rsi > 40 && _rsi < 70;
 
     const tlSignalEl = document.getElementById('tl-signal');
     const tlDetailEl = document.getElementById('tl-signal-detail');
@@ -3523,7 +3306,7 @@ self.onmessage=function(e){
   // ── WAVE 1: indicators + score + prediction + patterns ───────────────────
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
     const { ind, score, prediction, patterns, elapsed1 } = w1;
-    const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR } = ind;
+    const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
 
     // ── Indicator bars ──────────────────────────────────────────────────────
     if(rsi!==null){const c=rsi<30?'var(--green)':rsi>70?'var(--red)':'var(--warn)';setInd('rsiBar','rsiVal','rsiBadge',rsi,c,rsi.toFixed(1),rsi<30?'bull':rsi>70?'bear':'neut',rsi<30?'OVERSOLD':rsi>70?'OVERBOUGHT':rsi>=50?'BULLISH':'BEARISH');}
@@ -3538,32 +3321,70 @@ self.onmessage=function(e){
     if(mfi!==null){const c=mfi>80?'var(--red)':mfi<20?'var(--green)':'var(--warn)';setInd('mfiBar','mfiVal','mfiBadge',mfi,c,mfi.toFixed(1),mfi>80?'bear':mfi<20?'bull':'neut',mfi>80?'OVERBOUGHT':mfi<20?'OVERSOLD':mfi>=50?'BULLISH FLOW':'BEARISH FLOW');}
     if(roc!==null){const c=roc>0?'var(--green)':'var(--red)';const bp=Math.min(100,Math.max(0,50+roc*2));setInd('rocBar','rocVal','rocBadge',bp,c,(roc>=0?'+':'')+roc.toFixed(2)+'%',roc>0?'bull':'bear',roc>5?'STRONG UP':roc>0?'RISING':roc>-5?'FALLING':'STRONG DOWN');}
     if(ult!==null){const c=ult>70?'var(--red)':ult<30?'var(--green)':'var(--warn)';setInd('ultBar','ultVal','ultBadge',ult,c,ult.toFixed(1),ult>70?'bear':ult<30?'bull':'neut',ult>70?'OVERBOUGHT':ult<30?'OVERSOLD':ult>=50?'BULLISH':'BEARISH');}
+    if(psar){const c=psar.bull?'var(--green)':'var(--red)';setInd('psarBar','psarVal','psarBadge',psar.bull?75:25,c,fmtP(psar.value),psar.bull?'bull':'bear',psar.bull?'PRICE ABOVE SAR':'PRICE BELOW SAR');}
+    if(cmf!==null){const c=cmf>0.05?'var(--green)':cmf<-0.05?'var(--red)':'var(--warn)';const bp=Math.min(100,Math.max(0,50+cmf*200));setInd('cmfBar','cmfVal','cmfBadge',bp,c,cmf.toFixed(3),cmf>0.05?'bull':cmf<-0.05?'bear':'neut',cmf>0.1?'STRONG INFLOW':cmf>0.05?'INFLOW':cmf>-0.05?'NEUTRAL':cmf>-0.1?'OUTFLOW':'STRONG OUTFLOW');}
+    if(kelt){const c=kelt.pct<20?'var(--green)':kelt.pct>80?'var(--red)':'var(--warn)';setInd('keltBar','keltVal','keltBadge',kelt.pct,c,kelt.pct.toFixed(1)+'%',kelt.pct<30?'bull':kelt.pct>70?'bear':'neut',kelt.pct<20?'NEAR LOWER BAND':kelt.pct>80?'NEAR UPPER BAND':kelt.pct<50?'BELOW MID':'ABOVE MID');}
+
+    // ── Remaining indicators (EMA, ATR, OBV, ADX, ST, Pivots, Div, VWAP) ────
     if(ema8!==null){const a=price>ema8;setInd('ema9Bar','ema9Val','ema9Badge',75,a?'var(--green)':'var(--red)',fmtP(ema8),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
     if(ema13!==null){const a=price>ema13;setInd('ema13Bar','ema13Val','ema13Badge',75,a?'var(--green)':'var(--red)',fmtP(ema13),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
     if(ema21!==null){const a=price>ema21;setInd('ema21Bar','ema21Val','ema21Badge',75,a?'var(--green)':'var(--red)',fmtP(ema21),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
     if(ema55!==null){const a=price>ema55;setInd('ema200Bar','ema200Val','ema200Badge',75,a?'var(--green)':'var(--red)',fmtP(ema55),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
     if(ema200!==null){const a=price>ema200;setInd('ema200indBar','ema200indVal','ema200indBadge',75,a?'var(--green)':'var(--red)',fmtP(ema200),a?'bull':'bear',a?'ABOVE EMA200':'BELOW EMA200');}
-    if(atr!==null){const ap=(atr/price*100);setInd('atrBar','atrVal','atrBadge',Math.min(100,ap*10),'var(--warn)',fmtP(atr),ap>3?'bear':'neut',ap>5?'HIGH VOLATILITY':ap>2?'MODERATE ATR':'LOW VOLATILITY');}
-    if(obvData!==null){const c=obvData.rising?'var(--green)':'var(--red)';setInd('obvBar','obvVal','obvBadge',obvData.rising?80:20,c,obvData.rising?'Rising':'Falling',obvData.rising?'bull':'bear',obvData.rising?'ACCUMULATING':'DISTRIBUTING');}
+    else{const ev=document.getElementById('ema200indVal');if(ev)ev.textContent='Need 200+ candles';}
+    if(atr!==null){const ap=(atr/price*100);const c=ap>3?'var(--red)':ap>1.5?'var(--warn)':'var(--green)';setInd('atrBar','atrVal','atrBadge',Math.min(100,ap*10),c,fmtP(atr),ap>3?'bear':'neut',ap>5?'HIGH VOLATILITY':ap>2?'MODERATE ATR':'LOW VOLATILITY');
+      const ta=document.getElementById('tl-atr');if(ta)ta.textContent=fmtP(atr);
+      const tsl=document.getElementById('tl-sl');if(tsl)tsl.textContent=fmtP(price-(atr*1.5))+' (−'+((atr*1.5/price)*100).toFixed(2)+'%)';
+      const ttp=document.getElementById('tl-tp');if(ttp)ttp.textContent=fmtP(price+(atr*3))+' (+'+((atr*3/price)*100).toFixed(2)+'%)';
+      const tv=document.getElementById('tl-vol');if(tv){tv.textContent=ap.toFixed(2)+'% of price';tv.style.color=c;}
+    }
+    if(obvData!==null){const{value:ov,rising}=obvData;const c=rising?'var(--green)':'var(--red)';const av=Math.abs(ov);const dv=av>=1e6?(ov/1e6).toFixed(2)+'M':av>=1e3?(ov/1e3).toFixed(1)+'K':ov.toFixed(0);setInd('obvBar','obvVal','obvBadge',rising?72:28,c,dv,rising?'bull':'bear',rising?'ACCUMULATING':'DISTRIBUTING');}
     if(adxData!==null){const{adx,diPlus,diMinus}=adxData;const c=adx>40?'var(--green)':adx>25?'var(--warn)':'var(--red)';setInd('adxBar','adxVal','adxBadge',Math.min(100,adx*2),c,adx.toFixed(1)+(diPlus>diMinus?' +DI':' -DI'),adx>25&&diPlus>diMinus?'bull':adx>25&&diMinus>diPlus?'bear':'neut',adx>40?'STRONG TREND':adx>25?'TRENDING':'WEAK TREND');}
     if(st!==null){const u=st.trend==='up';setInd('strendBar','strendVal','strendBadge',u?75:25,u?'var(--green)':'var(--red)',fmtP(st.value),u?'bull':'bear',u?'UPTREND ↑':'DOWNTREND ↓');}
     if(piv!==null){setInd('pivR1Bar','pivR1Val','pivR1Badge',75,'var(--red)',fmtP(piv.r1),price<piv.r1?'neut':'bear','R1 RESISTANCE');setInd('pivPPBar','pivPPVal','pivPPBadge',50,'var(--warn)',fmtP(piv.pp),price>piv.pp?'bull':'bear',price>piv.pp?'ABOVE PP':'BELOW PP');setInd('pivS1Bar','pivS1Val','pivS1Badge',25,'var(--green)',fmtP(piv.s1),price>piv.s1?'bull':'neut','S1 SUPPORT');}
-    if(vwap!==null){const a=price>vwap;setInd('vwapBar','vwapVal','vwapBadge',75,a?'var(--green)':'var(--red)',fmtP(vwap),a?'bull':'bear',a?'ABOVE VWAP':'BELOW VWAP');}
-    if(mvwap!==null){const a=price>mvwap;setInd('mvwapBar','mvwapVal','mvwapBadge',75,a?'var(--green)':'var(--red)',fmtP(mvwap),a?'bull':'bear',a?'ABOVE MVWAP':'BELOW MVWAP');}
-    if(div){const rd=div.rsi,md=div.macd;const c=rd==='bullish'||md==='bullish'?'var(--green)':rd==='bearish'||md==='bearish'?'var(--red)':'var(--warn)';setInd('divRsiBar','divRsiVal','divRsiBadge',rd==='bullish'?75:rd==='bearish'?25:50,c,rd.toUpperCase(),rd==='bullish'?'bull':rd==='bearish'?'bear':'neut','RSI DIV: '+rd.toUpperCase());setInd('divMacdBar','divMacdVal','divMacdBadge',md==='bullish'?75:md==='bearish'?25:50,c,md.toUpperCase(),md==='bullish'?'bull':md==='bearish'?'bear':'neut','MACD DIV: '+md.toUpperCase());}
+    if(div){const rd=div.rsi,md=div.macd;setInd('divRsiBar','divRsiVal','divRsiBadge',rd==='bullish'?75:rd==='bearish'?25:50,rd==='bullish'?'var(--green)':rd==='bearish'?'var(--red)':'var(--muted)',rd.toUpperCase(),rd==='bullish'?'bull':rd==='bearish'?'bear':'neut','RSI DIV: '+rd.toUpperCase());setInd('divMacdBar','divMacdVal','divMacdBadge',md==='bullish'?75:md==='bearish'?25:50,md==='bullish'?'var(--green)':md==='bearish'?'var(--red)':'var(--muted)',md.toUpperCase(),md==='bullish'?'bull':md==='bearish'?'bear':'neut','MACD DIV: '+md.toUpperCase());}
+    if(vwap!==null){const a=price>vwap,dist=((price-vwap)/vwap*100);const fmtPct=v=>(v>=0?'+':'')+v.toFixed(2)+'%';setInd('vwapBar','vwapVal','vwapBadge',75,a?'var(--green)':'var(--red)',fmtP(vwap),a?'bull':'bear',a?'ABOVE VWAP':'BELOW VWAP');
+      const ve=document.getElementById('vwap-price');if(ve){ve.textContent=fmtP(vwap);ve.style.color=a?'var(--green)':'var(--red)';}
+      const vp=document.getElementById('vwap-pos');if(vp){vp.textContent=a?'Price ABOVE VWAP':'Price BELOW VWAP';vp.style.color=a?'var(--green)':'var(--red)';}
+      const vd=document.getElementById('vwap-dist');if(vd){vd.textContent=fmtPct(dist);vd.style.color=a?'var(--green)':'var(--red)';}
+      const vs=document.getElementById('vwap-signal');if(vs){vs.textContent=a?'🟢 Price above VWAP (Bullish)':'🔴 Price below VWAP (Bearish)';vs.style.color=a?'var(--green)':'var(--red)';}
+    }
+    if(mvwap!==null){const a=price>mvwap,dist=((price-mvwap)/mvwap*100);const fmtPct=v=>(v>=0?'+':'')+v.toFixed(2)+'%';setInd('mvwapBar','mvwapVal','mvwapBadge',75,a?'var(--green)':'var(--red)',fmtP(mvwap),a?'bull':'bear',a?'ABOVE MVWAP':'BELOW MVWAP');
+      const me=document.getElementById('mvwap-price');if(me){me.textContent=fmtP(mvwap);me.style.color=a?'var(--green)':'var(--red)';}
+      const mp=document.getElementById('mvwap-pos');if(mp){mp.textContent=a?'Price ABOVE MVWAP':'Price BELOW MVWAP';mp.style.color=a?'var(--green)':'var(--red)';}
+      const md2=document.getElementById('mvwap-dist');if(md2){md2.textContent=fmtPct(dist);md2.style.color=a?'var(--green)':'var(--red)';}
+    }
 
     // ── Ichimoku ────────────────────────────────────────────────────────────
     if(ichi!==null){
       const{tenkan,kijun,senkouA,senkouB,chikou,chikouRef,price:ip}=ichi;
       const cloudTop=Math.max(senkouA,senkouB),cloudBot=Math.min(senkouA,senkouB);
-      const aboveCloud=ip>cloudTop,belowCloud=ip<cloudBot;
-      const ichiScore=[aboveCloud,tenkan>kijun,senkouA>senkouB,chikou>chikouRef].filter(Boolean).length;
+      const aboveCloud=ip>cloudTop,belowCloud=ip<cloudBot,inCloud=!aboveCloud&&!belowCloud;
+      const bullCross=tenkan>kijun,cloudGreen=senkouA>senkouB,chikouBull=chikou>chikouRef;
+      const ichiScore=[aboveCloud,bullCross,cloudGreen,chikouBull].filter(Boolean).length;
       const ichiColor=ichiScore>=3?'var(--green)':ichiScore===2?'var(--warn)':'var(--red)';
       setInd('ichiBar','ichiVal','ichiBadge',ichiScore*25,ichiColor,aboveCloud?'ABOVE ☁':belowCloud?'BELOW ☁':'IN ☁',ichiScore>=3?'bull':ichiScore<=1?'bear':'neut',ichiScore>=3?'BULLISH':ichiScore===2?'MIXED':'BEARISH');
       const fp=n=>n>=1?'$'+n.toFixed(2):'$'+n.toFixed(6);
-      [['ichi-tenkan',tenkan],['ichi-kijun',kijun],['ichi-senkou-a',senkouA],['ichi-senkou-b',senkouB],['ichi-chikou',chikou]].forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=fp(v);});
+      // Ichimoku detail panel
+      [['ichi-tenkan',tenkan],['ichi-kijun',kijun],['ichi-sa',senkouA],['ichi-sb',senkouB]].forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=fp(v);});
+      const tk=document.getElementById('ichi-tenkan');if(tk)tk.style.color=tenkan>kijun?'var(--green)':'var(--red)';
       const ts=document.getElementById('ichi-tenkan-sig');if(ts){ts.textContent=tenkan>kijun?'↑ Above Kijun':'↓ Below Kijun';ts.style.color=tenkan>kijun?'var(--green)':'var(--red)';}
-      const cs=document.getElementById('ichi-cloud-sig');if(cs){cs.textContent=aboveCloud?'Price above cloud ☁ (Bullish)':belowCloud?'Price below cloud ☁ (Bearish)':'Price inside cloud (Neutral)';cs.style.color=aboveCloud?'var(--green)':belowCloud?'var(--red)':'var(--warn)';}
+      const kj=document.getElementById('ichi-kijun');if(kj)kj.style.color=ip>kijun?'var(--green)':'var(--red)';
+      const kjs=document.getElementById('ichi-kijun-sig');if(kjs){kjs.textContent=ip>kijun?'Price above':'Price below';kjs.style.color=ip>kijun?'var(--green)':'var(--red)';}
+      const sa=document.getElementById('ichi-sa');if(sa)sa.style.color=senkouA>senkouB?'var(--green)':'var(--red)';
+      const sas=document.getElementById('ichi-sa-sig');if(sas){sas.textContent=senkouA>senkouB?'Bullish cloud':'Bearish cloud';sas.style.color=senkouA>senkouB?'var(--green)':'var(--red)';}
+      const sbs=document.getElementById('ichi-sb-sig');if(sbs)sbs.textContent='Cloud bottom';
+      const cloudEl=document.getElementById('ichi-cloud');if(cloudEl){cloudEl.textContent=aboveCloud?'ABOVE':belowCloud?'BELOW':'INSIDE';cloudEl.style.color=aboveCloud?'var(--green)':belowCloud?'var(--red)':'var(--warn)';}
+      const cs=document.getElementById('ichi-cloud-sig');if(cs){cs.textContent=aboveCloud?'Bullish zone':belowCloud?'Bearish zone':'Neutral zone';cs.style.color=aboveCloud?'var(--green)':belowCloud?'var(--red)':'var(--warn)';}
+      let interp='';
+      if(aboveCloud&&bullCross&&cloudGreen)interp='🟢 <strong>Strong Bullish Setup</strong> — Price above cloud, Tenkan crossed Kijun, cloud is green. All 3 Ichimoku conditions align for long.';
+      else if(aboveCloud&&cloudGreen)interp='🟢 <strong>Bullish</strong> — Price above green cloud. Watch for Tenkan/Kijun cross to confirm entry.';
+      else if(aboveCloud&&!cloudGreen)interp='🟡 <strong>Cautiously Bullish</strong> — Price above cloud but cloud is red. Proceed with caution.';
+      else if(inCloud)interp='🟡 <strong>Neutral / Consolidation</strong> — Price inside cloud. No-trade zone — wait for breakout.';
+      else if(belowCloud&&!cloudGreen)interp='🔴 <strong>Strong Bearish Setup</strong> — Price below cloud, cloud is red. Avoid longs.';
+      else if(belowCloud&&cloudGreen)interp='🔴 <strong>Bearish</strong> — Price below cloud. Wait for price to reclaim cloud.';
+      else interp='Analyzing Ichimoku signals...';
+      const ii=document.getElementById('ichi-interpretation');if(ii)ii.innerHTML=interp;
     }
 
     // ── Trade score ring ────────────────────────────────────────────────────
