@@ -2276,57 +2276,24 @@ self.onmessage=function(e){
     return cumVol>0?cumTPV/cumVol:null;
   }
 
+  // Fast MTF scorer — EMA55 strategy signal only (5 EMA calls, no heavy indicators)
   function calcMTFScore(closes, highs, lows, volumes) {
-    if(!closes || closes.length < 55) return { score: null, sig: '—', color: 'var(--muted)', detail: 'Need more data' };
+    if(!closes || closes.length < 10) return { score: null, sig: '—', color: 'var(--muted)', detail: 'Need more data' };
     const price = closes[closes.length-1];
-
-    const e8  = calcEMA(closes, 8);
-    const e13 = calcEMA(closes, 13);
-    const e21 = calcEMA(closes, 21);
-    const e55 = calcEMA(closes, 55);
-    const e200= calcEMA(closes, 200);
-    const belowAll = e55&&e8&&e13&&e21 && e55<e8 && e55<e13 && e55<e21;
-    const aboveAll = e55&&e8&&e13&&e21 && e55>e8 && e55>e13 && e55>e21;
-    const aboveCnt = e55&&e8&&e13&&e21 ? [e55>e8,e55>e13,e55>e21].filter(Boolean).length : 1;
-
-    let sig, color;
-    if(belowAll){sig='🟢 BUY'; color='var(--green)';}
-    else if(aboveAll){sig='🔴 SELL'; color='var(--red)';}
-    else{sig='🟡 NEUTRAL'; color='var(--warn)';}
-
-    let sc=0, mx=0;
-    const rsi=calcRSI(closes);
-    if(rsi!==null){mx+=20; sc+=rsi>=45&&rsi<=65?20:rsi>=35&&rsi<45?12:rsi<30?16:rsi>70?4:8;}
-    const macdV=calcMACD(closes);
-    if(macdV!==null){mx+=20; sc+=macdV>0?20:4;}
-    const stoch=calcStochRSI(closes);
-    if(stoch!==null){mx+=12; sc+=stoch>=30&&stoch<=70?12:stoch<20?10:stoch>80?2:6;}
-    const bbP=calcBB(closes);
-    if(bbP!==null){mx+=8; sc+=bbP>=0.35&&bbP<=0.65?8:bbP<0.2?6:bbP>0.8?2:4;}
-
-    if(e8!==null){mx+=6; sc+=price>e8?6:0;}
-    if(e13!==null){mx+=6; sc+=price>e13?6:0;}
-    if(e21!==null){mx+=6; sc+=price>e21?6:0;}
-    if(e55!==null){mx+=10; sc+=price>e55?10:0;}
-    if(e200!==null){mx+=12; sc+=price>e200?12:0;}
-
-    const adx=calcADX(highs,lows,closes);
-    if(adx){mx+=10; sc+=adx.adx>25?(adx.diPlus>adx.diMinus?10:2):5;}
-
-    const ichi=calcIchimoku(highs,lows,closes);
-    if(ichi){mx+=9; const ct=Math.max(ichi.senkouA,ichi.senkouB); const is=[price>ct,ichi.tenkan>ichi.kijun,ichi.senkouA>ichi.senkouB].filter(Boolean).length; sc+=is===3?9:is===2?6:is===1?3:0;}
-
-    const st=calcSuperTrend(highs,lows,closes);
-    if(st){mx+=10; sc+=st.trend==='up'?10:0;}
-
-    if(volumes&&volumes.length>10){const obv=calcOBV(closes,volumes); if(obv){mx+=8; sc+=obv.rising?8:0;}}
-
-    mx+=20;
-    sc += belowAll?20:aboveCnt===2?14:aboveCnt===1?10:aboveCnt===0?4:2;
-
-    const score = mx>0 ? Math.round((sc/mx)*100) : 50;
-    const detail = `Score: ${score}/100 · ${sig.replace('🟢 ','').replace('🔴 ','').replace('🟡 ','EMA55 ')}`;
-    return { score, sig, color, detail };
+    const e8=calcEMA(closes,8),e13=calcEMA(closes,13),e21=calcEMA(closes,21);
+    const e55=calcEMA(closes,55),e200=calcEMA(closes,200);
+    const ok=e55&&e8&&e13&&e21;
+    const belowAll=ok&&e55<e8&&e55<e13&&e55<e21;
+    const aboveAll=ok&&e55>e8&&e55>e13&&e55>e21;
+    const aboveCnt=ok?[e55>e8,e55>e13,e55>e21].filter(Boolean).length:1;
+    const sig=belowAll?'🟢 BUY':aboveAll?'🔴 SELL':'🟡 NEUTRAL';
+    const color=belowAll?'var(--green)':aboveAll?'var(--red)':'var(--warn)';
+    if(closes.length < 55) return { score: belowAll?80:aboveAll?20:50, sig, color, detail:`⚠️ Only ${closes.length} candles` };
+    let sc=0,mx=60;
+    sc+=belowAll?40:aboveCnt===0?28:aboveCnt===1?18:aboveCnt===2?8:0;
+    sc+=e200?(price>e200?20:0):10;
+    const score=Math.round((sc/mx)*100);
+    return { score, sig, color, detail:`Score: ${score}/100 · EMA55 ${belowAll?'below all (BUY)':aboveAll?'above all (SELL)':aboveCnt+'/3 crossed'}` };
   }
 
   function calcIchimoku(highs, lows, closes) {
