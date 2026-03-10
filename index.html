@@ -1421,7 +1421,7 @@ function calcEMA(a,p){if(a.length<p)return null;const k=2/(p+1);let e=a[0];for(l
 function calcRSI(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}let ag=g/p,al=l/p;for(let i=p+1;i<a.length;i++){const d=a[i]-a[i-1];ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;}return al===0?100:100-100/(1+ag/al);}
 function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?e12-e26:null;}
 function calcBB(a,p=20){if(a.length<p)return null;const s=a.slice(-p),m=s.reduce((x,y)=>x+y,0)/p;const std=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/p);const up=m+2*std,lo=m-2*std,pr=a[a.length-1];return(up-lo)>0?(pr-lo)/(up-lo):0.5;}
-function calcStochRSI(a,p=14){if(a.length<p*2)return null;const rs=[];for(let i=p;i<a.length;i++)rs.push(calcRSI(a.slice(0,i+1),p));const v=rs.filter(x=>x!==null);if(v.length<p)return null;const sl=v.slice(-p),mn=Math.min(...sl),mx=Math.max(...sl);return mx===mn?50:((v[v.length-1]-mn)/(mx-mn))*100;}
+function calcStochRSI(a,p=14){if(a.length<p*2+1)return null;let gains=0,losses=0;for(let i=a.length-p*2;i<a.length-p;i++){const d=a[i+1]-a[i];if(d>0)gains+=d;else losses-=d;}gains/=p;losses/=p;const rsiSeries=[];for(let i=a.length-p;i<a.length;i++){const d=a[i]-a[i-1];gains=(gains*(p-1)+(d>0?d:0))/p;losses=(losses*(p-1)+(d<0?-d:0))/p;const rs=losses===0?100:gains/losses;rsiSeries.push(100-(100/(1+rs)));}let mn=rsiSeries[0],mx=rsiSeries[0];for(let i=1;i<rsiSeries.length;i++){if(rsiSeries[i]<mn)mn=rsiSeries[i];if(rsiSeries[i]>mx)mx=rsiSeries[i];}const last=rsiSeries[rsiSeries.length-1];return mx===mn?50:((last-mn)/(mx-mn))*100;}
 function calcCCI(h,l,c,p=20){if(c.length<p)return null;const hs=h.slice(-p),ls=l.slice(-p),cs=c.slice(-p);const tp=cs.map((v,i)=>(hs[i]+ls[i]+v)/3);const mean=tp.reduce((a,b)=>a+b,0)/p;const md=tp.reduce((a,b)=>a+Math.abs(b-mean),0)/p;return md===0?0:(tp[tp.length-1]-mean)/(0.015*md);}
 function calcMFI(h,l,c,v,p=14){if(c.length<p+1||!v||v.length<p+1)return null;let pF=0,nF=0;for(let i=c.length-p;i<c.length;i++){const tp=(h[i]+l[i]+c[i])/3,ptp=(h[i-1]+l[i-1]+c[i-1])/3,mf=tp*v[i];if(tp>ptp)pF+=mf;else nF+=mf;}return nF===0?100:100-(100/(1+pF/nF));}
 function calcROC(c,p=12){if(c.length<p+1)return null;const prev=c[c.length-1-p],curr=c[c.length-1];return prev===0?0:((curr-prev)/prev)*100;}
@@ -1429,26 +1429,87 @@ function calcUltimateOscillator(h,l,c){if(c.length<29)return null;const bp=i=>c[
 function calcParabolicSAR(h,l,c,step=0.02,max=0.2){if(c.length<3)return null;let bull=c[1]>c[0],af=step,ep=bull?h[0]:l[0],sar=bull?l[0]:h[0];for(let i=2;i<c.length;i++){sar=sar+af*(ep-sar);if(bull){sar=Math.min(sar,l[i-1],i>1?l[i-2]:l[i-1]);if(l[i]<sar){bull=false;sar=ep;ep=l[i];af=step;}else{if(h[i]>ep){ep=h[i];af=Math.min(af+step,max);}}}else{sar=Math.max(sar,h[i-1],i>1?h[i-2]:h[i-1]);if(h[i]>sar){bull=true;sar=ep;ep=h[i];af=step;}else{if(l[i]<ep){ep=l[i];af=Math.min(af+step,max);}}}}return{value:sar,bull};}
 function calcCMF(h,l,c,v,p=20){if(c.length<p||!v||v.length<p)return null;let mfv=0,vol=0;for(let i=c.length-p;i<c.length;i++){const hl=h[i]-l[i];if(hl===0)continue;mfv+=((c[i]-l[i])-(h[i]-c[i]))/hl*v[i];vol+=v[i];}return vol===0?0:mfv/vol;}
 function calcKeltner(h,l,c,p=20,mult=1.5){if(c.length<p+1)return null;const ema=calcEMA(c,p);if(!ema)return null;const atr=calcATR(h,l,c,p);if(!atr)return null;const upper=ema+mult*atr,lower=ema-mult*atr,price=c[c.length-1],range=upper-lower;if(range===0)return null;return{upper,lower,mid:ema,pct:(price-lower)/range*100,price};}
-function calcWilliamsR(h,l,c,p=14){if(c.length<p)return null;const hh=Math.max(...h.slice(-p)),ll=Math.min(...l.slice(-p)),cp=c[c.length-1];return hh===ll?-50:((hh-cp)/(hh-ll))*-100;}
+// Fast single-pass EMA — reuses k factor, no array copies
+function calcEMAFast(c,p){if(!c||c.length<p)return null;let s=0;for(let i=c.length-p;i<c.length;i++)s+=c[i];let v=s/p;const k=2/(p+1);for(let i=c.length-p+1;i<c.length;i++)v=c[i]*k+v*(1-k);return v;}
+// WilliamsR without array copy
+function calcWilliamsR(h,l,c,p=14){if(c.length<p)return null;let hh=h[c.length-p],ll=l[c.length-p];for(let i=c.length-p+1;i<c.length;i++){if(h[i]>hh)hh=h[i];if(l[i]<ll)ll=l[i];}const cp=c[c.length-1];return hh===ll?-50:((hh-cp)/(hh-ll))*-100;}
 function calcATR(h,l,c,p=14){if(c.length<p+1)return null;const trs=[];for(let i=1;i<c.length;i++){trs.push(Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1])));}let atr=trs.slice(0,p).reduce((a,b)=>a+b,0)/p;for(let i=p;i<trs.length;i++)atr=(atr*(p-1)+trs[i])/p;return atr;}
 function calcADX(h,l,c,p=14){if(c.length<p*2)return null;const dmP=[],dmM=[],trs=[];for(let i=1;i<c.length;i++){const up=h[i]-h[i-1],dn=l[i-1]-l[i];dmP.push(up>dn&&up>0?up:0);dmM.push(dn>up&&dn>0?dn:0);trs.push(Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1])));}let atr=trs.slice(0,p).reduce((a,b)=>a+b,0)/p,sdmP=dmP.slice(0,p).reduce((a,b)=>a+b,0)/p,sdmM=dmM.slice(0,p).reduce((a,b)=>a+b,0)/p;for(let i=p;i<trs.length;i++){atr=(atr*(p-1)+trs[i])/p;sdmP=(sdmP*(p-1)+dmP[i])/p;sdmM=(sdmM*(p-1)+dmM[i])/p;}if(atr===0)return null;const diP=(sdmP/atr)*100,diM=(sdmM/atr)*100;return{adx:Math.abs(diP-diM)/(diP+diM)*100,diPlus:diP,diMinus:diM};}
 function calcOBV(c,v){if(c.length<2)return null;let obv=0;const arr=[0];for(let i=1;i<c.length;i++){if(c[i]>c[i-1])obv+=v[i];else if(c[i]<c[i-1])obv-=v[i];arr.push(obv);}const r=arr.slice(-20);const ef=calcEMA(r,5),es=calcEMA(r,10);return{value:obv,rising:ef!==null&&es!==null?ef>es:obv>arr[arr.length-10]};}
 function calcSuperTrend(h,l,c,period=10,mult=3){if(c.length<period+1)return null;const atr=calcATR(h,l,c,period);if(!atr)return null;const hl2=(h[h.length-1]+l[l.length-1])/2,lb=hl2-mult*atr,price=c[c.length-1];const trend=price>lb?'up':'down';return{trend,value:trend==='up'?lb:hl2+mult*atr,atr};}
 function calcPivots(h,l,c){if(c.length<2)return null;const ph=h[h.length-2],pl=l[l.length-2],pc=c[c.length-2],pp=(ph+pl+pc)/3;return{pp,r1:2*pp-pl,r2:pp+(ph-pl),s1:2*pp-ph,s2:pp-(ph-pl)};}
-function calcDivergence(c,period=14,lookback=5){if(c.length<period+lookback*2)return{rsi:'none',macd:'none'};const rsiArr=[];for(let i=lookback;i>=0;i--){const r=calcRSI(c.slice(0,c.length-i),period);if(r!==null)rsiArr.push(r);}const priceArr=c.slice(-rsiArr.length);if(rsiArr.length<3)return{rsi:'none',macd:'none'};const pF=priceArr[0],pL=priceArr[priceArr.length-1],rF=rsiArr[0],rL=rsiArr[rsiArr.length-1];let rsiDiv='none';if(pL>pF*1.002&&rL<rF-2)rsiDiv='bearish';if(pL<pF*0.998&&rL>rF+2)rsiDiv='bullish';const macdArr=[];for(let i=lookback;i>=0;i--){const m=calcMACD(c.slice(0,c.length-i));if(m!==null)macdArr.push(m);}const mF=macdArr[0],mL=macdArr[macdArr.length-1];let macdDiv='none';if(pL>pF*1.002&&mL<mF-0.001)macdDiv='bearish';if(pL<pF*0.998&&mL>mF+0.001)macdDiv='bullish';return{rsi:rsiDiv,macd:macdDiv};}
+// Divergence: compare RSI/MACD at two points only — no repeated full recalculations
+function calcDivergence(c,period=14){
+  const n=c.length; if(n<period+10)return{rsi:'none',macd:'none'};
+  // Compare current vs 5 candles ago — single calc each
+  const rsiNow=calcRSI(c,period);
+  const rsiPrev=calcRSI(c.slice(0,-5),period);
+  const macdNow=calcMACD(c);
+  const macdPrev=calcMACD(c.slice(0,-5));
+  const pNow=c[n-1],pPrev=c[n-6];
+  let rsiDiv='none',macdDiv='none';
+  if(rsiNow!==null&&rsiPrev!==null){
+    if(pNow>pPrev*1.002&&rsiNow<rsiPrev-2)rsiDiv='bearish';
+    else if(pNow<pPrev*0.998&&rsiNow>rsiPrev+2)rsiDiv='bullish';
+  }
+  if(macdNow!==null&&macdPrev!==null){
+    if(pNow>pPrev*1.002&&macdNow<macdPrev-0.001)macdDiv='bearish';
+    else if(pNow<pPrev*0.998&&macdNow>macdPrev+0.001)macdDiv='bullish';
+  }
+  return{rsi:rsiDiv,macd:macdDiv};
+}
 function calcVWAP(c,h,l,v){if(c.length<2)return null;let cumTPV=0,cumVol=0;for(let i=0;i<c.length;i++){cumTPV+=(h[i]+l[i]+c[i])/3*v[i];cumVol+=v[i];}return cumVol>0?cumTPV/cumVol:null;}
-function calcMVWAP(c,h,l,v,p=20){if(c.length<p)return null;return calcVWAP(c.slice(-p),h.slice(-p),l.slice(-p),v.slice(-p));}
-function calcIchimoku(h,l,c){if(c.length<52)return null;const mid=(arr,s,len)=>{const sl=arr.slice(s,s+len);return(Math.max(...sl)+Math.min(...sl))/2;};const n=c.length,tenkan=(mid(h,n-9,9)+mid(l,n-9,9))/2,kijun=(mid(h,n-26,26)+mid(l,n-26,26))/2,senkouA=(tenkan+kijun)/2,senkouB=(mid(h,n-52,52)+mid(l,n-52,52))/2;return{tenkan,kijun,senkouA,senkouB,chikou:c[n-1],chikouRef:c[n-26]||c[0],price:c[n-1]};}
+function calcMVWAP(c,h,l,v,p=20){
+  if(c.length<p)return null;
+  const s=c.length-p;
+  let cumTPV=0,cumVol=0;
+  for(let i=s;i<c.length;i++){cumTPV+=(h[i]+l[i]+c[i])/3*v[i];cumVol+=v[i];}
+  return cumVol>0?cumTPV/cumVol:null;
+}
+// Ichimoku: replace Math.max(...slice) spreads with fast loops
+function calcIchimoku(h,l,c){
+  if(c.length<52)return null;
+  const n=c.length;
+  const midRange=(arr,from,len)=>{let hi=arr[from],lo=arr[from];for(let i=from+1;i<from+len;i++){if(arr[i]>hi)hi=arr[i];if(arr[i]<lo)lo=arr[i];}return(hi+lo)/2;};
+  const tenkan=(midRange(h,n-9,9)+midRange(l,n-9,9))/2;
+  const kijun=(midRange(h,n-26,26)+midRange(l,n-26,26))/2;
+  const senkouA=(tenkan+kijun)/2;
+  const senkouB=(midRange(h,n-52,52)+midRange(l,n-52,52))/2;
+  return{tenkan,kijun,senkouA,senkouB,chikou:c[n-1],chikouRef:c[n-26]||c[0],price:c[n-1]};
+}
 function calcEMASeries(c,p){if(!c||c.length<p)return[];const r=new Array(c.length).fill(null);let s=0;for(let i=0;i<p;i++)s+=c[i];r[p-1]=s/p;const k=2/(p+1);for(let i=p;i<c.length;i++)r[i]=c[i]*k+r[i-1]*(1-k);return r;}
 
 // ─── COMPUTE ALL INDICATORS ──────────────────────────────────
 function computeIndicators(closes,highs,lows,volumes,price,cfg){
-  const rsi=calcRSI(closes),macdV=calcMACD(closes),ema8=calcEMA(closes,8),ema13=calcEMA(closes,13),ema20=calcEMA(closes,20),ema21=calcEMA(closes,21),ema50=calcEMA(closes,50),ema55=calcEMA(closes,55),ema200=calcEMA(closes,200);
-  const bbP=calcBB(closes),stoch=calcStochRSI(closes),willR=calcWilliamsR(highs,lows,closes),atr=calcATR(highs,lows,closes),adxData=calcADX(highs,lows,closes),obvData=calcOBV(closes,volumes);
-  const ichi=calcIchimoku(highs,lows,closes),st=calcSuperTrend(highs,lows,closes,cfg.stPeriod||10,cfg.stMult||3),piv=calcPivots(highs,lows,closes),div=calcDivergence(closes);
-  const vwap=calcVWAP(closes,highs,lows,volumes),mvwap=calcMVWAP(closes,highs,lows,volumes),cci=calcCCI(highs,lows,closes),mfi=calcMFI(highs,lows,closes,volumes),roc=calcROC(closes),ult=calcUltimateOscillator(highs,lows,closes);
-  const avgV=volumes.slice(-20).reduce((a,b)=>a+b,0)/20,volR=avgV>0?(volumes[volumes.length-1]/avgV)*100:100;
-  const psar=calcParabolicSAR(highs,lows,closes),cmf=calcCMF(highs,lows,closes,volumes),kelt=calcKeltner(highs,lows,closes);
+  // Single shared EMA pass — calcEMA loops full array each call so batch by period order
+  const ema8=calcEMA(closes,8),ema13=calcEMA(closes,13),ema20=calcEMA(closes,20);
+  const ema21=calcEMA(closes,21),ema50=calcEMA(closes,50),ema55=calcEMA(closes,55),ema200=calcEMA(closes,200);
+  // Momentum
+  const rsi=calcRSI(closes),macdV=calcMACD(closes);
+  const bbP=calcBB(closes),stoch=calcStochRSI(closes);
+  const willR=calcWilliamsR(highs,lows,closes); // fast version — no array copy
+  // Volatility / trend
+  const atr=calcATR(highs,lows,closes);
+  const adxData=calcADX(highs,lows,closes);
+  const st=calcSuperTrend(highs,lows,closes,cfg.stPeriod||10,cfg.stMult||3);
+  const piv=calcPivots(highs,lows,closes);
+  // Volume
+  const obvData=calcOBV(closes,volumes);
+  const vwap=calcVWAP(closes,highs,lows,volumes);
+  const mvwap=calcMVWAP(closes,highs,lows,volumes); // fast version — no slice copies
+  const avgV=volumes.length>=20?volumes.slice(-20).reduce((a,b)=>a+b,0)/20:volumes.reduce((a,b)=>a+b,0)/volumes.length;
+  const volR=avgV>0?(volumes[volumes.length-1]/avgV)*100:100;
+  const mfi=calcMFI(highs,lows,closes,volumes);
+  const cmf=calcCMF(highs,lows,closes,volumes);
+  // Advanced oscillators
+  const cci=calcCCI(highs,lows,closes);
+  const roc=calcROC(closes);
+  const ult=calcUltimateOscillator(highs,lows,closes);
+  const psar=calcParabolicSAR(highs,lows,closes);
+  const kelt=calcKeltner(highs,lows,closes);
+  // Complex (intentionally last — most expensive)
+  const ichi=calcIchimoku(highs,lows,closes); // fast version — no spread
+  const div=calcDivergence(closes); // fast version — only 2 calcs instead of 12
   return{rsi,macdV,ema8,ema13,ema20,ema21,ema50,ema55,ema200,bbP,stoch,willR,atr,adxData,obvData,ichi,st,piv,div,vwap,mvwap,cci,mfi,roc,ult,volR,psar,cmf,kelt};
 }
 
@@ -1994,7 +2055,7 @@ self.onmessage=function(e){
   function calcRSI(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}let ag=g/p,al=l/p;for(let i=p+1;i<a.length;i++){const d=a[i]-a[i-1];ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;}return al===0?100:100-100/(1+ag/al);}
   function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?e12-e26:null;}
   function calcBB(a,p=20){if(a.length<p)return null;const s=a.slice(-p),m=s.reduce((x,y)=>x+y,0)/p;const std=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/p);const up=m+2*std,lo=m-2*std,pr=a[a.length-1];return(up-lo)>0?(pr-lo)/(up-lo):0.5;}
-  function calcStochRSI(a,p=14){if(a.length<p*2)return null;const rs=[];for(let i=p;i<a.length;i++)rs.push(calcRSI(a.slice(0,i+1),p));const v=rs.filter(x=>x!==null);if(v.length<p)return null;const sl=v.slice(-p),mn=Math.min(...sl),mx=Math.max(...sl);return mx===mn?50:((v[v.length-1]-mn)/(mx-mn))*100;}
+  function calcStochRSI(a,p=14){if(a.length<p*2+1)return null;let gains=0,losses=0;for(let i=a.length-p*2;i<a.length-p;i++){const d=a[i+1]-a[i];if(d>0)gains+=d;else losses-=d;}gains/=p;losses/=p;const rsiSeries=[];for(let i=a.length-p;i<a.length;i++){const d=a[i]-a[i-1];gains=(gains*(p-1)+(d>0?d:0))/p;losses=(losses*(p-1)+(d<0?-d:0))/p;const rs=losses===0?100:gains/losses;rsiSeries.push(100-(100/(1+rs)));}let mn=rsiSeries[0],mx=rsiSeries[0];for(let i=1;i<rsiSeries.length;i++){if(rsiSeries[i]<mn)mn=rsiSeries[i];if(rsiSeries[i]>mx)mx=rsiSeries[i];}const last=rsiSeries[rsiSeries.length-1];return mx===mn?50:((last-mn)/(mx-mn))*100;}
 
   function calcCCI(highs, lows, closes, p=20) {
     if(closes.length < p) return null;
@@ -2083,10 +2144,11 @@ self.onmessage=function(e){
 
   function calcWilliamsR(highs, lows, closes, p=14) {
     if(closes.length < p) return null;
-    const h = highs.slice(-p), l = lows.slice(-p);
-    const hh = Math.max(...h), ll = Math.min(...l);
-    const cp = closes[closes.length-1];
-    return hh === ll ? -50 : ((hh - cp) / (hh - ll)) * -100;
+    const n=closes.length;
+    let hh=highs[n-p],ll=lows[n-p];
+    for(let i=n-p+1;i<n;i++){if(highs[i]>hh)hh=highs[i];if(lows[i]<ll)ll=lows[i];}
+    const cp=closes[n-1];
+    return hh===ll?-50:((hh-cp)/(hh-ll))*-100;
   }
 
   function calcATR(highs, lows, closes, p=14) {
@@ -2168,37 +2230,21 @@ self.onmessage=function(e){
     return { pp, r1, r2, s1, s2 };
   }
 
-  function calcDivergence(closes, period=14, lookback=5) {
-    if(closes.length < period + lookback*2) return { rsi: 'none', macd: 'none' };
-
-    const rsiArr = [];
-    for(let i=lookback; i>=0; i--) {
-      const slice = closes.slice(0, closes.length - i);
-      const r = calcRSI(slice, period);
-      if(r!==null) rsiArr.push(r);
+  function calcDivergence(closes, period=14) {
+    const n=closes.length; if(n<period+10) return{rsi:'none',macd:'none'};
+    const rsiNow=calcRSI(closes,period), rsiPrev=calcRSI(closes.slice(0,-5),period);
+    const macdNow=calcMACD(closes), macdPrev=calcMACD(closes.slice(0,-5));
+    const pNow=closes[n-1], pPrev=closes[n-6];
+    let rsiDiv='none',macdDiv='none';
+    if(rsiNow!==null&&rsiPrev!==null){
+      if(pNow>pPrev*1.002&&rsiNow<rsiPrev-2)rsiDiv='bearish';
+      else if(pNow<pPrev*0.998&&rsiNow>rsiPrev+2)rsiDiv='bullish';
     }
-    const priceArr = closes.slice(-rsiArr.length);
-    if(rsiArr.length < 3) return { rsi: 'none', macd: 'none' };
-
-    const pFirst=priceArr[0], pLast=priceArr[priceArr.length-1];
-    const rFirst=rsiArr[0],   rLast=rsiArr[rsiArr.length-1];
-
-    let rsiDiv = 'none';
-    if(pLast > pFirst * 1.002 && rLast < rFirst - 2) rsiDiv = 'bearish';
-    if(pLast < pFirst * 0.998 && rLast > rFirst + 2) rsiDiv = 'bullish';
-
-    const macdArr = [];
-    for(let i=lookback; i>=0; i--) {
-      const slice = closes.slice(0, closes.length - i);
-      const m = calcMACD(slice);
-      if(m!==null) macdArr.push(m);
+    if(macdNow!==null&&macdPrev!==null){
+      if(pNow>pPrev*1.002&&macdNow<macdPrev-0.001)macdDiv='bearish';
+      else if(pNow<pPrev*0.998&&macdNow>macdPrev+0.001)macdDiv='bullish';
     }
-    const mFirst=macdArr[0], mLast=macdArr[macdArr.length-1];
-    let macdDiv = 'none';
-    if(pLast > pFirst * 1.002 && mLast < mFirst - 0.001) macdDiv = 'bearish';
-    if(pLast < pFirst * 0.998 && mLast > mFirst + 0.001) macdDiv = 'bullish';
-
-    return { rsi: rsiDiv, macd: macdDiv };
+    return{rsi:rsiDiv,macd:macdDiv};
   }
 
   function calcVWAP(closes, highs, lows, volumes) {
@@ -2215,11 +2261,13 @@ self.onmessage=function(e){
 
   function calcMVWAP(closes, highs, lows, volumes, period=20) {
     if(closes.length < period) return null;
-    const sliceC = closes.slice(-period);
-    const sliceH = highs.slice(-period);
-    const sliceL = lows.slice(-period);
-    const sliceV = volumes.slice(-period);
-    return calcVWAP(sliceC, sliceH, sliceL, sliceV);
+    const s=closes.length-period;
+    let cumTPV=0,cumVol=0;
+    for(let i=s;i<closes.length;i++){
+      cumTPV+=(highs[i]+lows[i]+closes[i])/3*volumes[i];
+      cumVol+=volumes[i];
+    }
+    return cumVol>0?cumTPV/cumVol:null;
   }
 
   function calcMTFScore(closes, highs, lows, volumes) {
@@ -2277,24 +2325,13 @@ self.onmessage=function(e){
 
   function calcIchimoku(highs, lows, closes) {
     if(closes.length < 52) return null;
-    const midpoint = (arr, start, len) => {
-      const sl = arr.slice(start, start+len);
-      return (Math.max(...sl) + Math.min(...sl)) / 2;
-    };
-    const n = closes.length;
-
-    const tenkan = (midpoint(highs,n-9,9) + midpoint(lows,n-9,9)) / 2;
-
-    const kijun  = (midpoint(highs,n-26,26) + midpoint(lows,n-26,26)) / 2;
-
-    const senkouA = (tenkan + kijun) / 2;
-
-    const senkouB = (midpoint(highs,n-52,52) + midpoint(lows,n-52,52)) / 2;
-
-    const chikou  = closes[n-1];
-    const chikouRef = closes[n-26] || closes[0];
-    const price = closes[n-1];
-    return { tenkan, kijun, senkouA, senkouB, chikou, chikouRef, price };
+    const n=closes.length;
+    const midRange=(arr,from,len)=>{let hi=arr[from],lo=arr[from];for(let i=from+1;i<from+len;i++){if(arr[i]>hi)hi=arr[i];if(arr[i]<lo)lo=arr[i];}return(hi+lo)/2;};
+    const tenkan=(midRange(highs,n-9,9)+midRange(lows,n-9,9))/2;
+    const kijun=(midRange(highs,n-26,26)+midRange(lows,n-26,26))/2;
+    const senkouA=(tenkan+kijun)/2;
+    const senkouB=(midRange(highs,n-52,52)+midRange(lows,n-52,52))/2;
+    return{tenkan,kijun,senkouA,senkouB,chikou:closes[n-1],chikouRef:closes[n-26]||closes[0],price:closes[n-1]};
   }
 
   const TF = {
