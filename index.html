@@ -1639,8 +1639,7 @@ function computeAdvancedPatterns(opens,highs,lows,closes){
       const [p1,p2]=pk.slice(-2);
       const diff=Math.abs(wh[p1]-wh[p2])/wh[p1];
       if(diff<0.02&&p2>p1+5){
-        const neckline=Math.min(...wl.slice(p1,p2+1));
-        const cur=closes[closes.length-1];
+        let neckline=wl[p1];for(let i=p1;i<=p2;i++)if(wl[i]<neckline)neckline=wl[i];
         doubleSig='🔴 DOUBLE TOP';doubleDesc=`Two peaks ~${(diff*100).toFixed(1)}% apart. Neckline ${fmtShort(neckline)}. Bearish if broken.`;
       }
     }
@@ -1732,13 +1731,14 @@ function computeKeyLevels(price,highs,lows,closes,atr){
 }
 
 // ─── BACKTEST ─────────────────────────────────────────────────
-function computeBacktest(closes,highs,lows){
+function computeBacktest(closes,highs,lows,e8,e13,e55){
   if(closes.length<60)return null;
-  const e8=calcEMASeries(closes,8),e13=calcEMASeries(closes,13),e21=calcEMASeries(closes,21),e55=calcEMASeries(closes,55);
+  // Use passed-in series or compute only if missing
+  const e8s=e8||calcEMASeries(closes,8),e21s=e13||calcEMASeries(closes,21),e55s=e55||calcEMASeries(closes,55);
   let trades=[],inTrade=null,wins=0,losses=0,totalPnl=0,maxDD=0,peak=0;
   for(let i=60;i<closes.length-1;i++){
-    if(!e8[i]||!e13[i]||!e21[i]||!e55[i])continue;
-    const buyS=e55[i]<e8[i]&&e55[i]<e13[i]&&e55[i]<e21[i],sellS=e55[i]>e8[i]&&e55[i]>e13[i]&&e55[i]>e21[i];
+    if(!e8s[i]||!e21s[i]||!e55s[i])continue;
+    const buyS=e55s[i]<e8s[i]&&e55s[i]<e21s[i],sellS=e55s[i]>e8s[i]&&e55s[i]>e21s[i];
     if(!inTrade&&buyS)inTrade={type:'LONG',entry:closes[i]};
     if(!inTrade&&sellS)inTrade={type:'SHORT',entry:closes[i]};
     if(inTrade){const ex=inTrade.type==='LONG'?sellS:buyS;if(ex||i===closes.length-2){const p=inTrade.type==='LONG'?(closes[i]-inTrade.entry)/inTrade.entry*100:(inTrade.entry-closes[i])/inTrade.entry*100;totalPnl+=p;if(p>0)wins++;else losses++;peak=Math.max(peak,totalPnl);maxDD=Math.max(maxDD,peak-totalPnl);trades.push({type:inTrade.type,pnlPct:p});inTrade=null;}}
@@ -1750,7 +1750,10 @@ function computeBacktest(closes,highs,lows){
 // ─── VOLUME PROFILE ───────────────────────────────────────────
 function computeVolumeProfile(closes,highs,lows,volumes){
   if(closes.length<20)return null;
-  const BINS=12,minP=Math.min(...lows),maxP=Math.max(...highs),step=(maxP-minP)/BINS;
+  const BINS=12;
+  let minP=lows[0],maxP=highs[0];
+  for(let i=1;i<lows.length;i++){if(lows[i]<minP)minP=lows[i];if(highs[i]>maxP)maxP=highs[i];}
+  const step=(maxP-minP)/BINS;
   const bins=Array(BINS).fill(0),labels=[];
   for(let b=0;b<BINS;b++)labels.push(minP+b*step+step/2);
   closes.forEach((c,i)=>{const bin=Math.min(BINS-1,Math.floor((c-minP)/step));if(bin>=0)bins[bin]+=(volumes[i]||0);});
@@ -1771,19 +1774,20 @@ self.onmessage=function(e){
     const score=computeScore(ind,price,isBUY,isSELL,belowCount,aboveCount,mtfScore,rm);
     const prediction=computePrediction(price,closes,highs,lows,ind,isBUY,isSELL);
     const patterns=opens?computeCandlePatterns(opens,highs,lows,closes):null;
-    const advPatterns=opens?computeAdvancedPatterns(opens,highs,lows,closes):null;
     const t1=Date.now();
 
-    self.postMessage({type:'WAVE1',id,payload:{ind,score,prediction,patterns,advPatterns,elapsed1:t1-t0}});
+    self.postMessage({type:'WAVE1',id,payload:{ind,score,prediction,patterns,elapsed1:t1-t0}});
 
-    // ── WAVE 2: slow — chart series + backtest + volume profile + key levels + S&R ──
-    const chart={e8:calcEMASeries(closes,8),e21:calcEMASeries(closes,21),e55:calcEMASeries(closes,55),e200:calcEMASeries(closes,200)};
-    const backtest=computeBacktest(closes,highs,lows);
+    // ── WAVE 2: chart + backtest + volume profile + key levels + advanced patterns ──
+    const e8s=calcEMASeries(closes,8),e21s=calcEMASeries(closes,21),e55s=calcEMASeries(closes,55),e200s=calcEMASeries(closes,200);
+    const chart={e8:e8s,e21:e21s,e55:e55s,e200:e200s};
+    const backtest=computeBacktest(closes,highs,lows,e8s,e21s,e55s);
     const volumeProfile=computeVolumeProfile(closes,highs,lows,volumes);
     const keyLevels=computeKeyLevels(price,highs,lows,closes,ind.atr);
+    const advPatterns=opens?computeAdvancedPatterns(opens,highs,lows,closes):null;
     const t2=Date.now();
 
-    self.postMessage({type:'WAVE2',id,payload:{chart,backtest,volumeProfile,keyLevels,elapsed2:t2-t1,totalElapsed:t2-t0}});
+    self.postMessage({type:'WAVE2',id,payload:{chart,backtest,volumeProfile,keyLevels,advPatterns,elapsed2:t2-t1,totalElapsed:t2-t0}});
 
   }catch(err){
     self.postMessage({type:'ERROR',id,error:err.message});
@@ -3481,7 +3485,7 @@ self.onmessage=function(e){
   // ── DOM apply after worker returns ────────────────────────────────────────
   // ── WAVE 1: indicators + score + prediction + patterns ───────────────────
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
-    const { ind, score, prediction, patterns, advPatterns, elapsed1 } = w1;
+    const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR } = ind;
 
     // ── Indicator bars ──────────────────────────────────────────────────────
@@ -3582,7 +3586,18 @@ self.onmessage=function(e){
       setPattern('pat-overall', patterns.overall[0], patterns.overall[1]);
     }
 
-    // ── Advanced chart patterns ──────────────────────────────────────────────
+    // ── Stash prediction for wave2 RR ladder ───────────────────────────────
+    window._lastPrediction = prediction;
+
+    // ── Status: wave 1 timing ───────────────────────────────────────────────
+    setStatus(`✓ ${pair} — ${source} · ${fmtP(price)} | RSI: ${(rsi||_rsi)?.toFixed(1)||'—'} | Score: ${overall}/100 · ⚡ W1:${elapsed1}ms`,'success');
+  }
+
+  // ── WAVE 2: chart + backtest + volume profile + key levels + S&R ──────────
+  function _applyWave2(w2, price, opens, closes, highs, lows, volumes, sym, tf) {
+    const { chart, backtest, volumeProfile, keyLevels, advPatterns, elapsed2, totalElapsed } = w2;
+
+    // ── Advanced chart patterns (arrives in wave2) ───────────────────────────
     if(advPatterns){
       setPattern('pat-flag',        advPatterns.flag[0],        advPatterns.flag[1]);
       setPattern('pat-pennant',     advPatterns.pennant[0],     advPatterns.pennant[1]);
@@ -3593,17 +3608,6 @@ self.onmessage=function(e){
       setPattern('pat-cup',         advPatterns.cup[0],         advPatterns.cup[1]);
       setPattern('pat-adv-overall', advPatterns.advOverall[0],  advPatterns.advOverall[1]);
     }
-
-    // ── Stash prediction for wave2 RR ladder ───────────────────────────────
-    window._lastPrediction = prediction;
-
-    // ── Status: wave 1 timing ───────────────────────────────────────────────
-    setStatus(`✓ ${pair} — ${source} · ${fmtP(price)} | RSI: ${(rsi||_rsi)?.toFixed(1)||'—'} | Score: ${overall}/100 · ⚡ W1:${elapsed1}ms`,'success');
-  }
-
-  // ── WAVE 2: chart + backtest + volume profile + key levels + S&R ──────────
-  function _applyWave2(w2, price, opens, closes, highs, lows, volumes, sym, tf) {
-    const { chart, backtest, volumeProfile, keyLevels, elapsed2, totalElapsed } = w2;
 
     // ── Chart ───────────────────────────────────────────────────────────────
     drawMiniChart(opens||closes,closes,highs,lows,chart.e8,chart.e21,chart.e55,chart.e200,sym,tf);
@@ -3738,13 +3742,14 @@ self.onmessage=function(e){
     const signals=[{label:'EMA55 Strategy',bull:isBUY,bear:isSELL,w:25},{label:'RSI',bull:rsi!==null&&rsi>50&&rsi<70,bear:rsi!==null&&(rsi<50||rsi>75),w:10},{label:'MACD',bull:macdV!==null&&macdV>0,bear:macdV!==null&&macdV<0,w:10},{label:'EMA200 Trend',bull:ema200!==null&&price>ema200,bear:ema200!==null&&price<ema200,w:10},{label:'SuperTrend',bull:st!==null&&st.trend==='up',bear:st!==null&&st.trend==='down',w:8},{label:'ADX',bull:adxData!==null&&adxData.diPlus>adxData.diMinus,bear:adxData!==null&&adxData.diMinus>adxData.diPlus,w:8},{label:'Ichimoku',bull:ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB),bear:ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB),w:8},{label:'Parabolic SAR',bull:psar!==null&&psar.bull,bear:psar!==null&&!psar.bull,w:7},{label:'OBV',bull:obvData!==null&&obvData.rising,bear:obvData!==null&&!obvData.rising,w:6},{label:'CMF',bull:cmf!==null&&cmf>0.05,bear:cmf!==null&&cmf<-0.05,w:6},{label:'Divergence',bull:div&&(div.rsi==='bullish'||div.macd==='bullish'),bear:div&&(div.rsi==='bearish'||div.macd==='bearish'),w:6},{label:'Keltner',bull:kelt!==null&&kelt.pct<40,bear:kelt!==null&&kelt.pct>60,w:5},{label:'Bollinger',bull:bbP!==null&&bbP<0.3,bear:bbP!==null&&bbP>0.7,w:4},{label:'Pivot Points',bull:piv!==null&&price>piv.pp,bear:piv!==null&&price<piv.pp,w:4}];
     const predData={direction,dirColor,dirDetail,confidence:conf,confLabel:conf>=75?'HIGH 🔥':conf>=60?'MODERATE':'LOW ⚠️',confColor:conf>=75?'var(--green)':conf>=60?'var(--warn)':'var(--red)',rangeHigh:price+atrV*2.5,rangeLow:price-atrV*2.0,entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail,isBull,signals};
     const e8s=calcEMASeries(closes,8),e21s=calcEMASeries(closes,21),e55s=calcEMASeries(closes,55),e200s=calcEMASeries(closes,200);
-    const btData=(()=>{if(closes.length<60)return null;const e8=calcEMASeries(closes,8),e13=calcEMASeries(closes,13),e21=calcEMASeries(closes,21),e55=calcEMASeries(closes,55);let trades=[],inTrade=null,wins=0,losses=0,totalPnl=0,maxDD=0,peak=0;for(let i=60;i<closes.length-1;i++){if(!e8[i]||!e13[i]||!e21[i]||!e55[i])continue;const buyS=e55[i]<e8[i]&&e55[i]<e13[i]&&e55[i]<e21[i],sellS=e55[i]>e8[i]&&e55[i]>e13[i]&&e55[i]>e21[i];if(!inTrade&&buyS)inTrade={type:'LONG',entry:closes[i]};if(!inTrade&&sellS)inTrade={type:'SHORT',entry:closes[i]};if(inTrade){const ex=inTrade.type==='LONG'?sellS:buyS;if(ex||i===closes.length-2){const p=inTrade.type==='LONG'?(closes[i]-inTrade.entry)/inTrade.entry*100:(inTrade.entry-closes[i])/inTrade.entry*100;totalPnl+=p;if(p>0)wins++;else losses++;peak=Math.max(peak,totalPnl);maxDD=Math.max(maxDD,peak-totalPnl);trades.push({type:inTrade.type,pnlPct:p});inTrade=null;}}}const tot=wins+losses;return{total:tot,wins,losses,winRate:tot>0?(wins/tot*100).toFixed(1):0,avgPnl:tot>0?(totalPnl/tot).toFixed(2):0,totalPnl,maxDD,recentTrades:trades.slice(-10).reverse()};})();
-    const vpData=(()=>{if(closes.length<20)return null;const BINS=12,minP=Math.min(...lows),maxP=Math.max(...highs),step=(maxP-minP)/BINS,bins=Array(BINS).fill(0),labels=[];for(let b=0;b<BINS;b++)labels.push(minP+b*step+step/2);closes.forEach((c,i)=>{const bin=Math.min(BINS-1,Math.floor((c-minP)/step));if(bin>=0)bins[bin]+=(volumes[i]||0);});const maxVol=Math.max(...bins),poc=labels[bins.indexOf(maxVol)];return{bins,labels,maxVol,poc,curPrice:closes[closes.length-1]};})();
+    const btData=computeBacktest(closes,highs,lows,e8s,e21s,e55s);
+    const vpData=computeVolumeProfile(closes,highs,lows,volumes);
+    const advPatsData=opens?computeAdvancedPatterns(opens,highs,lows,closes):null;
     const patsData=opens?detectCandlePatterns(opens,highs,lows,closes):null;
     const klData=(()=>{if(!closes||closes.length<20)return null;const n=closes.length,r=5,res=[],sup=[];for(let i=r;i<n-r;i++){if(highs.slice(i-r,i).every(h=>h<=highs[i])&&highs.slice(i+1,i+r+1).every(h=>h<=highs[i]))res.push(highs[i]);if(lows.slice(i-r,i).every(l=>l>=lows[i])&&lows.slice(i+1,i+r+1).every(l=>l>=lows[i]))sup.push(lows[i]);}const cl=arr=>{const m=[];arr.sort((a,b)=>a-b);for(const v of arr){if(!m.find(x=>Math.abs(x-v)/v<0.005))m.push(v);}return m;};return{resLevels:cl(res).filter(r=>r>price).sort((a,b)=>a-b).slice(0,3),supLevels:cl(sup).filter(s=>s<price).sort((a,b)=>b-a).slice(0,3)};})();
     // Apply in two waves same as worker path
     _applyWave1({ind,score:scoreData,prediction:predData,patterns:patsData,elapsed1:0},pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,tf,rm,ind.rsi,ind.macdV);
-    _applyWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest:btData,volumeProfile:vpData,keyLevels:klData,elapsed2:0,totalElapsed:0},price,opens,closes,highs,lows,volumes,sym,tf);
+    _applyWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest:btData,volumeProfile:vpData,keyLevels:klData,advPatterns:advPatsData,elapsed2:0,totalElapsed:0},price,opens,closes,highs,lows,volumes,sym,tf);
     saveSnapshot({pair,source,price,tf,rsi:ind.rsi?.toFixed(2),macd:ind.macdV?.toFixed(4),ema55:ind.ema55?.toFixed(4),ema200:ind.ema200?.toFixed(4),adx:ind.adxData?.adx?.toFixed(1),atr:ind.atr?.toFixed(4),volR:ind.volR?.toFixed(1),score:scoreData.overall,strategy:isBUY?'BUY':isSELL?'SELL':'NEUTRAL',prediction:predData.direction,confidence:predData.confidence+'%',entry:fmtP(predData.entry),sl:fmtP(predData.sl),tp1:fmtP(predData.tp1),tp2:fmtP(predData.tp2)});
   }
 
