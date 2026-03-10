@@ -831,6 +831,38 @@
     <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('EURUSD')">🇪🇺 EUR/USD</button>
     <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('EURIDR')">🇪🇺 EUR/IDR</button>
     <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('ANTAM')">🪙 ANTAM</button>
+    <div id="customPairBtns"></div>
+    <button class="pair-btn" style="border-color:rgba(255,255,255,.2);color:var(--muted)" onclick="openAddPair()" title="Add custom pair">＋ ADD</button>
+  </div>
+
+  <!-- ══ ADD CUSTOM PAIR MODAL ══ -->
+  <div id="addPairOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:none;align-items:center;justify-content:center">
+    <div style="background:#0d1117;border:1px solid var(--border);border-radius:12px;padding:24px;width:320px;max-width:90vw;font-family:'Share Tech Mono',monospace">
+      <div style="font-size:.7rem;letter-spacing:3px;color:var(--accent);margin-bottom:16px">＋ ADD CUSTOM PAIR</div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:.55rem;color:var(--muted);margin-bottom:4px;letter-spacing:1px">TYPE</div>
+        <select id="addPairType" style="width:100%;background:#0a0f1a;border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem" onchange="updateAddPairHint()">
+          <option value="crypto">🪙 Crypto (e.g. BTC, PEPE, WLD)</option>
+          <option value="forex">💱 Forex (e.g. GBPUSD, USDCAD)</option>
+          <option value="commodity">🛢️ Commodity (Yahoo ticker, e.g. GC=F, NG=F)</option>
+          <option value="stock">📈 Stock/IDX (Yahoo ticker, e.g. ANTM.JK, AAPL)</option>
+        </select>
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:.55rem;color:var(--muted);margin-bottom:4px;letter-spacing:1px">SYMBOL</div>
+        <input id="addPairSymbol" style="width:100%;background:#0a0f1a;border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;box-sizing:border-box" placeholder="e.g. GBPUSD" maxlength="20" oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:.55rem;color:var(--muted);margin-bottom:4px;letter-spacing:1px">LABEL (optional)</div>
+        <input id="addPairLabel" style="width:100%;background:#0a0f1a;border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;box-sizing:border-box" placeholder="e.g. GBP/USD" maxlength="20">
+      </div>
+      <div id="addPairHint" style="font-size:.53rem;color:var(--muted);margin-bottom:14px;line-height:1.5"></div>
+      <div style="display:flex;gap:8px">
+        <button onclick="confirmAddPair()" style="flex:1;padding:9px;background:var(--accent);color:#000;border:none;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;font-weight:700;cursor:pointer;letter-spacing:1px">ADD PAIR</button>
+        <button onclick="closeAddPair()" style="flex:1;padding:9px;background:transparent;color:var(--muted);border:1px solid var(--border);border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;cursor:pointer">CANCEL</button>
+      </div>
+      <div id="addPairError" style="font-size:.55rem;color:var(--red);margin-top:8px;display:none"></div>
+    </div>
   </div>
 
   <div class="tf-row">
@@ -2231,16 +2263,17 @@ self.onmessage=function(e){
     if(n===null||n===undefined||isNaN(n)) return '—';
     const sp = _fmtCtx ? SPECIAL_PAIRS[_fmtCtx] : null;
     if(sp?.isFiat) {
-      // IDR (≥1000) or JPY (≥100) — integer, no $
       if(n>=100) return n.toLocaleString('id-ID',{maximumFractionDigits:0});
       return n.toFixed(2);
     }
-    if(sp && !sp.isFiat && !sp.isStock) {
-      // EUR/USD style forex rate
+    if(sp?.isCommodity) {
+      // Silver ~$30, Oil ~$75 — 2 decimal USD
+      return '$'+n.toFixed(2);
+    }
+    if(sp && !sp.isFiat && !sp.isStock && !sp.isCommodity) {
       return n.toFixed(4);
     }
     if(sp?.isStock) {
-      // IDX stock — IDR integer
       if(n>=100) return n.toLocaleString('id-ID',{maximumFractionDigits:0});
       return n.toFixed(2);
     }
@@ -2249,7 +2282,7 @@ self.onmessage=function(e){
     if(n>=1) return '$'+n.toFixed(4);
     return '$'+n.toFixed(8);
   }
-  function fmtV(n){if(!n)return'—';if(n>=1e9)return(n/1e9).toFixed(2)+'B USD';if(n>=1e6)return(n/1e6).toFixed(2)+'M USD';if(n>=1e3)return(n/1e3).toFixed(2)+'K USD';return n.toFixed(2)+' USD';}
+  function fmtV(n,sym){const sp=sym?SPECIAL_PAIRS[sym]:(_fmtCtx?SPECIAL_PAIRS[_fmtCtx]:null);if(!n&&(sp?.isFiat||sp?.isStock))return'N/A (FX)';if(!n&&sp?.isCommodity)return'N/A';if(!n)return'—';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(2)+'K';return n.toFixed(2);}
   function setPxStatus(id,s){const el=document.getElementById('px-'+id);if(!el)return;el.className='pill'+(s==='trying'?' trying':s==='active'?' active':s==='fail'?' fail':s==='ok'?' ok':'');}
   function setExStatus(id,s){const el=document.getElementById('ex-'+id);if(!el)return;el.className='pill'+(s==='trying'?' trying':s==='active'?' active':s==='fail'?' fail':s==='ok'?' ok':'');}
   function resetAll(){PROXIES.forEach(p=>setPxStatus(p.id,''));EXCHANGES.forEach(e=>setExStatus(e.id,''));}
@@ -2391,9 +2424,132 @@ self.onmessage=function(e){
     };
   }
 
-  // ── SPECIAL_PAIRS: only ANTAM remains (forex handled by tryForex) ──────────
+  // ── Custom stocks — generic Yahoo Finance fetcher ────────────────────────────
+  async function tryCustomStock(sym, cs) {
+    const yInterval = ['15m','30m'].includes(currentTF) ? '1h' : (TF.yahoo[currentTF]||'1d');
+    const yRange    = ['15m','30m'].includes(currentTF) ? '60d' : (TF.yahooRange[currentTF]||'2y');
+    const ticker    = cs.yahoo || sym;
+
+    function parseYahoo(d) {
+      if(!d?.chart?.result?.[0]) throw new Error('No data');
+      const r = d.chart.result[0], q = r.indicators.quote[0];
+      const valid = r.timestamp.map((_,i)=>i).filter(i=>q.close[i]!=null&&q.open[i]!=null&&q.high[i]!=null);
+      if(valid.length < 10) throw new Error('Too few candles');
+      return {
+        closes:  valid.map(i=>+q.close[i]),
+        opens:   valid.map(i=>+q.open[i]),
+        highs:   valid.map(i=>+q.high[i]),
+        lows:    valid.map(i=>+q.low[i]),
+        volumes: valid.map(i=>+(q.volume[i]||0)),
+      };
+    }
+
+    let ohlcv = null, sourceLabel = '';
+    for(const host of ['query1','query2']) {
+      if(ohlcv) break;
+      try {
+        const url = `https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${yInterval}&range=${yRange}`;
+        const d = await smartFetch(url);
+        ohlcv = parseYahoo(d);
+        sourceLabel = `Yahoo Finance (${ticker} · ${yInterval})`;
+      } catch(e) {}
+    }
+    if(!ohlcv) throw new Error(`Yahoo Finance unavailable for ${ticker}`);
+
+    const { closes, opens, highs, lows, volumes } = ohlcv;
+    const price = closes[closes.length-1];
+    return {
+      price,
+      high24: Math.max(...highs.slice(-2)),
+      low24:  Math.min(...lows.slice(-2)),
+      open24: opens[opens.length-1],
+      vol24:  volumes[volumes.length-1]||0,
+      opens, closes, highs, lows, volumes,
+      source: sourceLabel, pair: cs.display||ticker
+    };
+  }
+
+  // ── Commodities: Silver & Oil via Yahoo Finance futures ──────────────────────
+  async function tryCommodity(sym) {
+    const cp = COMMODITY_PAIRS[sym];
+    if(!cp) throw new Error('Not a commodity pair');
+
+    const yInterval = ['15m','30m'].includes(currentTF) ? '1h' : (TF.yahoo[currentTF]||'1d');
+    const yRange    = ['15m','30m'].includes(currentTF) ? '60d' : (TF.yahooRange[currentTF]||'2y');
+
+    function parseYahoo(d) {
+      if(!d?.chart?.result?.[0]) throw new Error('No data');
+      const r = d.chart.result[0], q = r.indicators.quote[0];
+      const valid = r.timestamp.map((_,i)=>i).filter(i=>q.close[i]!=null&&q.open[i]!=null&&q.high[i]!=null);
+      if(valid.length < 10) throw new Error('Too few candles');
+      return {
+        closes:  valid.map(i=>+q.close[i]),
+        opens:   valid.map(i=>+q.open[i]),
+        highs:   valid.map(i=>+q.high[i]),
+        lows:    valid.map(i=>+q.low[i]),
+        volumes: valid.map(i=>+(q.volume[i]||0)),
+      };
+    }
+
+    let ohlcv = null, sourceLabel = '';
+
+    // Source 1: Yahoo query1
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${cp.yahoo}?interval=${yInterval}&range=${yRange}`;
+      const d = await smartFetch(url);
+      ohlcv = parseYahoo(d);
+      sourceLabel = `Yahoo Finance (${cp.yahoo} · ${yInterval})`;
+    } catch(e) {}
+
+    // Source 2: Yahoo query2
+    if(!ohlcv) try {
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${cp.yahoo}?interval=${yInterval}&range=${yRange}`;
+      const d = await smartFetch(url);
+      ohlcv = parseYahoo(d);
+      sourceLabel = `Yahoo Finance q2 (${cp.yahoo} · ${yInterval})`;
+    } catch(e) {}
+
+    // Source 3: Stooq (Silver=XAG.F, Oil=CL.F)
+    if(!ohlcv) try {
+      const stooqSym = sym==='XAGUSD' ? 'xag.f' : 'cl.f';
+      const res = await fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=d`, { signal: AbortSignal.timeout(8000) });
+      const text = await res.text();
+      if(text.includes('Date') && text.includes(',')) {
+        const lines = text.trim().split('\n').slice(1).filter(l=>l.trim());
+        if(lines.length >= 10) {
+          const rows = lines.map(l=>l.split(','));
+          ohlcv = {
+            closes:  rows.map(r=>+r[4]),
+            opens:   rows.map(r=>+r[1]),
+            highs:   rows.map(r=>+r[2]),
+            lows:    rows.map(r=>+r[3]),
+            volumes: rows.map(r=>+(r[5]||0)),
+          };
+          sourceLabel = `Stooq (${stooqSym} · Daily)`;
+        }
+      }
+    } catch(e) {}
+
+    if(!ohlcv) throw new Error(`${cp.display}: all sources failed`);
+
+    const { closes, opens, highs, lows, volumes } = ohlcv;
+    const price = closes[closes.length-1];
+    return {
+      price,
+      high24: Math.max(...highs.slice(-2)),
+      low24:  Math.min(...lows.slice(-2)),
+      open24: opens[opens.length-1],
+      vol24:  volumes[volumes.length-1]||0,
+      opens, closes, highs, lows, volumes,
+      source: sourceLabel, pair: cp.display
+    };
+  }
+
+  // ── SPECIAL_PAIRS: used for fmtP detection (forex + ANTAM + commodities) ────
   const SPECIAL_PAIRS = {
-    'ANTAM': { display:'ANTAM/IDR', isStock:true },
+    'ANTAM':  { display:'ANTAM/IDR',  isStock:true },
+    'XAGUSD': { display:'Silver (XAG/USD)', isCommodity:true },
+    'USOIL':  { display:'WTI Crude Oil',    isCommodity:true },
     // Keep for fmtP detection only:
     'USDIDR': { display:'USD/IDR',  isFiat:true },
     'USDJPY': { display:'USD/JPY',  isFiat:true },
@@ -2531,7 +2687,24 @@ self.onmessage=function(e){
       }
     }
 
-    // ── ANTAM: IDX stock — fetch directly from Yahoo Finance, skip crypto exchanges ──
+    // ── COMMODITIES: Silver & Oil via Yahoo Finance futures ───────────────────
+    if(!data && COMMODITY_PAIRS[sym]) {
+      const cp = COMMODITY_PAIRS[sym];
+      setStatus(`⟳ Fetching ${cp.display} via Yahoo Finance (${cp.yahoo})...`,'loading');
+      activeProgress('exchange');
+      try {
+        data = await tryCommodity(sym);
+        workingExchangeId = 'yahoo';
+        stepProgress('proxy','done');
+        stepProgress('exchange','done');
+      } catch(e) {
+        setStatus(`✗ ${cp.display} unavailable — ${e.message}`,'error');
+        document.getElementById('fetchBtn').disabled=false;
+        return;
+      }
+    }
+
+    // ── ANTAM: IDX stock ──────────────────────────────────────────────────────
     if(sym === 'ANTAM') {
       const yInt = ['15m','30m'].includes(currentTF) ? '1h' : TF.yahoo[currentTF]||'1d';
       setStatus(`⟳ Fetching ANTAM (IDX) — trying Yahoo Finance → Stooq...`,'loading');
@@ -2543,6 +2716,23 @@ self.onmessage=function(e){
         stepProgress('exchange','done');
       } catch(e) {
         setStatus('✗ ANTAM unavailable — Yahoo Finance & Stooq both blocked by proxy. Try again or use TradingView for ANTM.JK','error');
+        document.getElementById('fetchBtn').disabled=false;
+        return;
+      }
+    }
+
+    // ── Custom stocks — Yahoo Finance (same as ANTAM) ─────────────────────────
+    if(!data && window._customStocks?.[sym]) {
+      const cs = window._customStocks[sym];
+      setStatus(`⟳ Fetching ${cs.display} via Yahoo Finance...`,'loading');
+      activeProgress('exchange');
+      try {
+        data = await tryCustomStock(sym, cs);
+        workingExchangeId = 'yahoo';
+        stepProgress('proxy','done');
+        stepProgress('exchange','done');
+      } catch(e) {
+        setStatus(`✗ ${cs.display} unavailable — ${e.message}`,'error');
         document.getElementById('fetchBtn').disabled=false;
         return;
       }
@@ -2589,6 +2779,22 @@ self.onmessage=function(e){
     const mtfTFs = ['15m','30m','1h','4h','1d','1w','1M'];
     const mtfIds = ['15m','30m','1h','4h','1d','1w','1M'];
 
+    if(FOREX_PAIRS[sym] || COMMODITY_PAIRS[sym] || sym==='ANTAM' || window._customStocks?.[sym]) {
+      mtfIds.forEach(id => {
+        const sigEl=document.getElementById(`mtf-${id}-sig`);
+        const detEl=document.getElementById(`mtf-${id}-detail`);
+        const scEl =document.getElementById(`mtf-${id}-score`);
+        if(sigEl){sigEl.textContent='N/A';sigEl.style.color='var(--muted)';}
+        if(detEl){detEl.textContent='MTF not available for forex/stocks';detEl.style.color='var(--muted)';}
+        if(scEl){scEl.textContent='—';scEl.style.color='var(--muted)';}
+      });
+      const consEl=document.getElementById('mtf-consensus');
+      const consDetail=document.getElementById('mtf-consensus-detail');
+      if(consEl){consEl.textContent='⬡ N/A — Forex/Stock';consEl.style.color='var(--muted)';}
+      if(consDetail){consDetail.textContent='MTF analysis requires crypto exchange candle data';}
+      window._mtfScore=50; stepProgress('mtf','done');
+    }
+
     window._candleCache = window._candleCache || {};
     function getCacheKey(s, tf) { return `${s}_${tf}`; }
     function getCached(s, tf) {
@@ -2599,10 +2805,12 @@ self.onmessage=function(e){
     function setCache(s, tf, d) { window._candleCache[getCacheKey(s, tf)] = { data:d, ts:Date.now() }; }
 
     async function fetchMTFCandles(s, tf) {
+      if(FOREX_PAIRS[s] || s==='ANTAM') return null;
       const cached = getCached(s, tf);
       if(cached) return cached;
       const exOrder = ['binance','okx','bybit','mexc','gateio','kucoin'];
-      const ordered = workingExchangeId ? [workingExchangeId, ...exOrder.filter(e=>e!==workingExchangeId)] : exOrder;
+      const ordered = (workingExchangeId && workingExchangeId!=='forex' && workingExchangeId!=='yahoo')
+        ? [workingExchangeId, ...exOrder.filter(e=>e!==workingExchangeId)] : exOrder;
 
       const primaryUrl = mtfUrl(ordered[0], s, tf);
       if(primaryUrl) {
@@ -2630,8 +2838,10 @@ self.onmessage=function(e){
     }
 
     let mtfPromisesEarly;
-    if(WORKER_URL && !_workerFailed) {
-
+    if(FOREX_PAIRS[sym] || COMMODITY_PAIRS[sym] || sym==='ANTAM' || window._customStocks?.[sym]) {
+      // No crypto candles available — resolve immediately with empty results
+      mtfPromisesEarly = Promise.resolve(mtfIds.map(id => ({ id, parsed: null })));
+    } else if(WORKER_URL && !_workerFailed) {
       const exId = workingExchangeId || 'binance';
       const batchUrls = mtfTFs.map(tf => mtfUrl(exId, sym2, tf)).filter(Boolean);
       mtfPromisesEarly = (async () => {
@@ -2647,7 +2857,6 @@ self.onmessage=function(e){
             } catch(e) { return { id: mtfIds[i], parsed: null }; }
           });
         } catch(e) {
-
           return Promise.all(mtfTFs.map((tf, i) => fetchMTFCandles(sym2, tf).then(parsed => ({ id: mtfIds[i], parsed }))));
         }
       })();
@@ -2666,7 +2875,7 @@ self.onmessage=function(e){
     ce.textContent=(pct>=0?'+':'')+pct.toFixed(2)+'%';
     ce.style.color=pct>=0?'var(--green)':'var(--red)';
     const sp=SPECIAL_PAIRS[sym];
-    const unitLabel=sp?.isFiat?pair.split('/')[1]:sp?.isStock?'IDR':'USD';
+    const unitLabel=sp?.isFiat?pair.split('/')[1]:sp?.isStock?'IDR':sp?.isCommodity?'USD':'USD';
     document.getElementById('pc24hAbs').textContent=(price-open24>=0?'+':'')+fmtP(Math.abs(price-open24))+' '+unitLabel;
     document.getElementById('pcHigh').textContent=fmtP(high24);
     document.getElementById('pcLow').textContent=fmtP(low24);
@@ -3014,7 +3223,7 @@ self.onmessage=function(e){
     ].join('<br>');
 
     const dr=((high24-low24)/low24*100);
-    document.getElementById('mc24vol').textContent=fmtV(vol24);
+    document.getElementById('mc24vol').textContent=fmtV(vol24,sym);
     document.getElementById('mcOpen').textContent=fmtP(open24);
     document.getElementById('mcRange').textContent=dr.toFixed(2)+'%';
     document.getElementById('mcRange').style.color=dr>8?'var(--red)':dr>4?'var(--warn)':'var(--green)';
@@ -3721,6 +3930,10 @@ self.onmessage=function(e){
 
   async function calcBTCCorrelation(sym, closes) {
     const wrap=document.getElementById('corrPanel');
+    if(FOREX_PAIRS[sym]||COMMODITY_PAIRS[sym]||sym==='ANTAM'||window._customStocks?.[sym]) {
+      if(wrap) wrap.innerHTML='<div style="font-family:\'Share Tech Mono\',monospace;font-size:.6rem;color:var(--muted)">BTC Correlation: N/A for forex/stocks</div>';
+      return;
+    }
     if(!wrap||sym==='BTC') {
       if(wrap) wrap.innerHTML='<div style="font-family:\'Share Tech Mono\',monospace;font-size:.6rem;color:var(--muted)">Correlation: This IS BTC 😄</div>';
       return;
@@ -3729,7 +3942,7 @@ self.onmessage=function(e){
 
       let btcCloses = [];
       try {
-        const btcUrl = (workingExchangeId && workingExchangeId!=='indodax' && mtfUrl(workingExchangeId,'BTC',currentTF))
+        const btcUrl = (workingExchangeId && workingExchangeId!=='indodax' && workingExchangeId!=='forex' && workingExchangeId!=='yahoo' && mtfUrl(workingExchangeId,'BTC',currentTF))
           || `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${TF.binance[currentTF]||'1h'}&limit=1000`;
         const btcRaw = await smartFetch(btcUrl);
         const btcParsed = workingExchangeId && workingExchangeId!=='binance' ? mtfParse(workingExchangeId, btcRaw) : null;
@@ -3960,25 +4173,144 @@ self.onmessage=function(e){
   function updateLabels(){document.getElementById('slLabel').textContent=parseFloat(document.getElementById('rmSL').value).toFixed(1)+'% SL';document.getElementById('tpLabel').textContent=parseFloat(document.getElementById('rmTP').value).toFixed(1)+'% TP';}
   function showTab(id,el){document.querySelectorAll('.ind-group').forEach(g=>g.classList.remove('active'));document.querySelectorAll('.ind-tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');el.classList.add('active');}
 
+  // ══ CUSTOM PAIRS MANAGER ═══════════════════════════════════════════════════
+  // Stored as: [{ sym, label, type }]  type: 'crypto'|'forex'|'commodity'|'stock'
+  let customPairs = JSON.parse(localStorage.getItem('tl_custom_pairs') || '[]');
+
+  const CUSTOM_TYPE_STYLE = {
+    crypto:    'border-color:rgba(0,229,255,.4);color:var(--accent)',
+    forex:     'border-color:rgba(0,255,136,.4);color:var(--green)',
+    commodity: 'border-color:rgba(255,184,0,.4);color:var(--warn)',
+    stock:     'border-color:rgba(180,120,255,.4);color:#b478ff',
+  };
+  const CUSTOM_TYPE_ICON = { crypto:'🪙', forex:'💱', commodity:'🛢️', stock:'📈' };
+
+  function saveCustomPairs() {
+    localStorage.setItem('tl_custom_pairs', JSON.stringify(customPairs));
+  }
+
+  function renderCustomPairBtns() {
+    const wrap = document.getElementById('customPairBtns');
+    if(!wrap) return;
+    wrap.innerHTML = customPairs.map((p,i) => `
+      <span style="position:relative;display:inline-block">
+        <button class="pair-btn" style="${CUSTOM_TYPE_STYLE[p.type]||''}" onclick="quickPair('${p.sym}')" title="${p.type}: ${p.sym}">
+          ${CUSTOM_TYPE_ICON[p.type]||''} ${p.label||p.sym}
+        </button>
+        <span onclick="removeCustomPair(${i})" title="Remove" style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;background:var(--red);color:#fff;border-radius:50%;font-size:9px;line-height:14px;text-align:center;cursor:pointer;font-weight:700;z-index:10">×</span>
+      </span>`).join('');
+  }
+
+  function removeCustomPair(i) {
+    customPairs.splice(i, 1);
+    saveCustomPairs();
+    renderCustomPairBtns();
+  }
+
+  function openAddPair() {
+    document.getElementById('addPairOverlay').style.display = 'flex';
+    document.getElementById('addPairSymbol').value = '';
+    document.getElementById('addPairLabel').value = '';
+    document.getElementById('addPairError').style.display = 'none';
+    updateAddPairHint();
+    setTimeout(() => document.getElementById('addPairSymbol').focus(), 100);
+  }
+
+  function closeAddPair() {
+    document.getElementById('addPairOverlay').style.display = 'none';
+  }
+
+  function updateAddPairHint() {
+    const type = document.getElementById('addPairType').value;
+    const hints = {
+      crypto:    'Enter the coin symbol. It will be fetched as SYMBOL/USDT from crypto exchanges.\nExamples: WLD, RENDER, NEAR, OP',
+      forex:     'Enter a 6-letter forex pair (base+quote). Uses ECB/FX rate APIs.\nExamples: GBPUSD, USDCAD, AUDJPY, CHFJPY',
+      commodity: 'Enter a Yahoo Finance futures ticker.\nExamples: GC=F (Gold futures), NG=F (Natural Gas), ZC=F (Corn), HG=F (Copper)',
+      stock:     'Enter a Yahoo Finance stock ticker.\nExamples: AAPL, TSLA, ANTM.JK, BBCA.JK, 700.HK',
+    };
+    document.getElementById('addPairHint').textContent = hints[type] || '';
+  }
+
+  function confirmAddPair() {
+    const sym   = document.getElementById('addPairSymbol').value.trim().toUpperCase().replace(/[^A-Z0-9.=]/g,'');
+    const label = document.getElementById('addPairLabel').value.trim() || sym;
+    const type  = document.getElementById('addPairType').value;
+    const errEl = document.getElementById('addPairError');
+
+    if(!sym) { errEl.textContent='Symbol is required'; errEl.style.display='block'; return; }
+    if(customPairs.find(p=>p.sym===sym)) { errEl.textContent=`${sym} already added`; errEl.style.display='block'; return; }
+
+    // Register into runtime maps so fetch logic knows how to handle it
+    if(type === 'forex') {
+      if(sym.length !== 6) { errEl.textContent='Forex symbol must be 6 letters (e.g. GBPUSD)'; errEl.style.display='block'; return; }
+      FOREX_PAIRS[sym] = { base:sym.slice(0,3), quote:sym.slice(3), display:`${sym.slice(0,3)}/${sym.slice(3)}`, isFiat: sym.slice(3)!=='USD' };
+      SPECIAL_PAIRS[sym] = { display:`${sym.slice(0,3)}/${sym.slice(3)}`, isFiat: sym.slice(3)!=='USD' };
+    } else if(type === 'commodity') {
+      COMMODITY_PAIRS[sym] = { yahoo:sym, display:label, unit:'USD', isCommodity:true };
+      SPECIAL_PAIRS[sym] = { display:label, isCommodity:true };
+    } else if(type === 'stock') {
+      // Stock uses same Yahoo fetch as ANTAM
+      window._customStocks = window._customStocks || {};
+      window._customStocks[sym] = { yahoo:sym, display:label };
+      SPECIAL_PAIRS[sym] = { display:label, isStock:true };
+    }
+    // crypto: no extra registration needed — falls through to normal exchange loop
+
+    customPairs.push({ sym, label, type });
+    saveCustomPairs();
+    renderCustomPairBtns();
+    closeAddPair();
+    // Auto-load it
+    quickPair(sym);
+  }
+
+  // Restore custom pairs on load — re-register into runtime maps
+  customPairs.forEach(p => {
+    if(p.type === 'forex') {
+      const sym = p.sym;
+      FOREX_PAIRS[sym] = FOREX_PAIRS[sym] || { base:sym.slice(0,3), quote:sym.slice(3), display:p.label||sym, isFiat: sym.slice(3)!=='USD' };
+      SPECIAL_PAIRS[sym] = SPECIAL_PAIRS[sym] || { display:p.label||sym, isFiat: sym.slice(3)!=='USD' };
+    } else if(p.type === 'commodity') {
+      COMMODITY_PAIRS[p.sym] = COMMODITY_PAIRS[p.sym] || { yahoo:p.sym, display:p.label||p.sym, unit:'USD', isCommodity:true };
+      SPECIAL_PAIRS[p.sym] = SPECIAL_PAIRS[p.sym] || { display:p.label||p.sym, isCommodity:true };
+    } else if(p.type === 'stock') {
+      window._customStocks = window._customStocks || {};
+      window._customStocks[p.sym] = window._customStocks[p.sym] || { yahoo:p.sym, display:p.label||p.sym };
+      SPECIAL_PAIRS[p.sym] = SPECIAL_PAIRS[p.sym] || { display:p.label||p.sym, isStock:true };
+    }
+  });
+  renderCustomPairBtns();
+
+  // Close modal on overlay click
+  document.getElementById('addPairOverlay').addEventListener('click', function(e) {
+    if(e.target === this) closeAddPair();
+  });
+
+  // ══ END CUSTOM PAIRS MANAGER ════════════════════════════════════════════════
+
   const COMMODITY_MAP = {
     'XAUT': 'XAUT',
-    'XAGUSD': null,
-    'USOIL': null,
+    'XAGUSD': 'XAGUSD',
+    'USOIL': 'USOIL',
+  };
+
+  // Yahoo Finance tickers for commodities not on crypto exchanges
+  const COMMODITY_PAIRS = {
+    'XAGUSD': { yahoo:'SI=F',  display:'Silver (XAG/USD)', unit:'USD/oz',  isCommodity:true },
+    'USOIL':  { yahoo:'CL=F',  display:'WTI Crude Oil',    unit:'USD/bbl', isCommodity:true },
   };
 
   const FOREX_NOTICE = {
-    'USDIDR': 'USD/IDR — fetching via USDT/IDR proxy on crypto exchanges',
-    'USDJPY': 'USD/JPY — fetching via USDT/JPY proxy on crypto exchanges',
-    'EURUSD': 'EUR/USD — fetching EURUSDT pair',
-    'EURIDR': 'EUR/IDR — fetching via EURUSDT cross',
-    'ANTAM': 'ANTAM (IDX) — limited data via crypto proxy. For best accuracy use IDX data.',
+    'USDIDR': 'USD/IDR — fetching live FX rate data',
+    'USDJPY': 'USD/JPY — fetching live FX rate data',
+    'EURUSD': 'EUR/USD — fetching live FX rate data',
+    'EURIDR': 'EUR/IDR — fetching live FX rate data',
+    'ANTAM': 'ANTAM (IDX) — fetching via Yahoo Finance',
+    'XAGUSD': 'Silver — fetching futures data (SI=F) via Yahoo Finance',
+    'USOIL':  'WTI Crude Oil — fetching futures data (CL=F) via Yahoo Finance',
   };
 
   function quickPair(sym){
-    if(sym==='XAGUSD'||sym==='USOIL'){
-      alert(`⚠️ ${sym==='XAGUSD'?'Silver':'Oil'} is not available on crypto exchanges.\nTry TradingView for ${sym==='XAGUSD'?'XAGUSD / SILVER':'USOIL / WTI'} charts.`);
-      return;
-    }
     if(FOREX_NOTICE[sym]){
       document.getElementById('statusBar').textContent = '⚠️ ' + FOREX_NOTICE[sym];
     }
@@ -4314,7 +4646,7 @@ self.onmessage=function(e){
       const score = d?.score != null ? d.score+'/100' : '…';
       const scoreColor = d?.score!=null?(d.score>=60?'var(--green)':d.score>=40?'var(--warn)':'var(--red)'):'var(--muted)';
       return `<div class="wl-card" onclick="quickPair('${sym}')">
-        <div class="wl-card-sym">${sym}/USDT</div>
+        <div class="wl-card-sym">${(FOREX_PAIRS[sym]||SPECIAL_PAIRS[sym])?(FOREX_PAIRS[sym]?.display||SPECIAL_PAIRS[sym]?.display||sym):sym+'/USDT'}</div>
         <div class="wl-card-price">${price}</div>
         <div class="wl-card-chg" style="color:${pctColor}">${pct}</div>
         <div class="wl-card-score" style="color:${scoreColor};border-color:${scoreColor}">${score}</div>
