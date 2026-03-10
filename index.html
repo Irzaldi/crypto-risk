@@ -1639,11 +1639,14 @@ function computeAdvancedPatterns(opens,highs,lows,closes){
   const n=closes.length; if(n<30) return null;
   const atr=()=>{let s=0;for(let i=n-14;i<n;i++)s+=highs[i]-lows[i];return s/14;};
   const at=atr();
-  // Linear regression slope over window
+  // Linear regression slope over window — uses raw index, no copies
   const slope=(arr,start,end)=>{const ln=end-start;let sx=0,sy=0,sxy=0,sx2=0;for(let i=start;i<end;i++){const x=i-start;sx+=x;sy+=arr[i];sxy+=x*arr[i];sx2+=x*x;}const d=ln*sx2-sx*sx;return d===0?0:(ln*sxy-sx*sy)/d;};
-  // Local extrema finder
-  const peaks=(arr,w=3)=>{const p=[];for(let i=w;i<arr.length-w;i++){let ok=true;for(let j=1;j<=w;j++){if(arr[i]<=arr[i-j]||arr[i]<=arr[i+j]){ok=false;break;}}if(ok)p.push(i);}return p;};
-  const troughs=(arr,w=3)=>{const t=[];for(let i=w;i<arr.length-w;i++){let ok=true;for(let j=1;j<=w;j++){if(arr[i]>=arr[i-j]||arr[i]>=arr[i+j]){ok=false;break;}}if(ok)t.push(i);}return t;};
+  // Local extrema — returns absolute indices into arr, no copies
+  const peaks=(arr,from,len,w=3)=>{const p=[];const end=from+len;for(let i=from+w;i<end-w;i++){let ok=true;for(let j=1;j<=w;j++){if(arr[i]<=arr[i-j]||arr[i]<=arr[i+j]){ok=false;break;}}if(ok)p.push(i);}return p;};
+  const troughs=(arr,from,len,w=3)=>{const t=[];const end=from+len;for(let i=from+w;i<end-w;i++){let ok=true;for(let j=1;j<=w;j++){if(arr[i]>=arr[i-j]||arr[i]>=arr[i+j]){ok=false;break;}}if(ok)t.push(i);}return t;};
+  // min/max over index range — no spread, no copy
+  const rangeMax=(arr,from,len)=>{let v=arr[from];for(let i=from+1;i<from+len;i++)if(arr[i]>v)v=arr[i];return v;};
+  const rangeMin=(arr,from,len)=>{let v=arr[from];for(let i=from+1;i<from+len;i++)if(arr[i]<v)v=arr[i];return v;};
 
   // ── FLAG ──────────────────────────────────────────────────────
   let flagSig='—',flagDesc='No flag pattern';
@@ -1693,20 +1696,19 @@ function computeAdvancedPatterns(opens,highs,lows,closes){
   // ── DOUBLE TOP / BOTTOM ───────────────────────────────────────
   let doubleSig='—',doubleDesc='No double top/bottom';
   {
-    const win=closes.slice(-40);
-    const wh=highs.slice(-40),wl=lows.slice(-40);
-    const pk=peaks(wh,4),tr=troughs(wl,4);
+    const from=Math.max(0,n-40),len=n-from;
+    const pk=peaks(highs,from,len,4),tr=troughs(lows,from,len,4);
     if(pk.length>=2){
-      const [p1,p2]=pk.slice(-2);
-      const diff=Math.abs(wh[p1]-wh[p2])/wh[p1];
+      const p1=pk[pk.length-2],p2=pk[pk.length-1];
+      const diff=Math.abs(highs[p1]-highs[p2])/highs[p1];
       if(diff<0.02&&p2>p1+5){
-        let neckline=wl[p1];for(let i=p1;i<=p2;i++)if(wl[i]<neckline)neckline=wl[i];
+        let neckline=lows[p1];for(let i=p1;i<=p2;i++)if(lows[i]<neckline)neckline=lows[i];
         doubleSig='🔴 DOUBLE TOP';doubleDesc=`Two peaks ~${(diff*100).toFixed(1)}% apart. Neckline ${fmtShort(neckline)}. Bearish if broken.`;
       }
     }
     if(doubleSig==='—'&&tr.length>=2){
-      const [t1,t2]=tr.slice(-2);
-      const diff=Math.abs(wl[t1]-wl[t2])/wl[t1];
+      const t1=tr[tr.length-2],t2=tr[tr.length-1];
+      const diff=Math.abs(lows[t1]-lows[t2])/lows[t1];
       if(diff<0.02&&t2>t1+5){
         doubleSig='🟢 DOUBLE BOTTOM';doubleDesc=`Two troughs ~${(diff*100).toFixed(1)}% apart. Bullish reversal if neckline breaks.`;
       }
@@ -1716,19 +1718,17 @@ function computeAdvancedPatterns(opens,highs,lows,closes){
   // ── HEAD & SHOULDERS ─────────────────────────────────────────
   let hsSig='—',hsDesc='No H&S pattern';
   {
-    const pk=peaks(highs.slice(-50),3);
-    const tr=troughs(lows.slice(-50),3);
+    const from=Math.max(0,n-50),len=n-from;
+    const pk=peaks(highs,from,len,3),tr=troughs(lows,from,len,3);
     if(pk.length>=3){
-      const [l,h,r]=pk.slice(-3);
-      const lh=highs.slice(-50)[l],hh=highs.slice(-50)[h],rh=highs.slice(-50)[r];
-      if(hh>lh&&hh>rh&&Math.abs(lh-rh)/hh<0.03){
+      const l=pk[pk.length-3],h=pk[pk.length-2],r=pk[pk.length-1];
+      if(highs[h]>highs[l]&&highs[h]>highs[r]&&Math.abs(highs[l]-highs[r])/highs[h]<0.03){
         hsSig='🔴 HEAD & SHOULDERS';hsDesc='Classic top reversal — left shoulder, head, right shoulder detected';
       }
     }
     if(hsSig==='—'&&tr.length>=3){
-      const [l,h,r]=tr.slice(-3);
-      const ll=lows.slice(-50)[l],hl=lows.slice(-50)[h],rl=lows.slice(-50)[r];
-      if(hl<ll&&hl<rl&&Math.abs(ll-rl)/Math.abs(hl)<0.03){
+      const l=tr[tr.length-3],h=tr[tr.length-2],r=tr[tr.length-1];
+      if(lows[h]<lows[l]&&lows[h]<lows[r]&&Math.abs(lows[l]-lows[r])/Math.abs(lows[h])<0.03){
         hsSig='🟢 INV HEAD & SHOULDERS';hsDesc='Inverse H&S — bullish bottom reversal pattern detected';
       }
     }
@@ -1753,12 +1753,10 @@ function computeAdvancedPatterns(opens,highs,lows,closes){
   {
     const w=50;
     if(n>=w){
-      const seg=closes.slice(-w);
-      const left=seg.slice(0,15),bottom=seg.slice(15,35),right=seg.slice(35,45),handle=seg.slice(45);
-      const lMax=Math.max(...left),bMin=Math.min(...bottom),rMax=Math.max(...right);
-      const depth=(lMax-bMin)/lMax;
-      const symm=Math.abs(lMax-rMax)/lMax;
-      const hDrop=(rMax-Math.min(...handle))/rMax;
+      const base=n-w;
+      const lMax=rangeMax(closes,base,15),bMin=rangeMin(closes,base+15,20),rMax=rangeMax(closes,base+35,10);
+      const hMin=rangeMin(closes,base+45,5);
+      const depth=(lMax-bMin)/lMax,symm=Math.abs(lMax-rMax)/lMax,hDrop=(rMax-hMin)/rMax;
       if(depth>0.1&&depth<0.5&&symm<0.05&&hDrop>0.02&&hDrop<0.15){
         cupSig='🟢 CUP & HANDLE';cupDesc=`Cup depth ${(depth*100).toFixed(0)}%, handle pullback ${(hDrop*100).toFixed(1)}% — bullish continuation`;
       }
@@ -1780,14 +1778,22 @@ function fmtShort(n){if(!n||isNaN(n))return'—';if(n>=1000)return(n/1000).toFix
 function computeKeyLevels(price,highs,lows,closes,atr){
   if(!closes||closes.length<20)return null;
   const n=closes.length,r=5,res=[],sup=[];
+  // Direct index loop — no slice/every array allocations per candle
   for(let i=r;i<n-r;i++){
-    if(highs.slice(i-r,i).every(h=>h<=highs[i])&&highs.slice(i+1,i+r+1).every(h=>h<=highs[i]))res.push(highs[i]);
-    if(lows.slice(i-r,i).every(l=>l>=lows[i])&&lows.slice(i+1,i+r+1).every(l=>l>=lows[i]))sup.push(lows[i]);
+    let isHigh=true,isLow=true;
+    for(let j=1;j<=r;j++){
+      if(highs[i-j]>highs[i]||highs[i+j]>highs[i]){isHigh=false;break;}
+    }
+    if(isHigh)res.push(highs[i]);
+    for(let j=1;j<=r;j++){
+      if(lows[i-j]<lows[i]||lows[i+j]<lows[i]){isLow=false;break;}
+    }
+    if(isLow)sup.push(lows[i]);
   }
-  const cluster=arr=>{const m=[];arr.sort((a,b)=>a-b);for(const v of arr){if(!m.find(x=>Math.abs(x-v)/v<0.005))m.push(v);}return m;};
-  // More levels for S&R column (up to 5 each)
-  const resLevels=cluster(res).filter(r=>r>price).sort((a,b)=>a-b).slice(0,5);
-  const supLevels=cluster(sup).filter(s=>s<price).sort((a,b)=>b-a).slice(0,5);
+  // Cluster: merge prices within 0.5% of each other
+  const cluster=arr=>{const m=[];arr.sort((a,b)=>a-b);for(let i=0;i<arr.length;i++){let found=false;for(let j=0;j<m.length;j++){if(Math.abs(m[j]-arr[i])/arr[i]<0.005){found=true;break;}}if(!found)m.push(arr[i]);}return m;};
+  const resLevels=cluster(res).filter(v=>v>price).sort((a,b)=>a-b).slice(0,5);
+  const supLevels=cluster(sup).filter(v=>v<price).sort((a,b)=>b-a).slice(0,5);
   return{resLevels,supLevels};
 }
 
@@ -3073,7 +3079,7 @@ self.onmessage=function(e){
 
     fetchFearGreed();
 
-    runQuickPrediction(price, closes, highs, lows);
+    runQuickPrediction(price, isBUY, isSELL, e55BelowCount);
 
     const pct=((price-open24)/open24*100);
     document.getElementById('pcPrice').textContent=fmtP(price);
@@ -3150,8 +3156,9 @@ self.onmessage=function(e){
       stepProgress('mtf','done');
     })();
 
-    // EMAs already computed above via _snapIsBUY/_snapIsSELL/_snapBelowCount/_snapAboveCount
+    // EMAs needed for TradingLab isBUY/isSELL signal
     const ema8=calcEMA(closes,8),ema13=calcEMA(closes,13),ema21=calcEMA(closes,21),ema55=calcEMA(closes,55),ema200=calcEMA(closes,200);
+    const ema20=calcEMA(closes,20),ema50=calcEMA(closes,50); // also needed for pre-flight checklist
     if(ema200===null){document.getElementById('ema200indVal').textContent='Need 200+ candles';document.getElementById('ema200indBadge').textContent='N/A';}
 
     const e8=ema8||0,e13=ema13||0,e21=ema21||0,e55=ema55||0;
@@ -3169,9 +3176,9 @@ self.onmessage=function(e){
     const partialExitSell = !isBUY && !isSELL && e55AboveCount >= 1 && e55AboveCount <= 2 && e55AboveCount > e55BelowCount;
 
     const macdBull  = _macdV !== null && _macdV > 0;
-    const obvBull   = calcOBV(closes,volumes)?.rising === true;
-    const adxStrong = (calcADX(highs,lows,closes)?.adx||0) > 25;
     const rsiOk     = _rsi !== null && _rsi > 40 && _rsi < 70;
+    // obvBull/adxStrong deferred — checklist updated in _applyWave1 with worker results
+    const obvBull = false, adxStrong = false;
 
     const tlSignalEl = document.getElementById('tl-signal');
     const tlDetailEl = document.getElementById('tl-signal-detail');
@@ -3258,7 +3265,9 @@ self.onmessage=function(e){
 
     // ── Quick indicators on main thread (instant, shown immediately) ──
     activeProgress('score');
-    const _rsi=calcRSI(closes),_macdV=calcMACD(closes),_ema20=calcEMA(closes,20),_ema50=calcEMA(closes,50);
+    const _rsi=calcRSI(closes),_macdV=calcMACD(closes);
+    // Reuse ema20/ema50 already computed above — no recalculation
+    const _ema20=ema20, _ema50=ema50;
     const _volR=(()=>{const a=volumes.slice(-20).reduce((a,b)=>a+b,0)/20;return a>0?(volumes[volumes.length-1]/a)*100:100;})();
 
     function setChk(i,t,txt){const ic=document.getElementById('ci'+i),tx=document.getElementById('ct'+i);ic.className='chk-icon '+(t==='pass'?'ci-pass':t==='fail'?'ci-fail':'ci-warn');ic.textContent=t==='pass'?'✓':t==='fail'?'✗':'⚠';tx.textContent=txt;}
@@ -3385,6 +3394,40 @@ self.onmessage=function(e){
       else if(belowCloud&&cloudGreen)interp='🔴 <strong>Bearish</strong> — Price below cloud. Wait for price to reclaim cloud.';
       else interp='Analyzing Ichimoku signals...';
       const ii=document.getElementById('ichi-interpretation');if(ii)ii.innerHTML=interp;
+    }
+
+    // ── Refresh TL buy/sell rules with accurate worker OBV/ADX ──────────────
+    {
+      const _e55above8=ema55!==null&&ema8!==null&&ema55>ema8, _e55above13=ema55!==null&&ema13!==null&&ema55>ema13, _e55above21=ema55!==null&&ema21!==null&&ema55>ema21;
+      const _obvBull=obvData!==null&&obvData.rising, _adxStrong=adxData!==null&&adxData.adx>25;
+      const _macdBull2=macdV!==null&&macdV>0, _rsiOk2=rsi!==null&&rsi>40&&rsi<70;
+      const _isBUY=[_e55above8,_e55above13,_e55above21].every(v=>!v);
+      const _isSELL=[_e55above8,_e55above13,_e55above21].every(Boolean);
+      const _e55AboveCount=[_e55above8,_e55above13,_e55above21].filter(Boolean).length;
+      const _partialExitBuy=!_isBUY&&!_isSELL&&_e55AboveCount>=1&&_e55AboveCount<3&&_e55AboveCount<(3-_e55AboveCount);
+      const tlBuy=document.getElementById('tl-buy-rules');
+      if(tlBuy)tlBuy.innerHTML=[
+        `<b style="color:var(--green)">BUY Entry Rule:</b>`,
+        `${!_e55above8?'✅':'❌'} EMA 55 BELOW EMA 8`,
+        `${!_e55above13?'✅':'❌'} EMA 55 BELOW EMA 13`,
+        `${!_e55above21?'✅':'❌'} EMA 55 BELOW EMA 21`,
+        `<b style="color:var(--accent)">Confirmations:</b>`,
+        `${_macdBull2?'✅':'❌'} MACD bullish`,
+        `${_obvBull?'✅':'❌'} OBV rising`,
+        `${_adxStrong?'✅':'❌'} ADX > 25 (strong trend)`,
+        `${_rsiOk2?'✅':'❌'} RSI 40–70`,
+      ].join('<br>');
+      const tlSell=document.getElementById('tl-sell-rules');
+      if(tlSell)tlSell.innerHTML=[
+        `<b style="color:var(--red)">SELL Entry Rule:</b>`,
+        `${_e55above8?'🔴':'—'} EMA 55 ABOVE EMA 8`,
+        `${_e55above13?'🔴':'—'} EMA 55 ABOVE EMA 13`,
+        `${_e55above21?'🔴':'—'} EMA 55 ABOVE EMA 21`,
+        `<b style="color:var(--warn)">Partial Exit (from LONG):</b>`,
+        `${_partialExitBuy?'⚠️':'—'} EMA 55 back above EMA 21 → take 30–50%`,
+        `${_e55AboveCount===2?'⚠️':'—'} EMA 55 above 2 lines → tighten SL`,
+        `${_isSELL?'🚨':'—'} EMA 55 above ALL 3 → EXIT LONG`,
+      ].join('<br>');
     }
 
     // ── Trade score ring ────────────────────────────────────────────────────
@@ -3570,9 +3613,9 @@ self.onmessage=function(e){
       statusEl.textContent=statusEl.textContent.replace(/W1:\d+ms/,`W1+W2:${totalElapsed}ms`);
     }
   }  function _runAnalysisMainThread(pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,belowCount,aboveCount,tf,rm){
-    const ind={rsi:calcRSI(closes),macdV:calcMACD(closes),ema8:calcEMA(closes,8),ema13:calcEMA(closes,13),ema20:calcEMA(closes,20),ema21:calcEMA(closes,21),ema50:calcEMA(closes,50),ema55:calcEMA(closes,55),ema200:calcEMA(closes,200),bbP:calcBB(closes),stoch:calcStochRSI(closes),willR:calcWilliamsR(highs,lows,closes),atr:calcATR(highs,lows,closes),adxData:calcADX(highs,lows,closes),obvData:calcOBV(closes,volumes),ichi:calcIchimoku(highs,lows,closes),st:calcSuperTrend(highs,lows,closes,CFG.stPeriod||10,CFG.stMult||3),piv:calcPivots(highs,lows,closes),div:calcDivergence(closes),vwap:calcVWAP(closes,highs,lows,volumes),mvwap:calcMVWAP(closes,highs,lows,volumes),cci:calcCCI(highs,lows,closes),mfi:calcMFI(highs,lows,closes,volumes),roc:calcROC(closes),ult:calcUltimateOscillator(highs,lows,closes),volR:(()=>{const a=volumes.slice(-20).reduce((a,b)=>a+b,0)/20;return a>0?(volumes[volumes.length-1]/a)*100:100;})()};
+    const ind={rsi:calcRSI(closes),macdV:calcMACD(closes),ema8:calcEMA(closes,8),ema13:calcEMA(closes,13),ema20:calcEMA(closes,20),ema21:calcEMA(closes,21),ema50:calcEMA(closes,50),ema55:calcEMA(closes,55),ema200:calcEMA(closes,200),bbP:calcBB(closes),stoch:calcStochRSI(closes),willR:calcWilliamsR(highs,lows,closes),atr:calcATR(highs,lows,closes),adxData:calcADX(highs,lows,closes),obvData:calcOBV(closes,volumes),ichi:calcIchimoku(highs,lows,closes),st:calcSuperTrend(highs,lows,closes,CFG.stPeriod||10,CFG.stMult||3),piv:calcPivots(highs,lows,closes),div:calcDivergence(closes),vwap:calcVWAP(closes,highs,lows,volumes),mvwap:calcMVWAP(closes,highs,lows,volumes),cci:calcCCI(highs,lows,closes),mfi:calcMFI(highs,lows,closes,volumes),roc:calcROC(closes),ult:calcUltimateOscillator(highs,lows,closes),psar:calcParabolicSAR(highs,lows,closes),cmf:calcCMF(highs,lows,closes,volumes),kelt:calcKeltner(highs,lows,closes),volR:(()=>{const a=volumes.slice(-20).reduce((a,b)=>a+b,0)/20;return a>0?(volumes[volumes.length-1]/a)*100:100;})()};
     // Build score
-    const {rsi,macdV,stoch,willR,bbP,div,ema8,ema13,ema21,ema55,ema200,adxData,ichi,st,piv,obvData,volR,cci,mfi,roc,ult}=ind;
+    const {rsi,macdV,stoch,willR,bbP,div,ema8,ema13,ema21,ema55,ema200,adxData,ichi,st,piv,obvData,volR,cci,mfi,roc,ult,psar,cmf,kelt}=ind;
     let momS=0,momMax=0;
     if(rsi!==null){momMax+=20;if(rsi>=45&&rsi<=65)momS+=20;else if(rsi>=35&&rsi<45)momS+=12;else if(rsi<30)momS+=16;else if(rsi>70)momS+=4;else momS+=8;}
     if(macdV!==null){momMax+=20;momS+=macdV>0?20:4;}if(stoch!==null){momMax+=15;if(stoch>=30&&stoch<=70)momS+=15;else if(stoch<20)momS+=12;else if(stoch>80)momS+=3;else momS+=8;}
@@ -3603,8 +3646,8 @@ self.onmessage=function(e){
     const btData=computeBacktest(closes,highs,lows,e8s,e21s,e55s);
     const vpData=computeVolumeProfile(closes,highs,lows,volumes);
     const advPatsData=opens?computeAdvancedPatterns(opens,highs,lows,closes):null;
-    const patsData=opens?detectCandlePatterns(opens,highs,lows,closes):null;
-    const klData=(()=>{if(!closes||closes.length<20)return null;const n=closes.length,r=5,res=[],sup=[];for(let i=r;i<n-r;i++){if(highs.slice(i-r,i).every(h=>h<=highs[i])&&highs.slice(i+1,i+r+1).every(h=>h<=highs[i]))res.push(highs[i]);if(lows.slice(i-r,i).every(l=>l>=lows[i])&&lows.slice(i+1,i+r+1).every(l=>l>=lows[i]))sup.push(lows[i]);}const cl=arr=>{const m=[];arr.sort((a,b)=>a-b);for(const v of arr){if(!m.find(x=>Math.abs(x-v)/v<0.005))m.push(v);}return m;};return{resLevels:cl(res).filter(r=>r>price).sort((a,b)=>a-b).slice(0,3),supLevels:cl(sup).filter(s=>s<price).sort((a,b)=>b-a).slice(0,3)};})();
+    const patsData=opens?computeCandlePatterns(opens,highs,lows,closes):null;
+    const klData=computeKeyLevels(price,highs,lows,closes,ind.atr);
     // Apply in two waves same as worker path
     _applyWave1({ind,score:scoreData,prediction:predData,patterns:patsData,elapsed1:0},pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,tf,rm,ind.rsi,ind.macdV);
     _applyWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest:btData,volumeProfile:vpData,keyLevels:klData,advPatterns:advPatsData,elapsed2:0,totalElapsed:0},price,opens,closes,highs,lows,volumes,sym,tf);
@@ -3612,301 +3655,17 @@ self.onmessage=function(e){
   }
 
 
-  function runQuickPrediction(price, closes, highs, lows) {
-    if(!price || !closes || closes.length < 26) return;
-
-    const e8  = calcEMA(closes, 8);
-    const e13 = calcEMA(closes, 13);
-    const e21 = calcEMA(closes, 21);
-    const e55 = calcEMA(closes, 55);
-    const e200= calcEMA(closes, 200);
-    const rsi  = calcRSI(closes);
-    const macd = calcMACD(closes);
-    const atr  = calcATR(highs, lows, closes);
-    const atrVal = atr || price * 0.02;
-
-    let bull=0, bear=0;
-    const belowAll = e55&&e8&&e13&&e21 && e55<e8&&e55<e13&&e55<e21;
-    const aboveAll = e55&&e8&&e13&&e21 && e55>e8&&e55>e13&&e55>e21;
-    if(belowAll) bull+=30; else if(aboveAll) bear+=30; else { bull+=15; bear+=15; }
-    if(rsi!==null){ if(rsi>50&&rsi<70) bull+=20; else if(rsi<50) bear+=20; else { bull+=10; bear+=10; } }
-    if(macd!==null){ if(macd>0) bull+=20; else bear+=20; }
-    if(e200!==null){ if(price>e200) bull+=15; else bear+=15; }
-    if(e55!==null){ if(price>e55) bull+=15; else bear+=15; }
-
-    const total=bull+bear;
-    const bullPct=total>0?bull/total:0.5;
-    const bearPct=1-bullPct;
-    const confidence=Math.round(Math.max(bullPct,bearPct)*100);
-
+  // Zero-calculation quick placeholder — replaced by _applyWave1 when worker returns
+  // Zero-calculation quick placeholder — replaced by _applyWave1 when worker returns
+  function runQuickPrediction(price, isBUY, isSELL, belowCount) {
+    if(!price) return;
     let direction, dirColor;
-    if(bullPct>=0.65){direction='📈 BULLISH'; dirColor='var(--green)';}
-    else if(bearPct>=0.65){direction='📉 BEARISH'; dirColor='var(--red)';}
-    else if(bullPct>=0.55){direction='🟢 SLIGHT UP'; dirColor='var(--green)';}
-    else if(bearPct>=0.55){direction='🔴 SLIGHT DOWN'; dirColor='var(--red)';}
-    else{direction='〰️ STABLE'; dirColor='var(--warn)';}
-
-    const isBull=bullPct>0.5;
-    const entry=price;
-    const sl   =isBull?price-atrVal*1.2:price+atrVal*1.2;
-    const tp1  =isBull?price+atrVal*2:price-atrVal*2;
-    const tp2  =isBull?price+atrVal*3.5:price-atrVal*3.5;
-
+    if(isBUY)       { direction='📈 BULLISH';    dirColor='var(--green)'; }
+    else if(isSELL) { direction='📉 BEARISH';    dirColor='var(--red)';   }
+    else if(belowCount>=2){ direction='🟢 SLIGHT UP'; dirColor='var(--green)'; }
+    else            { direction='〰️ NEUTRAL';    dirColor='var(--warn)';  }
     const pd=document.getElementById('pred-direction');
-    pd.textContent=direction; pd.style.color=dirColor;
-    document.getElementById('pred-direction-detail').textContent='Quick estimate — full analysis loading...';
-    document.getElementById('pred-direction-detail').style.color='var(--muted)';
-    const pc=document.getElementById('pred-confidence');
-    pc.textContent=confidence+'%'; pc.style.color='var(--warn)';
-    document.getElementById('pred-confidence-detail').textContent='ESTIMATING ⟳';
-    document.getElementById('pred-confidence-detail').style.color='var(--warn)';
-    document.getElementById('pred-entry').textContent=fmtP(entry);
-    document.getElementById('pred-entry-detail').textContent='Market price (quick est.)';
-    document.getElementById('pred-sl').textContent=fmtP(sl);
-    document.getElementById('pred-sl-detail').textContent='ATR-based estimate';
-    document.getElementById('pred-tp1').textContent=fmtP(tp1);
-    document.getElementById('pred-tp1-detail').textContent='2× ATR estimate';
-    document.getElementById('pred-tp2').textContent=fmtP(tp2);
-    document.getElementById('pred-tp2-detail').textContent='3.5× ATR estimate';
-
-    const rh=document.getElementById('pred-range-high');
-    rh.textContent=fmtP(price+atrVal*2.5); rh.style.color='var(--green)';
-    const rl=document.getElementById('pred-range-low');
-    rl.textContent=fmtP(price-atrVal*2); rl.style.color='var(--red)';
-
-    const badge=document.getElementById('pred-pass-badge');
-    if(badge){ badge.textContent='⟳ PRELIMINARY'; badge.style.borderColor='var(--warn)'; badge.style.color='var(--warn)'; badge.style.background='rgba(255,184,0,.06)'; }
-
-    const bkEl=document.getElementById('pred-breakdown');
-    if(bkEl) bkEl.innerHTML=`
-      <div style="font-family:'Share Tech Mono',monospace;font-size:.64rem;color:var(--warn);padding:4px 0">⟳ Quick estimate using EMA + RSI + MACD only</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);padding:4px 0">Full indicator breakdown loading...</div>
-    `;
-  }
-
-  function runPrediction(price, closes, highs, lows, volumes, atr, rsi, macdV, ema8, ema13, ema21, ema55, ema200, adxData, ichi, stochRsi, willR, bbP, obvData, isBUY, isSELL, piv, st, div) {
-    if(!price || !closes || closes.length < 30) return;
-
-    let bullScore = 0, bearScore = 0, totalWeight = 0;
-
-    function addSignal(bull, bear, weight, label) {
-      totalWeight += weight;
-      if(bull) bullScore += weight;
-      else if(bear) bearScore += weight;
-      else { bullScore += weight * 0.5; bearScore += weight * 0.5; }
-    }
-
-    addSignal(isBUY, isSELL, 25, 'EMA55 Strategy');
-
-    if(rsi!==null) addSignal(rsi>50&&rsi<70, rsi<50||rsi>75, 10, 'RSI');
-
-    if(macdV!==null) addSignal(macdV>0, macdV<0, 10, 'MACD');
-
-    if(ema55&&ema200) addSignal(price>ema200, price<ema200, 10, 'EMA200 Trend');
-    if(ema8&&ema55)   addSignal(price>ema55, price<ema55, 8, 'EMA55 Position');
-
-    if(adxData) addSignal(adxData.diPlus>adxData.diMinus&&adxData.adx>20, adxData.diMinus>adxData.diPlus&&adxData.adx>20, 8, 'ADX');
-
-    if(ichi){ const ct=Math.max(ichi.senkouA,ichi.senkouB); addSignal(price>ct&&ichi.tenkan>ichi.kijun, price<ct&&ichi.tenkan<ichi.kijun, 8, 'Ichimoku'); }
-
-    if(st) addSignal(st.trend==='up', st.trend==='down', 8, 'SuperTrend');
-
-    if(stochRsi!==null) addSignal(stochRsi<80&&stochRsi>20, stochRsi>80||stochRsi<20, 5, 'Stoch RSI');
-
-    if(willR!==null) addSignal(willR>-50&&willR<-20, willR>-20||willR<-80, 4, 'Williams %R');
-
-    if(obvData) addSignal(obvData.rising, !obvData.rising, 6, 'OBV');
-
-    if(div){ addSignal(div.rsi==='bullish'||div.macd==='bullish', div.rsi==='bearish'||div.macd==='bearish', 6, 'Divergence'); }
-
-    if(bbP!==null) addSignal(bbP<0.3, bbP>0.7, 4, 'Bollinger %B');
-
-    if(piv) addSignal(price>piv.pp, price<piv.pp, 4, 'Pivot Points');
-
-    const totalSignals = bullScore + bearScore;
-    const bullPct = totalSignals > 0 ? bullScore / totalSignals : 0.5;
-    const bearPct = 1 - bullPct;
-
-    let direction, dirColor, dirDetail;
-    if(bullPct >= 0.65) { direction = '📈 BULLISH'; dirColor = 'var(--green)'; dirDetail = 'Most indicators point UP'; }
-    else if(bearPct >= 0.65) { direction = '📉 BEARISH'; dirColor = 'var(--red)'; dirDetail = 'Most indicators point DOWN'; }
-    else if(bullPct >= 0.55) { direction = '🟢 SLIGHT UP'; dirColor = 'var(--green)'; dirDetail = 'Mild bullish bias, stay cautious'; }
-    else if(bearPct >= 0.55) { direction = '🔴 SLIGHT DOWN'; dirColor = 'var(--red)'; dirDetail = 'Mild bearish bias, stay cautious'; }
-    else { direction = '〰️ STABLE'; dirColor = 'var(--warn)'; dirDetail = 'No strong directional bias'; }
-
-    const confidence = Math.round(Math.max(bullPct, bearPct) * 100);
-    const confLabel = confidence >= 75 ? 'HIGH 🔥' : confidence >= 60 ? 'MODERATE' : 'LOW ⚠️';
-    const confColor = confidence >= 75 ? 'var(--green)' : confidence >= 60 ? 'var(--warn)' : 'var(--red)';
-
-    const atrVal = atr || (price * 0.02);
-    const isBull = bullPct > 0.5;
-
-    const rangeHigh = price + atrVal * 2.5;
-    const rangeLow  = price - atrVal * 2.0;
-
-    let entry, sl, tp1, tp2, entryDetail, slDetail, tp1Detail, tp2Detail;
-
-    if(isBull) {
-
-      const support = piv ? Math.max(piv.s1, price - atrVal * 0.8) : price - atrVal * 0.5;
-      entry  = price;
-      sl     = support - atrVal * 0.3;
-      tp1    = piv ? piv.r1 : price + atrVal * 2;
-      tp2    = piv ? piv.r2 : price + atrVal * 3.5;
-      entryDetail = 'Market / dip to support';
-      slDetail    = `Below ${piv?'S1':'ATR floor'} · ${(((price-sl)/price)*100).toFixed(1)}% risk`;
-      tp1Detail   = `${piv?'Pivot R1':'1.5× ATR'} · +${(((tp1-price)/price)*100).toFixed(1)}%`;
-      tp2Detail   = `${piv?'Pivot R2':'2.5× ATR'} · +${(((tp2-price)/price)*100).toFixed(1)}%`;
-    } else {
-
-      entry  = piv ? piv.r1 : price + atrVal * 0.5;
-      sl     = piv ? piv.r2 : price + atrVal * 1.5;
-      tp1    = piv ? piv.s1 : price - atrVal * 2;
-      tp2    = piv ? piv.s2 : price - atrVal * 3.5;
-      entryDetail = 'Sell near resistance';
-      slDetail    = `Above ${piv?'R2':'ATR roof'} · ${(((sl-price)/price)*100).toFixed(1)}% risk`;
-      tp1Detail   = `${piv?'Pivot S1':'1.5× ATR'} · ${(((price-tp1)/price)*100).toFixed(1)}% gain`;
-      tp2Detail   = `${piv?'Pivot S2':'2.5× ATR'} · ${(((price-tp2)/price)*100).toFixed(1)}% gain`;
-    }
-
-    const pd = document.getElementById('pred-direction');
-    pd.textContent = direction; pd.style.color = dirColor;
-    document.getElementById('pred-direction-detail').textContent = dirDetail;
-    document.getElementById('pred-direction-detail').style.color = dirColor;
-
-    const pc = document.getElementById('pred-confidence');
-    pc.textContent = confidence + '%'; pc.style.color = confColor;
-    document.getElementById('pred-confidence-detail').textContent = confLabel;
-    document.getElementById('pred-confidence-detail').style.color = confColor;
-
-    const rh = document.getElementById('pred-range-high');
-    rh.textContent = fmtP(rangeHigh); rh.style.color = 'var(--green)';
-    const rl = document.getElementById('pred-range-low');
-    rl.textContent = fmtP(rangeLow); rl.style.color = 'var(--red)';
-
-    document.getElementById('pred-entry').textContent = fmtP(entry);
-    document.getElementById('pred-entry-detail').textContent = entryDetail;
-    document.getElementById('pred-sl').textContent = fmtP(sl);
-    document.getElementById('pred-sl-detail').textContent = slDetail;
-    document.getElementById('pred-tp1').textContent = fmtP(tp1);
-    document.getElementById('pred-tp1-detail').textContent = tp1Detail;
-    document.getElementById('pred-tp2').textContent = fmtP(tp2);
-    document.getElementById('pred-tp2-detail').textContent = tp2Detail;
-
-    const signals = [
-      { label: 'EMA55 Strategy', bull: isBUY, bear: isSELL, w: 25 },
-      { label: 'RSI', bull: rsi!==null&&rsi>50&&rsi<70, bear: rsi!==null&&(rsi<50||rsi>75), w: 10 },
-      { label: 'MACD', bull: macdV!==null&&macdV>0, bear: macdV!==null&&macdV<0, w: 10 },
-      { label: 'EMA200 Trend', bull: ema200!==null&&price>ema200, bear: ema200!==null&&price<ema200, w: 10 },
-      { label: 'SuperTrend', bull: st!==null&&st.trend==='up', bear: st!==null&&st.trend==='down', w: 8 },
-      { label: 'ADX', bull: adxData!==null&&adxData.diPlus>adxData.diMinus, bear: adxData!==null&&adxData.diMinus>adxData.diPlus, w: 8 },
-      { label: 'Ichimoku', bull: ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB), bear: ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB), w: 8 },
-      { label: 'OBV', bull: obvData!==null&&obvData.rising, bear: obvData!==null&&!obvData.rising, w: 6 },
-      { label: 'Divergence', bull: div&&(div.rsi==='bullish'||div.macd==='bullish'), bear: div&&(div.rsi==='bearish'||div.macd==='bearish'), w: 6 },
-      { label: 'Pivot Points', bull: piv!==null&&price>piv.pp, bear: piv!==null&&price<piv.pp, w: 4 },
-    ];
-
-    const bkEl = document.getElementById('pred-breakdown');
-    bkEl.innerHTML = signals.map(s => {
-      const color = s.bull ? 'var(--green)' : s.bear ? 'var(--red)' : 'var(--warn)';
-      const icon  = s.bull ? '▲' : s.bear ? '▼' : '—';
-      const label = s.bull ? 'BULL' : s.bear ? 'BEAR' : 'NEUT';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)">
-        <span style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">${s.label}</span>
-        <span style="font-family:'Share Tech Mono',monospace;font-size:.6rem;font-weight:700;color:${color}">${icon} ${label}</span>
-      </div>`;
-    }).join('');
-
-    const badge = document.getElementById('pred-pass-badge');
-    if(badge){
-      badge.textContent = '✓ FULL ANALYSIS';
-      badge.style.borderColor = 'var(--green)';
-      badge.style.color = 'var(--green)';
-      badge.style.background = 'rgba(0,255,136,.06)';
-    }
-  }
-
-  function toggleTheme(){
-    document.body.classList.toggle('light-theme');
-    const btn=document.getElementById('themeBtn');
-    btn.textContent=document.body.classList.contains('light-theme')?'🌙 DARK':'☀️ LIGHT';
-  }
-
-  function detectCandlePatterns(opens, highs, lows, closes) {
-    const n = closes.length;
-    if(n < 4) return;
-
-    const body   = i => Math.abs(closes[i] - opens[i]);
-    const range  = i => highs[i] - lows[i];
-    const isBull = i => closes[i] > opens[i];
-    const isBear = i => closes[i] < opens[i];
-    const upWick = i => isBull(i) ? highs[i]-closes[i] : highs[i]-opens[i];
-    const dnWick = i => isBull(i) ? opens[i]-lows[i]   : closes[i]-lows[i];
-
-    const c=n-1, p1=n-2, p2=n-3;
-
-    const isDoji = body(c) <= range(c) * 0.1 && range(c) > 0;
-    const dojiGravestone = isDoji && dnWick(c) < body(c) && upWick(c) > range(c)*0.6;
-    const dojiDragonfly  = isDoji && upWick(c) < body(c) && dnWick(c) > range(c)*0.6;
-    let dojiSig='—', dojiDesc='No doji';
-    if(dojiGravestone){dojiSig='🔴 GRAVESTONE'; dojiDesc='Bearish reversal signal';}
-    else if(dojiDragonfly){dojiSig='🟢 DRAGONFLY'; dojiDesc='Bullish reversal signal';}
-    else if(isDoji){dojiSig='🟡 DOJI'; dojiDesc='Market indecision';}
-    setPattern('pat-doji', dojiSig, dojiDesc);
-
-    const longDnWick = dnWick(c) >= body(c)*2 && upWick(c) <= body(c)*0.5;
-    const longUpWick = upWick(c) >= body(c)*2 && dnWick(c) <= body(c)*0.5;
-    let hamSig='—', hamDesc='No pattern';
-    if(longDnWick && isBull(c)){hamSig='🟢 HAMMER'; hamDesc='Bullish reversal — long lower wick';}
-    else if(longDnWick && isBear(c)){hamSig='🟡 HANG MAN'; hamDesc='Possible reversal — confirm next candle';}
-    else if(longUpWick && isBear(c)){hamSig='🔴 SHOOTING STAR'; hamDesc='Bearish reversal — long upper wick';}
-    else if(longUpWick && isBull(c)){hamSig='🟡 INVERTED HAMMER'; hamDesc='Possible bullish reversal';}
-    setPattern('pat-hammer', hamSig, hamDesc);
-
-    let engSig='—', engDesc='No engulfing';
-    const bullEngulf = isBear(p1) && isBull(c) && closes[c]>opens[p1] && opens[c]<closes[p1];
-    const bearEngulf = isBull(p1) && isBear(c) && closes[c]<opens[p1] && opens[c]>closes[p1];
-    if(bullEngulf){engSig='🟢 BULL ENGULF'; engDesc='Strong bullish reversal signal';}
-    else if(bearEngulf){engSig='🔴 BEAR ENGULF'; engDesc='Strong bearish reversal signal';}
-    setPattern('pat-engulf', engSig, engDesc);
-
-    let starSig='—', starDesc='No star pattern';
-    const morningStar = isBear(p2) && body(p1)<body(p2)*0.3 && isBull(c) && closes[c]>=(opens[p2]+closes[p2])/2;
-    const eveningStar = isBull(p2) && body(p1)<body(p2)*0.3 && isBear(c) && closes[c]<=(opens[p2]+closes[p2])/2;
-    if(morningStar){starSig='🟢 MORNING STAR'; starDesc='3-candle bullish reversal';}
-    else if(eveningStar){starSig='🔴 EVENING STAR'; starDesc='3-candle bearish reversal';}
-    setPattern('pat-star', starSig, starDesc);
-
-    let threeSig='—', threeDesc='No 3-candle trend';
-    const threeWhite = isBull(p2)&&isBull(p1)&&isBull(c) && closes[c]>closes[p1]&&closes[p1]>closes[p2] && body(c)>range(c)*0.5;
-    const threeCrows  = isBear(p2)&&isBear(p1)&&isBear(c) && closes[c]<closes[p1]&&closes[p1]<closes[p2] && body(c)>range(c)*0.5;
-    if(threeWhite){threeSig='🟢 THREE SOLDIERS'; threeDesc='Strong sustained bullish move';}
-    else if(threeCrows){threeSig='🔴 THREE CROWS'; threeDesc='Strong sustained bearish move';}
-    setPattern('pat-three', threeSig, threeDesc);
-
-    const bullHarami = isBear(p1)&&isBull(c) && closes[c]<opens[p1]&&opens[c]>closes[p1] && body(c)<body(p1)*0.5;
-    const bearHarami = isBull(p1)&&isBear(c) && closes[c]>opens[p1]&&opens[c]<closes[p1] && body(c)<body(p1)*0.5;
-    let harSig='—', harDesc='No harami';
-    if(bullHarami){harSig='🟢 BULL HARAMI'; harDesc='Inside bar — bullish reversal';}
-    else if(bearHarami){harSig='🔴 BEAR HARAMI'; harDesc='Inside bar — bearish reversal';}
-    setPattern('pat-harami', harSig, harDesc);
-
-    const bc3=[isBull(p2),isBull(p1),isBull(c)].filter(Boolean).length;
-    let mainSig, mainDesc;
-    if(bc3===3){mainSig='🟢 3 BULLS'; mainDesc='Three consecutive bullish candles';}
-    else if(bc3===0){mainSig='🔴 3 BEARS'; mainDesc='Three consecutive bearish candles';}
-    else if(bc3===2&&isBull(c)){mainSig='🟢 BULL TREND'; mainDesc='Mostly bullish recent candles';}
-    else if(bc3===1&&isBear(c)){mainSig='🔴 BEAR TREND'; mainDesc='Mostly bearish recent candles';}
-    else{mainSig='🟡 MIXED'; mainDesc='No clear candle direction';}
-    setPattern('pat-main', mainSig, mainDesc);
-
-    const bullPats=[bullEngulf,morningStar,threeWhite,bullHarami,dojiDragonfly,longDnWick&&isBull(c)].filter(Boolean).length;
-    const bearPats=[bearEngulf,eveningStar,threeCrows,bearHarami,dojiGravestone,longUpWick&&isBear(c)].filter(Boolean).length;
-    let ovSig, ovDesc;
-    if(bullPats>bearPats&&bullPats>0){ovSig='🟢 BULLISH PATTERNS'; ovDesc=`${bullPats} bullish pattern${bullPats>1?'s':''} detected`;}
-    else if(bearPats>bullPats&&bearPats>0){ovSig='🔴 BEARISH PATTERNS'; ovDesc=`${bearPats} bearish pattern${bearPats>1?'s':''} detected`;}
-    else{ovSig='⬡ NEUTRAL'; ovDesc='No strong pattern signal';}
-    setPattern('pat-overall', ovSig, ovDesc);
+    if(pd){ pd.textContent=direction; pd.style.color=dirColor; }
   }
 
   function setPattern(id, sig, desc) {
@@ -3922,78 +3681,25 @@ self.onmessage=function(e){
     try {
       const data = await smartFetch('https://api.alternative.me/fng/?limit=7&format=json');
       if(!data||!data.data||!data.data.length) return;
-      const latest  = data.data[0];
-      const yest    = data.data[1];
-      const lastWk  = data.data[6]||data.data[data.data.length-1];
-      const val     = parseInt(latest.value);
-      const color   = val>=75?'var(--red)':val>=55?'var(--warn)':val>=45?'var(--warn)':val>=25?'var(--green)':'var(--green)';
-      const label   = latest.value_classification;
-      const signal  = val>=75?'🔴 Extreme Greed — market may reverse':val>=55?'🟡 Greed — be cautious':val<=25?'🟢 Extreme Fear — buy opportunity':val<=45?'🟢 Fear — accumulation zone':'🟡 Neutral';
-
-      const offset  = 157 - (val/100*157);
-      const arc     = document.getElementById('fg-arc-fill');
-      if(arc){ arc.style.strokeDashoffset=offset; arc.style.stroke=color; }
-      const numEl   = document.getElementById('fg-num');
-      if(numEl){ numEl.textContent=val; numEl.style.fill=color; }
-
-      const lbEl=document.getElementById('fg-label');
-      if(lbEl){ lbEl.textContent=label; lbEl.style.color=color; }
-
-      const ySt=parseInt(yest.value);
-      const wSt=parseInt(lastWk.value);
-      const yEl=document.getElementById('fg-yesterday');
-      const wEl=document.getElementById('fg-lastweek');
-      const sEl=document.getElementById('fg-signal');
-      if(yEl){ yEl.textContent=ySt+' — '+yest.value_classification; yEl.style.color=ySt>=55?'var(--red)':ySt<=45?'var(--green)':'var(--warn)'; }
-      if(wEl){ wEl.textContent=wSt+' — '+lastWk.value_classification; wEl.style.color=wSt>=55?'var(--red)':wSt<=45?'var(--green)':'var(--warn)'; }
-      if(sEl){ sEl.textContent=signal; sEl.style.color=color; }
+      const latest = data.data[0];
+      const yest   = data.data[1];
+      const lastWk = data.data[6]||data.data[data.data.length-1];
+      const val    = parseInt(latest.value);
+      const color  = val>=75?'var(--red)':val>=55?'var(--warn)':val>=45?'var(--warn)':val>=25?'var(--green)':'var(--green)';
+      const label  = latest.value_classification;
+      const fgEl   = document.getElementById('fg-label');
+      if(fgEl){ fgEl.textContent=val+' — '+label; fgEl.style.color=color; }
+      // Arc gauge
+      const arc = document.getElementById('fg-arc');
+      if(arc){ const pct=val/100; arc.style.strokeDasharray=`${pct*220} 220`; arc.style.stroke=color; }
+      // Yesterday / last week
+      const yd=document.getElementById('fg-yest'),lw=document.getElementById('fg-lastweek');
+      if(yd)yd.textContent='Yesterday: '+yest.value+' ('+yest.value_classification+')';
+      if(lw)lw.textContent='Last week: '+lastWk.value+' ('+lastWk.value_classification+')';
     } catch(e) {
-      const lbEl=document.getElementById('fg-label');
-      if(lbEl) lbEl.textContent='Unavailable';
+      const fgEl=document.getElementById('fg-label');
+      if(fgEl)fgEl.textContent='Fear & Greed: unavailable';
     }
-  }
-
-  function detectKeyLevels(price, highs, lows, closes, atr) {
-    if(!closes||closes.length<20) return;
-    const n=closes.length;
-    const atv=atr||price*0.02;
-    const pivotRadius=5;
-    const resistances=[], supports=[];
-
-    for(let i=pivotRadius; i<n-pivotRadius; i++){
-      const isSwingH=highs.slice(i-pivotRadius,i).every(h=>h<=highs[i])&&highs.slice(i+1,i+pivotRadius+1).every(h=>h<=highs[i]);
-      const isSwingL=lows.slice(i-pivotRadius,i).every(l=>l>=lows[i])&&lows.slice(i+1,i+pivotRadius+1).every(l=>l>=lows[i]);
-      if(isSwingH) resistances.push(highs[i]);
-      if(isSwingL) supports.push(lows[i]);
-    }
-
-    const cluster=(arr)=>{
-      const merged=[];
-      arr.sort((a,b)=>a-b);
-      for(const v of arr){
-        const existing=merged.find(m=>Math.abs(m-v)/v<0.005);
-        if(!existing) merged.push(v);
-      }
-      return merged;
-    };
-
-    const resLevels=cluster(resistances).filter(r=>r>price).sort((a,b)=>a-b).slice(0,3);
-    const supLevels=cluster(supports).filter(s=>s<price).sort((a,b)=>b-a).slice(0,3);
-
-    const wrap=document.getElementById('keyLevels');
-    if(!wrap) return;
-    let html=`<div class="level-row"><span class="level-tag level-cur">PRICE</span><span style="font-family:'Orbitron',monospace;font-weight:700;color:var(--accent)">${fmtP(price)}</span><span style="margin-left:auto;color:var(--muted);font-size:.58rem">Current</span></div>`;
-
-    resLevels.forEach((r,i)=>{
-      const dist=((r-price)/price*100).toFixed(1);
-      html+=`<div class="level-row"><span class="level-tag level-res">R${i+1}</span><span style="color:var(--red)">${fmtP(r)}</span><span style="margin-left:auto;color:var(--muted);font-size:.58rem">+${dist}% away</span></div>`;
-    });
-    supLevels.forEach((s,i)=>{
-      const dist=((price-s)/price*100).toFixed(1);
-      html+=`<div class="level-row"><span class="level-tag level-sup">S${i+1}</span><span style="color:var(--green)">${fmtP(s)}</span><span style="margin-left:auto;color:var(--muted);font-size:.58rem">-${dist}% away</span></div>`;
-    });
-    if(!resLevels.length&&!supLevels.length) html+='<div style="font-family:\'Share Tech Mono\',monospace;font-size:.6rem;color:var(--muted)">No clear swing levels found</div>';
-    wrap.innerHTML=html;
   }
 
   async function calcBTCCorrelation(sym, closes) {
