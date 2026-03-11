@@ -3346,8 +3346,10 @@ self.onmessage=function(e){
 
     runQuickPrediction(price, isBUY, isSELL, e55BelowCount);
 
-    const partialExitBuy  = !isBUY && !isSELL && e55BelowCount >= 1 && e55BelowCount <= 2 && e55BelowCount > e55AboveCount;
-    const partialExitSell = !isBUY && !isSELL && e55AboveCount >= 1 && e55AboveCount <= 2 && e55AboveCount > e55BelowCount;
+    // partialExitBuy: was in BUY (all 3 below), now 1 or 2 lines have crossed above — weakening
+    // partialExitSell: was in SELL (all 3 above), now 1 or 2 lines have crossed below — weakening
+    const partialExitBuy  = !isBUY && !isSELL && e55AboveCount >= 1 && e55AboveCount <= 2;
+    const partialExitSell = !isBUY && !isSELL && e55BelowCount >= 1 && e55BelowCount <= 2;
 
     // Quick indicators needed immediately for checklist + TL signal (moved before first use)
     const _rsi=calcRSI(closes),_macdV=calcMACD(closes);
@@ -3371,12 +3373,13 @@ self.onmessage=function(e){
       tlDetail='EMA 55 is above EMA 8, 13 & 21.\nHold until EMA 55 drops below ALL three.';
     } else if(partialExitBuy) {
       tlColor='var(--warn)'; tlText='⚠️ HOLD LONG — PARTIAL EXIT?';
-      const crossedBack = e55AboveCount === 1 ? 'EMA 21' : 'EMA 21 & 13';
-      tlDetail=`In a LONG trade. EMA 55 just crossed back above ${crossedBack} (${e55AboveCount}/3).\nConsider taking 30–50% profit.\nFull SELL only when EMA 55 crosses above ALL three.`;
+      // EMA 55 crosses EMAs in order: EMA 8 first (fastest), then EMA 13, then EMA 21
+      const crossedLines = e55AboveCount === 1 ? 'EMA 8 (1/3)' : 'EMA 8 & EMA 13 (2/3)';
+      tlDetail=`In a LONG trade. EMA 55 just crossed above ${crossedLines}.\nConsider taking ${e55AboveCount===2?'50%':'30%'} profit.\nFull SELL only when EMA 55 crosses above ALL three.`;
     } else if(partialExitSell) {
       tlColor='var(--warn)'; tlText='⚠️ HOLD SHORT — PARTIAL EXIT?';
-      const crossedBack = e55BelowCount === 1 ? 'EMA 21' : 'EMA 21 & 13';
-      tlDetail=`In a SHORT trade. EMA 55 just crossed back below ${crossedBack} (${e55BelowCount}/3).\nConsider taking 30–50% profit.\nFull BUY only when EMA 55 crosses below ALL three.`;
+      const crossedLines = e55BelowCount === 1 ? 'EMA 8 (1/3)' : 'EMA 8 & EMA 13 (2/3)';
+      tlDetail=`In a SHORT trade. EMA 55 just crossed back below ${crossedLines}.\nConsider taking ${e55BelowCount===2?'50%':'30%'} profit.\nFull BUY only when EMA 55 crosses below ALL three.`;
     } else {
       tlColor='var(--muted)'; tlText='⬡ NEUTRAL';
       tlDetail='EMA 55 is between the fast EMAs.\nNo clear signal — wait for full cross.';
@@ -3420,8 +3423,8 @@ self.onmessage=function(e){
       `${e55above13?'🔴':'—'} EMA 55 ABOVE EMA 13`,
       `${e55above21?'🔴':'—'} EMA 55 ABOVE EMA 21`,
       `<b style="color:var(--warn)">Partial Exit (from LONG):</b>`,
-      `${partialExitBuy?'⚠️':'—'} EMA 55 back above EMA 21 → take 30–50%`,
-      `${e55AboveCount===2?'⚠️':'—'} EMA 55 above 2 lines → tighten SL`,
+      `${e55AboveCount===1?'⚠️':'—'} EMA 55 crossed above EMA 8 (1/3) → consider 30% exit`,
+      `${e55AboveCount===2?'⚠️':'—'} EMA 55 crossed above EMA 8 & 13 (2/3) → take 50% profit`,
       `${isSELL?'🚨':'—'} EMA 55 above ALL 3 → EXIT LONG`,
     ].join('<br>');
 
@@ -3580,7 +3583,8 @@ self.onmessage=function(e){
       const _isBUY=[_e55above8,_e55above13,_e55above21].every(v=>!v);
       const _isSELL=[_e55above8,_e55above13,_e55above21].every(Boolean);
       const _e55AboveCount=[_e55above8,_e55above13,_e55above21].filter(Boolean).length;
-      const _partialExitBuy=!_isBUY&&!_isSELL&&_e55AboveCount>=1&&_e55AboveCount<3&&_e55AboveCount<(3-_e55AboveCount);
+      // partialExitBuy: 1 or 2 lines have crossed above (weakening from BUY state)
+      const _partialExitBuy=!_isBUY&&!_isSELL&&_e55AboveCount>=1&&_e55AboveCount<=2;
       const tlBuy=document.getElementById('tl-buy-rules');
       if(tlBuy)tlBuy.innerHTML=[
         `<b style="color:var(--green)">BUY Entry Rule:</b>`,
@@ -3600,8 +3604,8 @@ self.onmessage=function(e){
         `${_e55above13?'🔴':'—'} EMA 55 ABOVE EMA 13`,
         `${_e55above21?'🔴':'—'} EMA 55 ABOVE EMA 21`,
         `<b style="color:var(--warn)">Partial Exit (from LONG):</b>`,
-        `${_partialExitBuy?'⚠️':'—'} EMA 55 back above EMA 21 → take 30–50%`,
-        `${_e55AboveCount===2?'⚠️':'—'} EMA 55 above 2 lines → tighten SL`,
+        `${_e55AboveCount===1?'⚠️':'—'} EMA 55 crossed above EMA 8 (1/3) → consider 30% exit`,
+        `${_e55AboveCount===2?'⚠️':'—'} EMA 55 crossed above EMA 8 & 13 (2/3) → take 50% profit`,
         `${_isSELL?'🚨':'—'} EMA 55 above ALL 3 → EXIT LONG`,
       ].join('<br>');
     }
@@ -5432,11 +5436,14 @@ self.onmessage=function(e){
       const barW = maxAbs > 0 ? (Math.abs(chg)/maxAbs*100).toFixed(0) : 0;
       const price = c.current_price >= 1 ? '$' + c.current_price.toLocaleString(undefined,{maximumFractionDigits:2}) : '$' + c.current_price.toFixed(6);
       const vol = fmtBig(c.total_volume);
-      return `<div class="mover-row">
+      const sym = c.symbol.toUpperCase();
+      return `<div class="mover-row" style="cursor:pointer" title="Click to load ${sym} in Analysis"
+        onclick="(function(){const i=document.getElementById('symInput');if(i){i.value='${sym}';switchTab('analysis');setTimeout(()=>fetchData(),150);}})()">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px">
-            <span class="mover-sym">${c.symbol.toUpperCase()}</span>
+            <span class="mover-sym">${sym}</span>
             <span class="mover-price">${price}</span>
+            <span style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-left:4px">→ load</span>
             <span class="mover-chg" style="color:${color};margin-left:auto">${fmtPct(chg)}</span>
           </div>
           <div class="mover-bar" style="width:${barW}%;background:${color};opacity:.5"></div>
