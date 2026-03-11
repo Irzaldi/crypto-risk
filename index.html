@@ -2523,7 +2523,7 @@ self.onmessage=function(e){
     kucoin: {'15m':'15min','30m':'30min','1h':'1hour','4h':'4hour','1d':'1day','1w':'1week','1M':'1month'},
     // Yahoo Finance intervals and matching range for sufficient candles
     yahoo:  {'15m':'15m','30m':'30m','1h':'1h','4h':'1h','1d':'1d','1w':'1wk','1M':'1mo'},
-    yahooRange: {'15m':'5d','30m':'10d','1h':'60d','4h':'60d','1d':'2y','1w':'5y','1M':'10y'},
+    yahooRange: {'15m':'60d','30m':'60d','1h':'60d','4h':'60d','1d':'2y','1w':'5y','1M':'10y'},
   };
 
   // Forex/fiat pairs have limited interval support on crypto exchanges.
@@ -2738,8 +2738,11 @@ self.onmessage=function(e){
     'EURIDR': { base:'EUR', quote:'IDR', display:'EUR/IDR', isFiat:true  },
   };
 
-  // How many days of history to fetch per TF (to get ~300 daily candles)
-  const FOREX_HISTORY_DAYS = { '15m':7,'30m':14,'1h':30,'4h':90,'1d':365,'1w':1000,'1M':3000 };
+  // How many days of history to fetch per TF
+  // Frankfurter only gives DAILY data — sub-daily TFs get remapped to daily with more history
+  const FOREX_HISTORY_DAYS = { '15m':365,'30m':365,'1h':365,'4h':500,'1d':500,'1w':1500,'1M':3000 };
+  // Sub-daily TFs that have no real intraday forex data — will use daily candles + show warning
+  const FOREX_DAILY_ONLY_TFS = new Set(['15m','30m','1h','4h']);
 
   async function tryForex(sym) {
     const fp = FOREX_PAIRS[sym];
@@ -2759,20 +2762,24 @@ self.onmessage=function(e){
     }
 
     // Helper: turn daily rate array into OHLCV (synthetic candles)
-    // For daily data, O=prev close, H/L=±0.2% noise based on real range, V=0
+    // Synthesizes proxy volume from price volatility (|change| * scale)
     function ratesToOHLCV(rates) {
       const closes  = rates.map(r => r.rate);
       const opens   = [closes[0], ...closes.slice(0,-1)];
-      // Synthetic high/low: use actual close range between adjacent candles
       const highs = closes.map((c,i) => {
         const prev = opens[i];
-        return Math.max(c, prev) * (1 + 0.0008); // tiny spread
+        return Math.max(c, prev) * (1 + 0.0008);
       });
       const lows = closes.map((c,i) => {
         const prev = opens[i];
         return Math.min(c, prev) * (1 - 0.0008);
       });
-      const volumes = closes.map(() => 0);
+      // Proxy volume: proportional to daily price change magnitude (so OBV/CMF work directionally)
+      const avgPrice = closes.reduce((a,b)=>a+b,0)/closes.length;
+      const volumes = closes.map((c,i) => {
+        const chg = Math.abs(c - opens[i]) / avgPrice; // fractional move
+        return Math.round(1000000 * (0.5 + chg * 50)); // synthetic tick volume
+      });
       return { opens, closes, highs, lows, volumes };
     }
 
@@ -2845,7 +2852,18 @@ self.onmessage=function(e){
 
     const { opens, closes, highs, lows, volumes } = ratesToOHLCV(rates);
     const price = closes[closes.length-1];
-    const recentCloses = closes.slice(-5);
+
+    // Warn user if they selected a sub-daily TF — forex only has daily candles
+    if(FOREX_DAILY_ONLY_TFS.has(currentTF)) {
+      setTimeout(() => {
+        const sb = document.getElementById('statusBar');
+        if(sb) {
+          sb.textContent = `⚠️ Forex only has daily candles — ${currentTF} not available. Showing ${closes.length}× daily data instead.`;
+          sb.className = 'status-bar loading';
+        }
+      }, 800);
+    }
+
     return {
       price,
       high24: Math.max(...highs.slice(-2)),
@@ -2898,8 +2916,9 @@ self.onmessage=function(e){
 
   // ── Custom stocks — generic Yahoo Finance fetcher ────────────────────────────
   async function tryCustomStock(sym, cs) {
-    const interval = ['15m','30m'].includes(currentTF) ? '1h' : (TF.yahoo[currentTF]||'1d');
-    const range    = ['15m','30m'].includes(currentTF) ? '60d' : (TF.yahooRange[currentTF]||'2y');
+    // Yahoo doesn't support 4h — silently falls back to 1h
+    const interval = TF.yahoo[currentTF] || '1d';
+    const range    = TF.yahooRange[currentTF] || '2y';
     const ticker   = cs.yahoo || sym;
 
     const cached = _yahooCached(ticker, interval, range);
@@ -2910,6 +2929,15 @@ self.onmessage=function(e){
 
     const { closes, opens, highs, lows, volumes } = ohlcv;
     const price = closes[closes.length-1];
+
+    // Warn user if 4h was selected (not supported by Yahoo)
+    if(currentTF === '4h') {
+      setTimeout(() => {
+        const sb = document.getElementById('statusBar');
+        if(sb) { sb.textContent = `⚠️ Yahoo Finance doesn't support 4h — showing 1h candles instead.`; sb.className = 'status-bar loading'; }
+      }, 800);
+    }
+
     const result = {
       price,
       high24: Math.max(...highs.slice(-2)),
@@ -2929,8 +2957,8 @@ self.onmessage=function(e){
     const cp = COMMODITY_PAIRS[sym];
     if(!cp) throw new Error('Not a commodity pair');
 
-    const interval = ['15m','30m'].includes(currentTF) ? '1h' : (TF.yahoo[currentTF]||'1d');
-    const range    = ['15m','30m'].includes(currentTF) ? '60d' : (TF.yahooRange[currentTF]||'2y');
+    const interval = TF.yahoo[currentTF] || '1d';
+    const range    = TF.yahooRange[currentTF] || '2y';
 
     const cached = _yahooCached(cp.yahoo, interval, range);
     if(cached) return { ...cached, pair:cp.display, source:`Yahoo (cached · ${interval})` };
@@ -2992,8 +3020,8 @@ self.onmessage=function(e){
 
   // For ANTAM (IDX stock, no crypto exchange) — use Yahoo Finance via proxy
   async function tryANTAM() {
-    const interval = ['15m','30m'].includes(currentTF) ? '1h' : (TF.yahoo[currentTF]||'1d');
-    const range    = ['15m','30m'].includes(currentTF) ? '60d' : (TF.yahooRange[currentTF]||'2y');
+    const interval = TF.yahoo[currentTF] || '1d';
+    const range    = TF.yahooRange[currentTF] || '2y';
     const ticker   = 'ANTM.JK';
 
     const cached = _yahooCached(ticker, interval, range);
@@ -4565,6 +4593,11 @@ self.onmessage=function(e){
     localStorage.setItem('tl_cfg', JSON.stringify(CFG));
     const s = document.getElementById('settingsSaveStatus');
     s.textContent = '✓ Saved!'; setTimeout(()=>s.textContent='', 2000);
+    // Immediately redraw chart with new candle count if data already loaded
+    if(window._lastChartData) {
+      const d = window._lastChartData;
+      drawMiniChart(d.opens, d.closes, d.highs, d.lows, d.e8, d.e21, d.e55, d.e200, d.sym, d.tf);
+    }
   }
   function resetSettings() {
     CFG = {...DEFAULTS};
