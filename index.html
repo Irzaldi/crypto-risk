@@ -3903,15 +3903,23 @@ self.onmessage=function(e){
       const val    = parseInt(latest.value);
       const color  = val>=75?'var(--red)':val>=55?'var(--warn)':val>=45?'var(--warn)':val>=25?'var(--green)':'var(--green)';
       const label  = latest.value_classification;
+      // Label
       const fgEl   = document.getElementById('fg-label');
       if(fgEl){ fgEl.textContent=val+' — '+label; fgEl.style.color=color; }
-      // Arc gauge
-      const arc = document.getElementById('fg-arc');
-      if(arc){ const pct=val/100; arc.style.strokeDasharray=`${pct*220} 220`; arc.style.stroke=color; }
+      // Number inside SVG
+      const fgNum = document.getElementById('fg-num');
+      if(fgNum){ fgNum.textContent=val; fgNum.setAttribute('fill',color); }
+      // Arc gauge (id=fg-arc-fill, full arc length=157)
+      const arc = document.getElementById('fg-arc-fill');
+      if(arc){ const pct=val/100; arc.style.strokeDasharray=`${pct*157} 157`; arc.style.stroke=color; arc.style.strokeDashoffset='0'; }
       // Yesterday / last week
-      const yd=document.getElementById('fg-yest'),lw=document.getElementById('fg-lastweek');
-      if(yd)yd.textContent='Yesterday: '+yest.value+' ('+yest.value_classification+')';
-      if(lw)lw.textContent='Last week: '+lastWk.value+' ('+lastWk.value_classification+')';
+      const yd=document.getElementById('fg-yesterday'),lw=document.getElementById('fg-lastweek');
+      if(yd)yd.textContent=yest.value+' ('+yest.value_classification+')';
+      if(lw)lw.textContent=lastWk.value+' ('+lastWk.value_classification+')';
+      // Signal
+      const sig = val>=75?'🔴 Extreme Greed — caution':val>=55?'🟡 Greed — stay alert':val>=45?'🟡 Neutral':val>=25?'🟢 Fear — possible buy zone':'🟢 Extreme Fear — contrarian buy';
+      const fgSig=document.getElementById('fg-signal');
+      if(fgSig){fgSig.textContent=sig;fgSig.style.color=color;}
     } catch(e) {
       const fgEl=document.getElementById('fg-label');
       if(fgEl)fgEl.textContent='Fear & Greed: unavailable';
