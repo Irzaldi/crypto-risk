@@ -35,6 +35,7 @@
   .live-dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 8px var(--green); animation:blink 1s step-end infinite; }
   .loading-dot { width:7px; height:7px; border-radius:50%; background:var(--warn); animation:pdot .5s ease-in-out infinite; }
   @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.15} }
+  @keyframes mktShimmer { 0%,100%{opacity:.35} 50%{opacity:.9} }
   @keyframes pdot { 0%,100%{transform:scale(1)} 50%{transform:scale(1.6)} }
 
   /* Connection status grid */
@@ -701,17 +702,29 @@
      MARKET DASHBOARD
   ══════════════════════════════════════════════ */
   /* Top metrics row */
-  .mkt-metrics { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:14px; }
+  .mkt-metrics { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px; }
   .mkt-card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px; position:relative; overflow:hidden; }
   .mkt-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1.5px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.2; }
   .mkt-card-label { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
   .mkt-card-value { font-family:'Orbitron',monospace; font-size:.95rem; font-weight:700; color:var(--accent); }
   .mkt-card-sub { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--muted); margin-top:3px; }
+  @media(max-width:900px){ .mkt-metrics { grid-template-columns:repeat(3,1fr); } }
   @media(max-width:700px){ .mkt-metrics { grid-template-columns:repeat(2,1fr); } }
+  /* Trending panel rows */
+  .trend-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); cursor:pointer; gap:8px; }
+  .trend-row:last-child { border-bottom:none; }
+  .trend-row:hover .trend-sym { color:var(--accent); }
+  .trend-rank { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); min-width:16px; }
+  .trend-sym { font-family:'Orbitron',monospace; font-size:.65rem; font-weight:700; color:var(--text); min-width:48px; }
+  .trend-name { font-family:'Share Tech Mono',monospace; font-size:.58rem; color:var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trend-score { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--warn); }
+  /* News source badge */
+  .news-src { font-family:'Share Tech Mono',monospace; font-size:.5rem; padding:1px 5px; border-radius:3px; margin-left:4px; font-weight:700; letter-spacing:.5px; }
 
   /* Dashboard grid */
-  .mkt-grid-top { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+  .mkt-grid-top { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
   .mkt-grid-mid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  @media(max-width:900px){ .mkt-grid-top { grid-template-columns:1fr 1fr; } }
   @media(max-width:700px){ .mkt-grid-top,.mkt-grid-mid { grid-template-columns:1fr; } }
 
   /* Funding rate rows */
@@ -1462,9 +1475,21 @@
       <div class="mkt-card"><div class="mkt-card-label">ETH Dominance</div><div class="mkt-card-value" id="mkt-ethdom">—</div><div class="mkt-card-sub" id="mkt-ethdom-sub">of total market</div></div>
       <div class="mkt-card"><div class="mkt-card-label">24h Volume</div><div class="mkt-card-value" id="mkt-vol24">—</div><div class="mkt-card-sub" id="mkt-vol24-sub">—</div></div>
       <div class="mkt-card"><div class="mkt-card-label">Active Cryptos</div><div class="mkt-card-value" id="mkt-active">—</div><div class="mkt-card-sub" id="mkt-active-sub">—</div></div>
+      <!-- Fear & Greed Index card -->
+      <div class="mkt-card" id="mkt-fng-card" style="position:relative;overflow:hidden">
+        <div class="mkt-card-label">Fear &amp; Greed Index</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:2px">
+          <canvas id="mkt-fng-arc" width="56" height="32" style="display:block"></canvas>
+          <div>
+            <div class="mkt-card-value" id="mkt-fng-value" style="font-size:1.1rem">—</div>
+            <div class="mkt-card-sub" id="mkt-fng-label">loading...</div>
+          </div>
+        </div>
+        <div id="mkt-fng-sparkline" style="margin-top:6px;height:22px"></div>
+      </div>
     </div>
 
-    <!-- ── Row 1: Funding Rates | OI | Top Movers ── -->
+    <!-- ── Row 1: Funding Rates | OI | Top Movers | Trending ── -->
     <div class="mkt-grid-top">
 
       <!-- Funding Rates -->
@@ -1493,14 +1518,29 @@
         <div id="moversPanel"><div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div></div>
       </div>
 
+      <!-- 🔥 Trending Coins -->
+      <div class="panel">
+        <div class="ptitle">🔥 Trending <span style="font-size:.5rem;color:var(--muted);margin-left:4px">CoinGecko search · click to load</span></div>
+        <div id="trendingPanel"><div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div></div>
+      </div>
+
     </div>
 
-    <!-- ── Row 2: News Feed | Heatmap ── -->
+    <!-- ── Row 2: News Feed ── -->
     <div class="mkt-grid-mid">
 
-      <!-- News Feed -->
+      <!-- News Feed — multi-source with tabs -->
       <div class="panel">
-        <div class="ptitle">📰 Crypto News Feed</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+          <div class="ptitle" style="margin-bottom:0">📰 News Feed</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="newsSrcTabs">
+            <button class="ind-tab active" id="ntab-all"     onclick="filterNews('all')">All</button>
+            <button class="ind-tab"        id="ntab-yf"      onclick="filterNews('yf')">Yahoo Finance</button>
+            <button class="ind-tab"        id="ntab-ct"      onclick="filterNews('ct')">CoinTelegraph</button>
+            <button class="ind-tab"        id="ntab-cn"      onclick="filterNews('cn')">CryptoNews</button>
+            <button class="ind-tab"        id="ntab-dc"      onclick="filterNews('dc')">Decrypt</button>
+          </div>
+        </div>
         <div id="newsPanel" class="news-scroll">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading news...</div>
         </div>
@@ -5304,6 +5344,11 @@ self.onmessage=function(e){
   let _mktLoaded = false;
   let _moversData = { gainers:[], losers:[] };
 
+  const _mktCache = {};
+  function _mktGet(k,ms){const h=_mktCache[k];return(h&&Date.now()-h.ts<ms)?h.data:null;}
+  function _mktSet(k,d){_mktCache[k]={data:d,ts:Date.now()};}
+  function _skel(n){n=n||5;var s='';for(var i=0;i<n;i++)s+='<div style="height:26px;background:rgba(255,255,255,.04);border-radius:4px;margin-bottom:7px;animation:mktShimmer 1.5s ease-in-out infinite '+(i*0.1)+'s"></div>';return s;}
+
   function fmtBig(n) {
     if(!n) return '—';
     if(n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
@@ -5320,37 +5365,25 @@ self.onmessage=function(e){
     return n > 0 ? 'var(--green)' : n < 0 ? 'var(--red)' : 'var(--muted)';
   }
 
-  async function fetchMarketDashboard() {
-    const btn = document.getElementById('mktRefreshBtn');
-    const status = document.getElementById('mktStatus');
-    if(btn) { btn.disabled = true; btn.textContent = '⟳ LOADING...'; }
-    if(status) status.textContent = 'Fetching market data...';
-
-    try {
-      await Promise.allSettled([
-        fetchGlobalMetrics(),
-        fetchFundingRates(),
-        fetchOpenInterest(),
-        fetchTopMovers(),
-        fetchCryptoNews(),
-        fetchHeatmap(),
-      ]);
-      _mktLoaded = true;
-      const now = new Date();
-      const upd = document.getElementById('mktLastUpdate');
-      if(upd) upd.textContent = 'Updated: ' + now.toLocaleTimeString();
-      if(status) status.textContent = '✓ Dashboard loaded';
-    } catch(e) {
-      if(status) status.textContent = '✗ Some data failed to load';
-    }
-    if(btn) { btn.disabled = false; btn.textContent = '⟳ REFRESH DASHBOARD'; }
+  async function fetchMarketDashboard(bust) {
+    const btn=document.getElementById('mktRefreshBtn'), status=document.getElementById('mktStatus');
+    if(btn){btn.disabled=true;btn.textContent='⟳ LOADING...';}
+    if(status) status.textContent='Fetching market data...';
+    ['fundingPanel','oiPanel','moversPanel','trendingPanel'].forEach(function(id){const el=document.getElementById(id);if(el)el.innerHTML=_skel(6);});
+    const cgTTL=3*60*1000, cgCached=!bust&&_mktGet('cgMarkets',cgTTL);
+    const cgP=cgCached?Promise.resolve(cgCached):smartFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h').then(function(d){if(!Array.isArray(d))throw new Error('bad');_mktSet('cgMarkets',d);return d;});
+    await Promise.allSettled([fetchGlobalMetrics(bust),fetchFearGreed(bust),fetchFundingRates(bust),fetchOpenInterestBatch(bust),_fetchTopMovers(cgP),fetchTrending(bust),fetchCryptoNews(bust),_fetchHeatmap(cgP)]);
+    _mktLoaded=true;
+    const upd=document.getElementById('mktLastUpdate');if(upd)upd.textContent='Updated: '+new Date().toLocaleTimeString();
+    if(status)status.textContent='✓ Dashboard loaded';
+    if(btn){btn.disabled=false;btn.textContent='⟳ REFRESH DASHBOARD';}
   }
 
   // ── Global metrics via CoinGecko ──────────────────────────
-  async function fetchGlobalMetrics() {
+  async function fetchGlobalMetrics(bust) {
     try {
-      const url = 'https://api.coingecko.com/api/v3/global';
-      const data = await smartFetch(url);
+      let data=!bust&&_mktGet('globalMetrics',5*60*1000);
+      if(!data){data=await smartFetch('https://api.coingecko.com/api/v3/global');_mktSet('globalMetrics',data);}
       if(!data || !data.data) return;
       const d = data.data;
       const cap = d.total_market_cap?.usd;
@@ -5377,11 +5410,12 @@ self.onmessage=function(e){
   }
 
   // ── Funding Rates via Binance Futures ─────────────────────
-  async function fetchFundingRates() {
+  async function fetchFundingRates(bust) {
     const panel = document.getElementById('fundingPanel');
     const coins = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
     try {
-      const data = await smartFetch('https://fapi.binance.com/fapi/v1/premiumIndex');
+      let data=!bust&&_mktGet('fundingRates',30*60*1000);
+      if(!data){data=await smartFetch('https://fapi.binance.com/fapi/v1/premiumIndex');_mktSet('fundingRates',data);}
       if(!Array.isArray(data)) throw new Error('bad data');
       const rates = data
         .filter(d => coins.includes(d.symbol))
@@ -5409,48 +5443,37 @@ self.onmessage=function(e){
     }
   }
 
-  // ── Open Interest via Binance Futures ─────────────────────
-  async function fetchOpenInterest() {
-    const panel = document.getElementById('oiPanel');
-    const coins = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT'];
+  // ── Open Interest — workerBatch sends all 7 URLs in ONE request ─────────────
+  async function fetchOpenInterestBatch(bust) {
+    const panel=document.getElementById('oiPanel');
+    const coins=['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT'];
     try {
-      const results = await Promise.all(
-        coins.map(sym => smartFetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${sym}`)
-          .catch(() => null))
-      );
-      panel.innerHTML = results.map((r, i) => {
-        if(!r) return '';
-        const sym = coins[i].replace('USDT','');
-        const oi = parseFloat(r.openInterest);
-        const notional = oi * (parseFloat(r.openInterest) || 1);
-        const oiStr = oi >= 1e6 ? (oi/1e6).toFixed(2)+'M' : oi >= 1e3 ? (oi/1e3).toFixed(1)+'K' : oi.toFixed(0);
-        // OI change color (we don't have historical here, so just show value)
-        return `<div class="oi-row">
-          <span style="font-family:'Orbitron',monospace;font-size:.65rem;font-weight:700;min-width:52px">${sym}</span>
-          <span style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);flex:1;margin:0 8px">Open Interest</span>
-          <span style="font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--accent);font-weight:700">${oiStr} contracts</span>
-        </div>`;
+      let results=!bust&&_mktGet('openInterest',5*60*1000);
+      if(!results){
+        const urls=coins.map(function(s){return 'https://fapi.binance.com/fapi/v1/openInterest?symbol='+s;});
+        try{results=await workerBatch(urls);}catch(e){results=await Promise.all(urls.map(function(u){return smartFetch(u).catch(function(){return null;});}));}
+        _mktSet('openInterest',results);
+      }
+      panel.innerHTML=results.map(function(r,i){
+        const sym=coins[i].replace('USDT','');
+        if(!r)return '<div class="oi-row"><span style="font-family:Orbitron,monospace;font-size:.65rem;color:var(--muted)">'+sym+'</span><span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--red);margin-left:auto">—</span></div>';
+        const oi=parseFloat(r.openInterest),oiStr=oi>=1e9?(oi/1e9).toFixed(2)+'B':oi>=1e6?(oi/1e6).toFixed(2)+'M':oi>=1e3?(oi/1e3).toFixed(1)+'K':oi.toFixed(0);
+        return '<div class="oi-row"><span style="font-family:Orbitron,monospace;font-size:.65rem;font-weight:700;min-width:52px">'+sym+'</span><span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted);flex:1;margin:0 8px">Open Interest</span><span style="font-family:Share Tech Mono,monospace;font-size:.65rem;color:var(--accent);font-weight:700">'+oiStr+' contracts</span></div>';
       }).join('');
-      if(!panel.innerHTML.trim()) panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">No OI data returned</div>`;
-    } catch(e) {
-      panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Open Interest unavailable</div>`;
-    }
+      if(!panel.innerHTML.trim())panel.innerHTML='<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No OI data</div>';
+    }catch(e){if(panel)panel.innerHTML='<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Open Interest unavailable</div>';}
   }
 
-  // ── Top Movers via CoinGecko ──────────────────────────────
-  async function fetchTopMovers() {
+  // ── Top Movers — zero extra fetch; reuses shared CoinGecko promise ──────────
+  async function _fetchTopMovers(cgP) {
     try {
-      const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=percent_change_24h&per_page=250&page=1&sparkline=false&price_change_percentage=24h';
-      const data = await smartFetch(url);
-      if(!Array.isArray(data)) throw new Error('bad data');
-      const sorted = [...data].sort((a,b) => (b.price_change_percentage_24h||0) - (a.price_change_percentage_24h||0));
-      _moversData.gainers = sorted.slice(0, 10);
-      _moversData.losers = [...sorted].reverse().slice(0, 10);
+      const data=await cgP;
+      if(!Array.isArray(data))throw new Error('bad data');
+      const sorted=data.slice().sort(function(a,b){return(b.price_change_percentage_24h||0)-(a.price_change_percentage_24h||0);});
+      _moversData.gainers=sorted.slice(0,10);
+      _moversData.losers=sorted.slice().reverse().slice(0,10);
       showMovers('gainers');
-    } catch(e) {
-      const p = document.getElementById('moversPanel');
-      if(p) p.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Top movers unavailable</div>`;
-    }
+    }catch(e){const p=document.getElementById('moversPanel');if(p)p.innerHTML='<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Top movers unavailable</div>';}
   }
 
   function showMovers(type) {
@@ -5486,374 +5509,297 @@ self.onmessage=function(e){
     }).join('');
   }
 
-  // ── Crypto News via RSS proxy ─────────────────────────────
-  async function fetchCryptoNews() {
-    const panel = document.getElementById('newsPanel');
-    const sources = [
-      'https://cryptonews.com/news/feed/',
-      'https://cointelegraph.com/rss',
-      'https://decrypt.co/feed',
-    ];
-    // Use allorigins to fetch RSS feed
-    const rssUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(sources[0])}`;
+  // ═══════════════════════════════════════════════════════════
+  //  FEAR & GREED INDEX — mini arc gauge + 7-day sparkline
+  // ═══════════════════════════════════════════════════════════
+  async function fetchFearGreed(bust) {
     try {
-      const raw = await fetch(rssUrl, { signal: AbortSignal.timeout(8000) });
-      const json = await raw.json();
-      const xml = json.contents;
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xml, 'text/xml');
-      const items = Array.from(doc.querySelectorAll('item')).slice(0, 12);
-      if(!items.length) throw new Error('no items');
-      panel.innerHTML = items.map(item => {
-        const title = item.querySelector('title')?.textContent || '';
-        const link  = item.querySelector('link')?.textContent || '#';
-        const pubDate = item.querySelector('pubDate')?.textContent || '';
-        const date = pubDate ? new Date(pubDate).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-        // Simple sentiment from title keywords
-        const bullWords = /bullish|rally|surge|rise|pump|gain|breakout|ath|buy/i;
-        const bearWords = /bearish|crash|fall|drop|dump|fear|ban|sell|plunge|down/i;
-        const sentiment = bullWords.test(title) ? 'BULL' : bearWords.test(title) ? 'BEAR' : 'NEUT';
-        const sColor = sentiment==='BULL' ? 'var(--green)' : sentiment==='BEAR' ? 'var(--red)' : 'var(--warn)';
-        return `<div class="news-item">
-          <div class="news-title" onclick="window.open('${link}','_blank')">${title}</div>
-          <div class="news-meta">
-            <span>${date}</span>
-            <span class="news-sentiment" style="background:${sColor}18;color:${sColor};border:1px solid ${sColor}40">${sentiment}</span>
-          </div>
-        </div>`;
+      const TTL = 60 * 60 * 1000; // 1h cache (updates once daily)
+      let data = !bust && _mktGet('fearGreed', TTL);
+      if(!data) {
+        data = await smartFetch('https://api.alternative.me/fng/?limit=8&format=json');
+        _mktSet('fearGreed', data);
+      }
+      if(!data?.data?.length) return;
+
+      const latest = data.data[0];
+      const val = parseInt(latest.value);
+      const label = latest.value_classification;
+      const history = data.data.slice(0,8).reverse(); // oldest→newest
+
+      // Color gradient: 0=extreme fear(red) → 50=neutral(yellow) → 100=greed(green)
+      const fgColor = val <= 25 ? '#ff2d55' : val <= 45 ? '#ff8c00' : val <= 55 ? '#ffd700' : val <= 75 ? '#9acd32' : '#00ff88';
+
+      // Update text
+      const valEl = document.getElementById('mkt-fng-value');
+      const lblEl = document.getElementById('mkt-fng-label');
+      if(valEl) { valEl.textContent = val; valEl.style.color = fgColor; }
+      if(lblEl) { lblEl.textContent = label; lblEl.style.color = fgColor; }
+
+      // Draw arc gauge on canvas
+      const cv = document.getElementById('mkt-fng-arc');
+      if(cv) {
+        const ctx = cv.getContext('2d');
+        const W = 56, H = 32, cx = W/2, cy = H-2, r = 22;
+        ctx.clearRect(0,0,W,H);
+        // Background arc (gray)
+        ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,0); ctx.lineWidth=5;
+        ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.stroke();
+        // Value arc
+        const angle = Math.PI + (val/100)*Math.PI;
+        ctx.beginPath(); ctx.arc(cx,cy,r,Math.PI,angle); ctx.lineWidth=5;
+        ctx.strokeStyle=fgColor; ctx.stroke();
+        // Center dot
+        ctx.beginPath(); ctx.arc(cx,cy,3,0,Math.PI*2);
+        ctx.fillStyle=fgColor; ctx.fill();
+      }
+
+      // Draw 7-day sparkline (mini bar chart)
+      const spEl = document.getElementById('mkt-fng-sparkline');
+      if(spEl && history.length > 1) {
+        const maxV = 100, barW = Math.floor(100/history.length);
+        spEl.innerHTML = '<div style="display:flex;align-items:flex-end;gap:2px;height:22px">' +
+          history.map(function(d) {
+            const v = parseInt(d.value);
+            const h = Math.max(3, Math.round(v/maxV*22));
+            const c = v<=25?'#ff2d55':v<=45?'#ff8c00':v<=55?'#ffd700':v<=75?'#9acd32':'#00ff88';
+            return '<div style="flex:1;height:'+h+'px;background:'+c+';border-radius:1px 1px 0 0;opacity:.8" title="'+d.value_classification+' ('+d.value+')"></div>';
+          }).join('') + '</div>';
+      }
+    } catch(e) { console.warn('Fear & Greed failed:', e.message); }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  TRENDING COINS — CoinGecko /search/trending
+  // ═══════════════════════════════════════════════════════════
+  async function fetchTrending(bust) {
+    const panel = document.getElementById('trendingPanel');
+    if(!panel) return;
+    try {
+      const TTL = 5 * 60 * 1000;
+      let data = !bust && _mktGet('trending', TTL);
+      if(!data) {
+        data = await smartFetch('https://api.coingecko.com/api/v3/search/trending');
+        _mktSet('trending', data);
+      }
+      const coins = (data?.coins || []).slice(0, 10);
+      if(!coins.length) throw new Error('no trending data');
+
+      panel.innerHTML = coins.map(function(entry, i) {
+        const c = entry.item;
+        const sym = (c.symbol||'').toUpperCase();
+        const name = c.name || sym;
+        const rank = c.market_cap_rank ? '#'+c.market_cap_rank : '—';
+        const score = c.score !== undefined ? (c.score + 1) : (i + 1);
+        const priceChange = c.data?.price_change_percentage_24h?.usd;
+        const chgStr = priceChange != null ? (priceChange >= 0 ? '+' : '') + priceChange.toFixed(1) + '%' : '';
+        const chgColor = priceChange > 0 ? 'var(--green)' : priceChange < 0 ? 'var(--red)' : 'var(--muted)';
+        const hotness = i < 3 ? '🔥' : i < 6 ? '📈' : '·';
+        return '<div class="trend-row" title="Click to load '+sym+' in Analysis" onclick="(function(){var inp=document.getElementById(\'symInput\');if(inp){inp.value=\''+sym+'\';switchTab(\'analysis\');setTimeout(function(){fetchData();},100);}})()">'+
+          '<span class="trend-rank">'+hotness+'</span>'+
+          '<span class="trend-sym">'+sym+'</span>'+
+          '<span class="trend-name">'+name+'</span>'+
+          (chgStr ? '<span class="trend-score" style="color:'+chgColor+'">'+chgStr+'</span>' : '<span class="trend-score">MCap '+rank+'</span>')+
+          '</div>';
       }).join('');
     } catch(e) {
-      // Fallback: show static crypto news sources links
-      panel.innerHTML = `
-        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:10px">Live feed unavailable — quick links:</div>
-        ${['CoinTelegraph','CoinDesk','Decrypt','CryptoNews','The Block'].map((name,i) => {
-          const urls = ['https://cointelegraph.com','https://coindesk.com','https://decrypt.co','https://cryptonews.com','https://theblock.co'];
-          return `<div class="news-item"><div class="news-title" onclick="window.open('${urls[i]}','_blank')">📰 ${name} →</div></div>`;
-        }).join('')}
-      `;
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Trending unavailable</div>';
     }
   }
 
-  // ── Heatmap via CoinGecko — canvas treemap + VP-style table ─
-  async function fetchHeatmap() {
-    const canvas = document.getElementById('heatmapCanvas');
-    const tooltip = document.getElementById('heatmapTooltip');
-    try {
-      const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h';
-      const data = await smartFetch(url);
-      if(!Array.isArray(data)) throw new Error('bad response');
+  // ═══════════════════════════════════════════════════════════
+  //  NEWS FEED — multi-source aggregation with source tabs
+  //  Sources: Yahoo Finance · CoinTelegraph · CryptoNews · Decrypt
+  // ═══════════════════════════════════════════════════════════
+  let _newsAllItems = []; // all fetched items, stored for tab filtering
 
-      // ── 1. Canvas treemap (squarified) ──────────────────────
-      if(canvas) {
-        const DPR = window.devicePixelRatio || 1;
-        const W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 800;
-        const H = 320;
-        canvas.width  = W * DPR;
-        canvas.height = H * DPR;
-        canvas.style.height = H + 'px';
-        const ctx = canvas.getContext('2d');
-        ctx.scale(DPR, DPR);
+  const NEWS_SOURCES = [
+    { id:'yf',  name:'Yahoo Finance',   badge:'YF',  color:'#6C63FF', rss:'https://finance.yahoo.com/rss/crypto' },
+    { id:'ct',  name:'CoinTelegraph',   badge:'CT',  color:'#00e5ff', rss:'https://cointelegraph.com/rss' },
+    { id:'cn',  name:'CryptoNews',      badge:'CN',  color:'#00ff88', rss:'https://cryptonews.com/news/feed/' },
+    { id:'dc',  name:'Decrypt',         badge:'DC',  color:'#ff8c00', rss:'https://decrypt.co/feed' },
+  ];
 
-        // Squarified treemap layout using market cap as weight
-        const items = data.slice(0,50).map(c => ({
-          sym: c.symbol.toUpperCase(),
-          name: c.name,
-          chg: c.price_change_percentage_24h || 0,
-          cap: c.market_cap || 1,
-          price: c.current_price,
-          vol: c.total_volume,
-        }));
-        const totalCap = items.reduce((s,c) => s + c.cap, 0);
-        const maxAbsChg = Math.max(...items.map(c => Math.abs(c.chg)), 1);
+  const _bRx = /bullish|rally|surge|rises?|pumps?|gains?|breakout|ath|buy|soar|jump|up |climb/i;
+  const _beRx = /bearish|crash|falls?|drops?|dumps?|fear|ban|sell|plunge|down |slide|warn|risk|hack|scam/i;
 
-        // Simple squarified treemap
-        function squarify(items, x, y, w, h) {
-          if(!items.length) return [];
-          const total = items.reduce((s,c) => s + c.cap, 0);
-          const rects = [];
-          let remaining = [...items];
-          let rx = x, ry = y, rw = w, rh = h;
-          while(remaining.length) {
-            const isHoriz = rw >= rh;
-            const shortSide = isHoriz ? rh : rw;
-            let row = [], rowSum = 0, bestRatio = Infinity;
-            for(let i = 0; i < remaining.length; i++) {
-              const tryRow = [...row, remaining[i]];
-              const trySum = rowSum + remaining[i].cap;
-              const scale = (rw * rh) / total;
-              const maxA = Math.max(...tryRow.map(c => c.cap * scale));
-              const minA = Math.min(...tryRow.map(c => c.cap * scale));
-              const ratio = Math.max(shortSide*shortSide*maxA/(trySum*trySum*scale*scale),
-                                     trySum*trySum*scale*scale/(shortSide*shortSide*minA));
-              if(ratio <= bestRatio) { row = tryRow; rowSum = trySum; bestRatio = ratio; }
-              else break;
-            }
-            const rowFrac = rowSum / total;
-            const rowLen = isHoriz ? rw * rowFrac : rh * rowFrac;  // actually thickness
-            // Actually: thickness of row
-            const thickness = isHoriz ? rh : rw;
-            const rowPx = (rowSum / total) * (isHoriz ? rw : rh);
-            let pos = isHoriz ? ry : rx;
-            for(const item of row) {
-              const frac = item.cap / rowSum;
-              const sz = frac * thickness;
-              if(isHoriz) {
-                rects.push({...item, x:rx, y:pos, w:rowPx, h:sz});
-                pos += sz;
-              } else {
-                rects.push({...item, x:pos, y:ry, w:sz, h:rowPx});
-                pos += sz;
-              }
-            }
-            if(isHoriz) { rx += rowPx; rw -= rowPx; }
-            else        { ry += rowPx; rh -= rowPx; }
-            remaining = remaining.slice(row.length);
-            total && (total - rowSum); // recalc not needed as we track remaining
-          }
-          return rects;
-        }
-
-        // Simpler row-based layout (more reliable)
-        function layoutTreemap(items, x, y, w, h) {
-          const total = items.reduce((s,c) => s + c.cap, 0);
-          const rects = [];
-          let remaining = [...items];
-          let cx = x, cy = y, cw = w, ch = h;
-          while(remaining.length > 0) {
-            const landscape = cw >= ch;
-            // Greedily fill a row/column
-            let rowItems = [], rowSum = 0;
-            let i = 0;
-            while(i < remaining.length) {
-              const candidate = [...rowItems, remaining[i]];
-              const candSum = rowSum + remaining[i].cap;
-              const totalArea = cw * ch;
-              const rowFrac = candSum / total * (landscape ? cw : ch);
-              const scale = totalArea / total;
-              const worst = (r) => {
-                const side = landscape ? ch : cw;
-                const areas = r.map(c => c.cap * scale);
-                const rowThick = (r.reduce((s,c) => s+c.cap,0) / total) * (landscape ? cw : ch);
-                const mx = Math.max(...areas), mn = Math.min(...areas);
-                return Math.max(rowThick*rowThick/mn, mx/rowThick/rowThick);
-              };
-              if(!rowItems.length || worst(candidate) <= worst(rowItems) + 0.001) {
-                rowItems.push(remaining[i]);
-                rowSum += remaining[i].cap;
-                i++;
-              } else break;
-            }
-            // place rowItems
-            const rowFrac = rowSum / total;
-            const thickness = landscape ? ch * rowFrac : cw * rowFrac;
-            let pos = landscape ? cy : cx;
-            for(const item of rowItems) {
-              const frac = item.cap / rowSum;
-              if(landscape) {
-                const sz = frac * (landscape ? cw : ch);
-                // actually needs rethinking — use simple row
-                rects.push({...item, x:cx, y:pos, w: landscape ? cw*rowFrac : frac*cw, h: landscape ? frac*ch : ch*rowFrac});
-                pos += landscape ? frac*ch : frac*cw;
-              } else {
-                rects.push({...item, x:pos, y:cy, w: frac*cw, h: ch*rowFrac});
-                pos += frac*cw;
-              }
-            }
-            if(landscape) { cy += ch*rowFrac; ch -= ch*rowFrac; total_placed = rowSum; }
-            else          { cx += cw*rowFrac; cw -= cw*rowFrac; }
-            remaining = remaining.slice(rowItems.length);
-            // recalc total for remaining
-            const newTotal = remaining.reduce((s,c) => s+c.cap, 0);
-            if(newTotal === 0) break;
-            // adjust fraction basis
-          }
-          return rects;
-        }
-
-        // Use a clean slice-and-dice layout
-        function sliceDice(items, x, y, w, h, dir=0) {
-          if(!items.length) return [];
-          if(items.length === 1) return [{...items[0], x, y, w, h}];
-          const total = items.reduce((s,c) => s+c.cap, 0);
-          const rects = [];
-          let pos = dir===0 ? x : y;
-          for(const item of items) {
-            const frac = item.cap / total;
-            if(dir===0) { rects.push({...item, x:pos, y, w:w*frac, h}); pos += w*frac; }
-            else        { rects.push({...item, x, y:pos, w, h:h*frac}); pos += h*frac; }
-          }
-          return rects;
-        }
-
-        // Binary split treemap (most visually balanced)
-        function binaryTreemap(items, x, y, w, h) {
-          if(!items.length) return [];
-          if(items.length === 1) return [{...items[0], x, y, w, h}];
-          const total = items.reduce((s,c) => s+c.cap, 0);
-          // Split into two halves by cumulative sum ~50%
-          let half = 0, splitIdx = 0;
-          for(let i = 0; i < items.length; i++) {
-            if(half + items[i].cap >= total/2 || i === items.length-2) { splitIdx = i+1; break; }
-            half += items[i].cap;
-          }
-          splitIdx = Math.max(1, Math.min(splitIdx, items.length-1));
-          const left = items.slice(0, splitIdx);
-          const right = items.slice(splitIdx);
-          const leftFrac = left.reduce((s,c) => s+c.cap,0) / total;
-          if(w >= h) {
-            return [
-              ...binaryTreemap(left,  x,              y, w*leftFrac,         h),
-              ...binaryTreemap(right, x+w*leftFrac,   y, w*(1-leftFrac),     h),
-            ];
-          } else {
-            return [
-              ...binaryTreemap(left,  x, y,              w, h*leftFrac),
-              ...binaryTreemap(right, x, y+h*leftFrac,   w, h*(1-leftFrac)),
-            ];
-          }
-        }
-
-        const rects = binaryTreemap(items, 0, 0, W, H);
-        const GAP = 2;
-
-        // Draw cells
-        ctx.clearRect(0, 0, W, H);
-        const cellData = [];
-        for(const r of rects) {
-          const chg = r.chg;
-          const intensity = Math.min(1, Math.abs(chg) / maxAbsChg);
-          const rx = r.x + GAP/2, ry = r.y + GAP/2, rw = r.w - GAP, rh = r.h - GAP;
-          if(rw < 2 || rh < 2) continue;
-
-          // Background
-          ctx.beginPath();
-          ctx.roundRect ? ctx.roundRect(rx, ry, rw, rh, 4) : ctx.rect(rx, ry, rw, rh);
-          if(chg > 0) {
-            ctx.fillStyle = `rgba(0,${80 + Math.round(intensity*175)},${60 + Math.round(intensity*40)},${0.4+intensity*0.5})`;
-          } else if(chg < 0) {
-            ctx.fillStyle = `rgba(${120+Math.round(intensity*135)},${30+Math.round(intensity*15)},${50+Math.round(intensity*35)},${0.4+intensity*0.5})`;
-          } else {
-            ctx.fillStyle = 'rgba(30,50,70,0.6)';
-          }
-          ctx.fill();
-
-          // Border
-          ctx.strokeStyle = chg > 0 ? `rgba(0,255,136,${0.15+intensity*0.5})` : chg < 0 ? `rgba(255,45,85,${0.15+intensity*0.5})` : 'rgba(255,255,255,0.08)';
-          ctx.lineWidth = 1;
-          ctx.stroke();
-
-          // Text — only if cell is big enough
-          if(rw > 30 && rh > 22) {
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            const cx = rx + rw/2, cy = ry + rh/2;
-            // Symbol
-            const fontSize = Math.min(13, Math.max(7, rw/6));
-            ctx.font = `700 ${fontSize}px "Orbitron", monospace`;
-            ctx.fillStyle = '#fff';
-            ctx.fillText(r.sym, cx, rh > 40 ? cy - fontSize*0.6 : cy);
-            // % change — only if tall enough
-            if(rh > 36) {
-              ctx.font = `${Math.max(6,fontSize*0.78)}px "Share Tech Mono", monospace`;
-              ctx.fillStyle = chg >= 0 ? '#00ff88' : '#ff2d55';
-              ctx.fillText((chg >= 0 ? '+' : '') + chg.toFixed(2) + '%', cx, cy + fontSize*0.7);
-            }
-          }
-          cellData.push({...r, rx, ry, rw, rh});
-        }
-
-        // Tooltip on hover
-        canvas.onmousemove = (e) => {
-          const rect = canvas.getBoundingClientRect();
-          const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-          const hit = cellData.find(c => mx>=c.rx && mx<=c.rx+c.rw && my>=c.ry && my<=c.ry+c.rh);
-          if(hit && tooltip) {
-            const chgColor = hit.chg >= 0 ? '#00ff88' : '#ff2d55';
-            tooltip.style.display = 'block';
-            tooltip.style.left = Math.min(mx+12, W-140) + 'px';
-            tooltip.style.top = Math.max(my-60, 4) + 'px';
-            tooltip.innerHTML = `<div style="color:#fff;font-weight:700;font-size:.7rem;margin-bottom:4px">${hit.sym} — ${hit.name||''}</div>
-              <div style="color:${chgColor};margin-bottom:2px">24h: ${hit.chg >= 0 ? '+' : ''}${hit.chg.toFixed(2)}%</div>
-              <div style="color:var(--muted)">Price: ${hit.price >= 1 ? '$'+hit.price.toLocaleString(undefined,{maximumFractionDigits:2}) : '$'+hit.price.toFixed(6)}</div>
-              <div style="color:var(--muted)">Vol: ${fmtBig(hit.vol)}</div>`;
-          } else if(tooltip) tooltip.style.display = 'none';
-        };
-        canvas.onmouseleave = () => { if(tooltip) tooltip.style.display = 'none'; };
-        // Click to load coin in analysis
-        canvas.onclick = (e) => {
-          const rect = canvas.getBoundingClientRect();
-          const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-          const hit = cellData.find(c => mx>=c.rx && mx<=c.rx+c.rw && my>=c.ry && my<=c.ry+c.rh);
-          if(hit) {
-            const inp = document.getElementById('symInput');
-            if(inp) { inp.value = hit.sym; switchTab('analysis'); setTimeout(()=>fetchData(),100); }
-          }
-        };
-        canvas.style.cursor = 'pointer';
-        canvas.title = 'Click any coin to load it in Analysis';
-      }
-
-      // ── 2. Summary stats ────────────────────────────────────
-      const bullCount = data.filter(c => (c.price_change_percentage_24h||0) > 0).length;
-      const bearCount = data.filter(c => (c.price_change_percentage_24h||0) < 0).length;
-      const avgChg = data.reduce((s,c) => s + (c.price_change_percentage_24h||0), 0) / data.length;
-      const sorted = [...data].sort((a,b) => (b.price_change_percentage_24h||0) - (a.price_change_percentage_24h||0));
-      const best = sorted[0], worst = sorted[sorted.length-1];
-      const mood = bullCount/data.length >= 0.7 ? '🟢 Very Bullish' : bullCount/data.length >= 0.55 ? '🟡 Bullish' : bearCount/data.length >= 0.7 ? '🔴 Very Bearish' : bearCount/data.length >= 0.55 ? '🟠 Bearish' : '⬡ Mixed';
-      const moodColor = bullCount/data.length >= 0.55 ? 'var(--green)' : bearCount/data.length >= 0.55 ? 'var(--red)' : 'var(--warn)';
-
-      const setEl = (id, val, color) => { const el=document.getElementById(id); if(el){el.textContent=val; if(color) el.style.color=color;} };
-      setEl('hm-bull', bullCount + ' / ' + data.length, 'var(--green)');
-      setEl('hm-bear', bearCount + ' / ' + data.length, 'var(--red)');
-      setEl('hm-avg', fmtPct(avgChg), pctColor(avgChg));
-      setEl('hm-best', best.symbol.toUpperCase() + ' ' + fmtPct(best.price_change_percentage_24h), 'var(--green)');
-      setEl('hm-worst', worst.symbol.toUpperCase() + ' ' + fmtPct(worst.price_change_percentage_24h), 'var(--red)');
-      setEl('hm-mood', mood, moodColor);
-
-      // ── 3. VP-style ranked tables (gainers left, losers right) ─
-      const gainers = sorted.filter(c => (c.price_change_percentage_24h||0) >= 0);
-      const losers  = [...sorted].reverse().filter(c => (c.price_change_percentage_24h||0) < 0);
-      const maxG = gainers.length ? Math.max(...gainers.map(c => c.price_change_percentage_24h||0)) : 1;
-      const maxL = losers.length  ? Math.max(...losers.map(c => Math.abs(c.price_change_percentage_24h||0))) : 1;
-
-      function vpRow(c, maxChgAbs, color) {
-        const chg = c.price_change_percentage_24h || 0;
-        const barW = (Math.abs(chg)/maxChgAbs*100).toFixed(1);
-        const price = c.current_price >= 1
-          ? '$' + c.current_price.toLocaleString(undefined,{maximumFractionDigits:2})
-          : '$' + c.current_price.toFixed(6);
-        const vol = fmtBig(c.total_volume);
-        const mcap = fmtBig(c.market_cap);
-        return `<div class="hm-row" style="cursor:pointer" onclick="(function(){const i=document.getElementById('symInput');if(i){i.value='${c.symbol.toUpperCase()}';switchTab('analysis');setTimeout(()=>fetchData(),100);}})()">
-          <span class="hm-row-sym" style="color:${color}">${c.symbol.toUpperCase()}</span>
-          <div style="flex:1;margin:0 8px">
-            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-              <span style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted)">${price}</span>
-              <span class="hm-row-chg" style="color:${color}">${fmtPct(chg)}</span>
-            </div>
-            <div class="hm-row-bar-wrap"><div class="hm-row-bar" style="width:${barW}%;background:${color};opacity:.7"></div></div>
-            <div style="display:flex;justify-content:space-between;margin-top:2px">
-              <span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">Vol ${vol}</span>
-              <span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">MCap ${mcap}</span>
-            </div>
-          </div>
-        </div>`;
-      }
-
-      const gEl = document.getElementById('hmTableGainers');
-      const lEl = document.getElementById('hmTableLosers');
-      if(gEl) gEl.innerHTML = gainers.map(c => vpRow(c, maxG, 'var(--green)')).join('');
-      if(lEl) lEl.innerHTML = losers.map(c => vpRow(c, maxL, 'var(--red)')).join('');
-
-    } catch(e) {
-      const canvas = document.getElementById('heatmapCanvas');
-      if(canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = 'rgba(255,45,85,0.5)';
-        ctx.font = '14px Share Tech Mono';
-        ctx.fillText('Heatmap unavailable: ' + e.message, 20, 160);
-      }
+  async function _fetchOneRSS(src) {
+    let xml = null;
+    // Try direct fetch first (fastest if CORS open)
+    try { const r = await fetch(src.rss, {signal:AbortSignal.timeout(5000)}); if(r.ok) xml = await r.text(); } catch(_) {}
+    // Fallback: allorigins proxy
+    if(!xml) {
+      try {
+        const r = await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(src.rss), {signal:AbortSignal.timeout(9000)});
+        xml = (await r.json()).contents;
+      } catch(_) {}
     }
+    if(!xml) return [];
+
+    const doc = new DOMParser().parseFromString(xml, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item')).slice(0, 12);
+    const now = Date.now();
+
+    return items.map(function(item) {
+      const title = item.querySelector('title') ? item.querySelector('title').textContent.trim() : '';
+      const link  = item.querySelector('link')  ? item.querySelector('link').textContent.trim()  : '#';
+      const pub   = item.querySelector('pubDate') ? item.querySelector('pubDate').textContent : '';
+      const ts    = pub ? new Date(pub).getTime() : 0;
+      const ageMs = ts ? now - ts : Infinity;
+      const dateStr = ts ? new Date(ts).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+      const sent  = _bRx.test(title) ? 'BULL' : _beRx.test(title) ? 'BEAR' : 'NEUT';
+      const isBreaking = ageMs < 2 * 60 * 60 * 1000; // < 2h old
+      return { title, link, ts, dateStr, sent, isBreaking, srcId: src.id, srcName: src.name, srcBadge: src.badge, srcColor: src.color };
+    }).filter(function(x) { return x.title; });
+  }
+
+  function _renderNewsItems(items) {
+    if(!items.length) return '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No articles found</div>';
+    return items.map(function(item) {
+      const sColor = item.sent==='BULL' ? 'var(--green)' : item.sent==='BEAR' ? 'var(--red)' : 'var(--warn)';
+      const safeLink = item.link.replace(/'/g, '%27');
+      return '<div class="news-item">'+
+        '<div class="news-title" onclick="window.open(\''+safeLink+'\',\'_blank\')">'+(item.isBreaking?'<span style="color:#ff2d55;font-size:.55rem;font-weight:700;margin-right:5px;letter-spacing:1px">⚡ BREAKING</span>':'')+item.title+'</div>'+
+        '<div class="news-meta">'+
+          '<span>'+item.dateStr+'</span>'+
+          '<span class="news-src" style="background:'+item.srcColor+'22;color:'+item.srcColor+';border:1px solid '+item.srcColor+'44">'+item.srcBadge+'</span>'+
+          '<span class="news-sentiment" style="background:'+sColor+'18;color:'+sColor+';border:1px solid '+sColor+'40">'+item.sent+'</span>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  function filterNews(srcId) {
+    // Update active tab
+    ['all','yf','ct','cn','dc'].forEach(function(id) {
+      const btn = document.getElementById('ntab-'+id);
+      if(btn) btn.classList.toggle('active', id === srcId);
+    });
+    const panel = document.getElementById('newsPanel');
+    if(!panel || !_newsAllItems.length) return;
+    const filtered = srcId === 'all' ? _newsAllItems : _newsAllItems.filter(function(x) { return x.srcId === srcId; });
+    panel.innerHTML = _renderNewsItems(filtered);
+  }
+
+  async function fetchCryptoNews(bust) {
+    const panel = document.getElementById('newsPanel');
+    const TTL = 10 * 60 * 1000;
+    try {
+      const cached = !bust && _mktGet('cryptoNews', TTL);
+      if(cached) { _newsAllItems = cached; filterNews('all'); return; }
+
+      // Fetch all sources in parallel — partial failures are ok
+      const results = await Promise.allSettled(NEWS_SOURCES.map(function(src) { return _fetchOneRSS(src); }));
+      let all = [];
+      results.forEach(function(r) { if(r.status === 'fulfilled') all = all.concat(r.value); });
+
+      if(!all.length) throw new Error('all sources failed');
+
+      // Sort by timestamp descending (newest first), deduplicate by title
+      const seen = new Set();
+      all = all
+        .sort(function(a,b) { return b.ts - a.ts; })
+        .filter(function(x) {
+          const key = x.title.slice(0,60).toLowerCase();
+          if(seen.has(key)) return false;
+          seen.add(key); return true;
+        });
+
+      _newsAllItems = all;
+      _mktSet('cryptoNews', all);
+      filterNews('all'); // render all by default
+    } catch(e) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted);margin-bottom:10px">Live feeds unavailable — quick links:</div>' +
+        NEWS_SOURCES.map(function(src) {
+          return '<div class="news-item"><div class="news-title" onclick="window.open(\''+src.rss.split('/rss')[0].split('/feed')[0]+'\')" style="color:'+src.srcColor+'">&#128240; '+src.name+' &rarr;</div></div>';
+        }).join('');
+    }
+  }
+
+  // ── Heatmap — shared CoinGecko promise + rAF canvas sizing fix ─────────
+  async function _fetchHeatmap(cgP) {
+    try {
+      const data=await cgP;
+      if(!Array.isArray(data))throw new Error('bad response');
+      _renderHeatmap(data, document.getElementById('heatmapTooltip'));
+    }catch(e){
+      const cv=document.getElementById('heatmapCanvas');
+      if(cv){const ctx=cv.getContext('2d');ctx.fillStyle='rgba(255,45,85,.5)';ctx.font='13px monospace';ctx.fillText('Heatmap unavailable: '+e.message,20,160);}
+    }
+  }
+
+  function _renderHeatmap(data, tooltip) {
+    const canvas=document.getElementById('heatmapCanvas');
+    if(!canvas)return;
+    const W=canvas.offsetWidth||(canvas.parentElement&&canvas.parentElement.offsetWidth)||0;
+    if(W<10){requestAnimationFrame(function(){_renderHeatmap(data,tooltip);});return;}
+    const DPR=window.devicePixelRatio||1,H=320;
+    canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.height=H+'px';
+    const ctx=canvas.getContext('2d');ctx.scale(DPR,DPR);
+    const items=data.slice(0,50).map(function(c){return{sym:c.symbol.toUpperCase(),name:c.name,chg:c.price_change_percentage_24h||0,cap:c.market_cap||1,price:c.current_price,vol:c.total_volume};});
+    const maxAbs=Math.max.apply(null,items.map(function(c){return Math.abs(c.chg);}).concat([1]));
+    function bTree(items,x,y,w,h){
+      if(!items.length)return[];if(items.length===1)return[Object.assign({},items[0],{x:x,y:y,w:w,h:h})];
+      const tot=items.reduce(function(s,c){return s+c.cap;},0);let half=0,si=1;
+      for(let i=0;i<items.length-1;i++){half+=items[i].cap;if(half>=tot/2){si=i+1;break;}}
+      si=Math.max(1,Math.min(si,items.length-1));
+      const L=items.slice(0,si),R=items.slice(si),lf=L.reduce(function(s,c){return s+c.cap;},0)/tot;
+      if(w>=h)return bTree(L,x,y,w*lf,h).concat(bTree(R,x+w*lf,y,w*(1-lf),h));
+      return bTree(L,x,y,w,h*lf).concat(bTree(R,x,y+h*lf,w,h*(1-lf)));
+    }
+    const rects=bTree(items,0,0,W,H),GAP=2;
+    ctx.clearRect(0,0,W,H);const cellData=[];
+    for(let ri=0;ri<rects.length;ri++){
+      const r=rects[ri],chg=r.chg,itns=Math.min(1,Math.abs(chg)/maxAbs);
+      const rx=r.x+GAP/2,ry=r.y+GAP/2,rw=r.w-GAP,rh=r.h-GAP;if(rw<2||rh<2)continue;
+      ctx.beginPath();if(ctx.roundRect)ctx.roundRect(rx,ry,rw,rh,4);else ctx.rect(rx,ry,rw,rh);
+      ctx.fillStyle=chg>0?'rgba(0,'+(80+Math.round(itns*175))+','+(60+Math.round(itns*40))+','+(0.4+itns*0.5)+')':chg<0?'rgba('+(120+Math.round(itns*135))+','+(30+Math.round(itns*15))+','+(50+Math.round(itns*35))+','+(0.4+itns*0.5)+')':'rgba(30,50,70,0.6)';
+      ctx.fill();
+      ctx.strokeStyle=chg>0?'rgba(0,255,136,'+(0.15+itns*0.5)+')':chg<0?'rgba(255,45,85,'+(0.15+itns*0.5)+')':'rgba(255,255,255,0.08)';ctx.lineWidth=1;ctx.stroke();
+      if(rw>30&&rh>22){
+        ctx.textAlign='center';ctx.textBaseline='middle';const cx=rx+rw/2,cy=ry+rh/2,fs=Math.min(13,Math.max(7,rw/6));
+        ctx.font='700 '+fs+'px Orbitron,monospace';ctx.fillStyle='#fff';ctx.fillText(r.sym,cx,rh>40?cy-fs*0.6:cy);
+        if(rh>36){ctx.font=Math.max(6,fs*0.78)+'px "Share Tech Mono",monospace';ctx.fillStyle=chg>=0?'#00ff88':'#ff2d55';ctx.fillText((chg>=0?'+':'')+chg.toFixed(2)+'%',cx,cy+fs*0.7);}
+      }
+      cellData.push(Object.assign({},r,{rx:rx,ry:ry,rw:rw,rh:rh}));
+    }
+    canvas.onmousemove=function(e){
+      const rc=canvas.getBoundingClientRect(),mx=e.clientX-rc.left,my=e.clientY-rc.top;
+      const hit=cellData.find(function(c){return mx>=c.rx&&mx<=c.rx+c.rw&&my>=c.ry&&my<=c.ry+c.rh;});
+      if(hit&&tooltip){const cc=hit.chg>=0?'#00ff88':'#ff2d55';tooltip.style.display='block';tooltip.style.left=Math.min(mx+12,W-145)+'px';tooltip.style.top=Math.max(my-60,4)+'px';tooltip.innerHTML='<div style="color:#fff;font-weight:700;font-size:.7rem;margin-bottom:4px">'+hit.sym+' — '+(hit.name||'')+'</div><div style="color:'+cc+';margin-bottom:2px">24h: '+(hit.chg>=0?'+':'')+hit.chg.toFixed(2)+'%</div><div style="color:var(--muted)">Price: '+(hit.price>=1?'$'+hit.price.toLocaleString(undefined,{maximumFractionDigits:2}):'$'+hit.price.toFixed(6))+'</div><div style="color:var(--muted)">Vol: '+fmtBig(hit.vol)+'</div>';}
+      else if(tooltip)tooltip.style.display='none';
+    };
+    canvas.onmouseleave=function(){if(tooltip)tooltip.style.display='none';};
+    canvas.onclick=function(e){
+      const rc=canvas.getBoundingClientRect(),mx=e.clientX-rc.left,my=e.clientY-rc.top;
+      const hit=cellData.find(function(c){return mx>=c.rx&&mx<=c.rx+c.rw&&my>=c.ry&&my<=c.ry+c.rh;});
+      if(hit){const inp=document.getElementById('symInput');if(inp){inp.value=hit.sym;switchTab('analysis');setTimeout(function(){fetchData();},100);}}
+    };
+    canvas.style.cursor='pointer';canvas.title='Click any coin to load in Analysis';
+    const bull=data.filter(function(c){return(c.price_change_percentage_24h||0)>0;}).length;
+    const bear=data.filter(function(c){return(c.price_change_percentage_24h||0)<0;}).length;
+    const avg=data.reduce(function(s,c){return s+(c.price_change_percentage_24h||0);},0)/data.length;
+    const srt=data.slice().sort(function(a,b){return(b.price_change_percentage_24h||0)-(a.price_change_percentage_24h||0);});
+    const bR=bull/data.length,rR=bear/data.length;
+    const mood=bR>=0.7?'&#55357;&#57314; Very Bullish':bR>=0.55?'&#55357;&#57313; Bullish':rR>=0.7?'&#55357;&#56628; Very Bearish':rR>=0.55?'&#55357;&#57312; Bearish':'⧁ Mixed';
+    const moodC=bR>=0.55?'var(--green)':rR>=0.55?'var(--red)':'var(--warn)';
+    function hmEl(id,v,c){const el=document.getElementById(id);if(el){el.textContent=v;if(c)el.style.color=c;}}
+    hmEl('hm-bull',bull+' / '+data.length,'var(--green)');hmEl('hm-bear',bear+' / '+data.length,'var(--red)');
+    hmEl('hm-avg',fmtPct(avg),pctColor(avg));hmEl('hm-best',srt[0].symbol.toUpperCase()+' '+fmtPct(srt[0].price_change_percentage_24h),'var(--green)');
+    hmEl('hm-worst',srt[srt.length-1].symbol.toUpperCase()+' '+fmtPct(srt[srt.length-1].price_change_percentage_24h),'var(--red)');hmEl('hm-mood',mood,moodC);
+    const gainers=srt.filter(function(c){return(c.price_change_percentage_24h||0)>=0;}),losers=srt.slice().reverse().filter(function(c){return(c.price_change_percentage_24h||0)<0;});
+    const maxG=gainers.length?Math.max.apply(null,gainers.map(function(c){return c.price_change_percentage_24h||0;})):1;
+    const maxL=losers.length?Math.max.apply(null,losers.map(function(c){return Math.abs(c.price_change_percentage_24h||0);})):1;
+    function vpRow(c,mca,col){
+      const chg=c.price_change_percentage_24h||0,bw=(Math.abs(chg)/mca*100).toFixed(1);
+      const pr=c.current_price>=1?'$'+c.current_price.toLocaleString(undefined,{maximumFractionDigits:2}):'$'+c.current_price.toFixed(6);
+      const sym=c.symbol.toUpperCase();
+      const onclick='(function(){var i=document.getElementById(\'symInput\');if(i){i.value=\''+sym+'\';switchTab(\'analysis\');setTimeout(function(){fetchData();},100);}})()';
+      return '<div class="hm-row" style="cursor:pointer" onclick="'+onclick+'"><span class="hm-row-sym" style="color:'+col+'">'+sym+'</span><div style="flex:1;margin:0 8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-family:Share Tech Mono,monospace;font-size:.56rem;color:var(--muted)">'+pr+'</span><span class="hm-row-chg" style="color:'+col+'">'+fmtPct(chg)+'</span></div><div class="hm-row-bar-wrap"><div class="hm-row-bar" style="width:'+bw+'%;background:'+col+';opacity:.7"></div></div><div style="display:flex;justify-content:space-between;margin-top:2px"><span style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted)">Vol '+fmtBig(c.total_volume)+'</span><span style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted)">MCap '+fmtBig(c.market_cap)+'</span></div></div></div>';
+    }
+    const gEl=document.getElementById('hmTableGainers'),lEl=document.getElementById('hmTableLosers');
+    if(gEl)gEl.innerHTML=gainers.map(function(c){return vpRow(c,maxG,'var(--green)');}).join('');
+    if(lEl)lEl.innerHTML=losers.map(function(c){return vpRow(c,maxL,'var(--red)');}).join('');
   }
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
