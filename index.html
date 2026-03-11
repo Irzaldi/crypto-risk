@@ -686,6 +686,99 @@
       margin-bottom: 6px;
     }
   }
+
+  /* ══════════════════════════════════════════════
+     PAGE TABS — Analysis vs Market Dashboard
+  ══════════════════════════════════════════════ */
+  .page-tabs { display:flex; gap:0; margin-bottom:18px; border-bottom:2px solid var(--border); }
+  .page-tab { padding:10px 24px; font-family:'Share Tech Mono',monospace; font-size:.65rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; cursor:pointer; transition:all .2s; }
+  .page-tab:hover { color:var(--accent); }
+  .page-tab.active { color:var(--accent); border-bottom-color:var(--accent); background:rgba(0,229,255,.04); }
+  .page-content { display:none; }
+  .page-content.active { display:block; }
+
+  /* ══════════════════════════════════════════════
+     MARKET DASHBOARD
+  ══════════════════════════════════════════════ */
+  /* Top metrics row */
+  .mkt-metrics { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:14px; }
+  .mkt-card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px; position:relative; overflow:hidden; }
+  .mkt-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1.5px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.2; }
+  .mkt-card-label { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
+  .mkt-card-value { font-family:'Orbitron',monospace; font-size:.95rem; font-weight:700; color:var(--accent); }
+  .mkt-card-sub { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--muted); margin-top:3px; }
+  @media(max-width:700px){ .mkt-metrics { grid-template-columns:repeat(2,1fr); } }
+
+  /* Dashboard grid */
+  .mkt-grid-top { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+  .mkt-grid-mid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  @media(max-width:700px){ .mkt-grid-top,.mkt-grid-mid { grid-template-columns:1fr; } }
+
+  /* Funding rate rows */
+  .fr-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .fr-row:last-child { border-bottom:none; }
+  .fr-sym { font-family:'Share Tech Mono',monospace; font-size:.65rem; font-weight:700; min-width:60px; }
+  .fr-rate { font-family:'Share Tech Mono',monospace; font-size:.65rem; font-weight:700; }
+  .fr-bar-wrap { flex:1; height:4px; background:rgba(255,255,255,.05); border-radius:2px; margin:0 10px; overflow:hidden; position:relative; }
+  .fr-bar { height:100%; border-radius:2px; position:absolute; }
+  .fr-signal { font-family:'Share Tech Mono',monospace; font-size:.54rem; padding:2px 7px; border-radius:10px; }
+
+  /* Open interest rows */
+  .oi-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .oi-row:last-child { border-bottom:none; }
+  .oi-change { font-family:'Share Tech Mono',monospace; font-size:.62rem; }
+
+  /* Top movers */
+  .mover-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .mover-row:last-child { border-bottom:none; }
+  .mover-sym { font-family:'Orbitron',monospace; font-size:.7rem; font-weight:700; min-width:60px; }
+  .mover-price { font-family:'Share Tech Mono',monospace; font-size:.62rem; color:var(--muted); }
+  .mover-chg { font-family:'Share Tech Mono',monospace; font-size:.7rem; font-weight:700; }
+  .mover-bar { height:3px; border-radius:2px; margin-top:3px; }
+
+  /* News feed */
+  .news-item { padding:10px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .news-item:last-child { border-bottom:none; }
+  .news-title { font-size:.78rem; font-weight:600; color:var(--text); line-height:1.4; margin-bottom:4px; cursor:pointer; }
+  .news-title:hover { color:var(--accent); }
+  .news-meta { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); display:flex; gap:10px; }
+  .news-sentiment { padding:1px 6px; border-radius:10px; font-size:.52rem; }
+  .news-scroll { max-height:320px; overflow-y:auto; padding-right:4px; }
+  .news-scroll::-webkit-scrollbar { width:3px; }
+  .news-scroll::-webkit-scrollbar-thumb { background:var(--accent); border-radius:2px; }
+
+  /* Heatmap */
+  .heatmap-grid { display:grid; gap:3px; margin-bottom:14px; }
+  .hm-cell { border-radius:6px; padding:8px 6px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; transition:all .2s; position:relative; overflow:hidden; }
+  .hm-cell:hover { transform:scale(1.04); z-index:2; box-shadow:0 0 14px rgba(0,0,0,.5); }
+  .hm-sym { font-family:'Orbitron',monospace; font-size:.64rem; font-weight:700; text-align:center; line-height:1.1; }
+  .hm-chg { font-family:'Share Tech Mono',monospace; font-size:.58rem; font-weight:700; margin-top:3px; }
+  .hm-vol { font-family:'Share Tech Mono',monospace; font-size:.48rem; opacity:.65; margin-top:2px; }
+
+  /* Heatmap table stats */
+  .hm-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
+  @media(max-width:700px){ .hm-stats { grid-template-columns:repeat(3,1fr); } }
+  .hm-stat-card { background:rgba(0,0,0,.3); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
+  .hm-stat-label { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); letter-spacing:1px; margin-bottom:5px; }
+  .hm-stat-val { font-family:'Orbitron',monospace; font-size:.85rem; font-weight:700; }
+  .hm-rows { max-height:280px; overflow-y:auto; padding-right:2px; }
+  .hm-rows::-webkit-scrollbar { width:3px; }
+  .hm-rows::-webkit-scrollbar-thumb { background:var(--accent); border-radius:2px; }
+  .hm-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .hm-row:last-child { border-bottom:none; }
+  .hm-row-rank { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); min-width:18px; }
+  .hm-row-sym { font-family:'Orbitron',monospace; font-size:.65rem; font-weight:700; min-width:52px; }
+  .hm-row-bar-wrap { flex:1; height:4px; background:rgba(255,255,255,.05); border-radius:2px; overflow:hidden; }
+  .hm-row-bar { height:100%; border-radius:2px; transition:width 1s; }
+  .hm-row-chg { font-family:'Share Tech Mono',monospace; font-size:.65rem; font-weight:700; min-width:54px; text-align:right; }
+  .hm-row-vol { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); min-width:60px; text-align:right; }
+
+  /* Dashboard refresh button */
+  .mkt-refresh-btn { padding:7px 18px; background:rgba(0,229,255,.08); border:1px solid rgba(0,229,255,.3); color:var(--accent); border-radius:8px; font-family:'Share Tech Mono',monospace; font-size:.6rem; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all .2s; }
+  .mkt-refresh-btn:hover { background:rgba(0,229,255,.15); }
+  .mkt-refresh-btn:disabled { opacity:.4; cursor:not-allowed; }
+  .mkt-status { font-family:'Share Tech Mono',monospace; font-size:.58rem; color:var(--muted); margin-left:10px; }
+  .mkt-last-update { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); margin-left:auto; }
 </style>
 <!-- Vercel Web Analytics -->
 <script defer src="/_vercel/insights/script.js"></script>
@@ -706,7 +799,14 @@
     <button class="theme-btn" onclick="toggleSettings()" style="border-color:rgba(255,184,0,.4);color:var(--warn)">⚙️ SETTINGS</button>
   </header>
 
-  <!-- ── Session P&L Strip ── -->
+  <!-- ── Page Tabs ── -->
+  <div class="page-tabs">
+    <button class="page-tab active" onclick="switchTab('analysis')" id="tab-analysis">🔬 Analysis</button>
+    <button class="page-tab" onclick="switchTab('market')" id="tab-market">🌐 Market Dashboard</button>
+  </div>
+
+  <!-- ══ PAGE: Analysis ══ -->
+  <div class="page-content active" id="page-analysis">
   <div class="panel" style="margin-bottom:12px;padding:12px 18px;background:rgba(0,0,0,.5)">
     <div class="pnl-strip">
       <div class="pnl-stat"><span class="pnl-stat-k">Session P&L</span><span class="pnl-stat-v" id="sess-pnl" style="color:var(--muted)">$0.00</span></div>
@@ -1341,6 +1441,113 @@
   </div>
 
   </div><!-- end .wrap -->
+
+  </div><!-- end #page-analysis -->
+
+  <!-- ══ PAGE: Market Dashboard ══ -->
+  <div class="page-content" id="page-market">
+  <div class="wrap" style="padding-top:0">
+
+    <!-- Refresh row -->
+    <div style="display:flex;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+      <button class="mkt-refresh-btn" id="mktRefreshBtn" onclick="fetchMarketDashboard()">⟳ REFRESH DASHBOARD</button>
+      <span class="mkt-status" id="mktStatus">Click refresh to load live market data</span>
+      <span class="mkt-last-update" id="mktLastUpdate"></span>
+    </div>
+
+    <!-- ── Top Global Metrics ── -->
+    <div class="mkt-metrics" id="mktMetrics">
+      <div class="mkt-card"><div class="mkt-card-label">Total Market Cap</div><div class="mkt-card-value" id="mkt-totalcap">—</div><div class="mkt-card-sub" id="mkt-totalcap-chg">—</div></div>
+      <div class="mkt-card"><div class="mkt-card-label">BTC Dominance</div><div class="mkt-card-value" id="mkt-btcdom">—</div><div class="mkt-card-sub" id="mkt-btcdom-sub">of total market</div></div>
+      <div class="mkt-card"><div class="mkt-card-label">ETH Dominance</div><div class="mkt-card-value" id="mkt-ethdom">—</div><div class="mkt-card-sub" id="mkt-ethdom-sub">of total market</div></div>
+      <div class="mkt-card"><div class="mkt-card-label">24h Volume</div><div class="mkt-card-value" id="mkt-vol24">—</div><div class="mkt-card-sub" id="mkt-vol24-sub">—</div></div>
+      <div class="mkt-card"><div class="mkt-card-label">Active Cryptos</div><div class="mkt-card-value" id="mkt-active">—</div><div class="mkt-card-sub" id="mkt-active-sub">—</div></div>
+    </div>
+
+    <!-- ── Row 1: Funding Rates | OI | Top Movers ── -->
+    <div class="mkt-grid-top">
+
+      <!-- Funding Rates -->
+      <div class="panel">
+        <div class="ptitle">💸 Funding Rates <span style="font-size:.5rem;font-weight:400;color:var(--muted);letter-spacing:1px;margin-left:4px">8h rate · positive = longs pay</span></div>
+        <div id="fundingPanel">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Open Interest -->
+      <div class="panel">
+        <div class="ptitle">📊 Open Interest <span style="font-size:.5rem;font-weight:400;color:var(--muted);letter-spacing:1px;margin-left:4px">vs 24h ago</span></div>
+        <div id="oiPanel">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Top Movers -->
+      <div class="panel">
+        <div class="ptitle">🚀 Top Movers <span style="font-size:.5rem;color:var(--muted);margin-left:4px">24h % change</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <button class="ind-tab active" id="movers-btn-gainers" onclick="showMovers('gainers')">📈 Gainers</button>
+          <button class="ind-tab" id="movers-btn-losers" onclick="showMovers('losers')">📉 Losers</button>
+        </div>
+        <div id="moversPanel"><div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div></div>
+      </div>
+
+    </div>
+
+    <!-- ── Row 2: News Feed | Heatmap ── -->
+    <div class="mkt-grid-mid">
+
+      <!-- News Feed -->
+      <div class="panel">
+        <div class="ptitle">📰 Crypto News Feed</div>
+        <div id="newsPanel" class="news-scroll">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading news...</div>
+        </div>
+      </div>
+
+      <!-- Heatmap full panel — spans both columns -->
+    </div><!-- close mkt-grid-mid early -->
+    <div class="panel" style="margin-bottom:14px">
+      <div class="ptitle">🟥 Market Heatmap <span style="font-size:.5rem;color:var(--muted);margin-left:4px">24h performance · top 50 by market cap</span></div>
+
+      <!-- ── Canvas treemap chart ── -->
+      <div style="position:relative;width:100%;background:rgba(0,0,0,.4);border-radius:8px;overflow:hidden;margin-bottom:12px;border:1px solid var(--border)">
+        <canvas id="heatmapCanvas" style="display:block;width:100%;height:320px"></canvas>
+        <div id="heatmapTooltip" style="display:none;position:absolute;background:rgba(6,12,20,.95);border:1px solid var(--accent);border-radius:6px;padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:.6rem;pointer-events:none;z-index:10;min-width:120px"></div>
+      </div>
+
+      <!-- ── Summary stats bar ── -->
+      <div class="hm-stats" id="heatmapStats" style="margin-bottom:14px">
+        <div class="hm-stat-card"><div class="hm-stat-label">🟢 Bullish</div><div class="hm-stat-val" id="hm-bull" style="color:var(--green)">—</div></div>
+        <div class="hm-stat-card"><div class="hm-stat-label">🔴 Bearish</div><div class="hm-stat-val" id="hm-bear" style="color:var(--red)">—</div></div>
+        <div class="hm-stat-card"><div class="hm-stat-label">Avg 24h</div><div class="hm-stat-val" id="hm-avg">—</div></div>
+        <div class="hm-stat-card"><div class="hm-stat-label">Best</div><div class="hm-stat-val" id="hm-best" style="color:var(--green);font-size:.68rem">—</div></div>
+        <div class="hm-stat-card"><div class="hm-stat-label">Worst</div><div class="hm-stat-val" id="hm-worst" style="color:var(--red);font-size:.68rem">—</div></div>
+        <div class="hm-stat-card"><div class="hm-stat-label">Market Mood</div><div class="hm-stat-val" id="hm-mood" style="font-size:.7rem">—</div></div>
+      </div>
+
+      <!-- ── VP-style ranked table (like Volume Profile) ── -->
+      <div class="ptitle" style="margin-bottom:10px">📊 Performance Table <span style="font-size:.5rem;color:var(--muted);margin-left:4px">bar width = relative strength · sorted by 24h change</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <!-- Gainers column -->
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--green);letter-spacing:2px;text-transform:uppercase;padding:4px 0;border-bottom:1px solid rgba(0,255,136,.15);margin-bottom:6px">▲ Gainers</div>
+          <div id="hmTableGainers" class="hm-rows" style="max-height:340px"></div>
+        </div>
+        <!-- Losers column -->
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--red);letter-spacing:2px;text-transform:uppercase;padding:4px 0;border-bottom:1px solid rgba(255,45,85,.15);margin-bottom:6px">▼ Losers</div>
+          <div id="hmTableLosers" class="hm-rows" style="max-height:340px"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display:none"><!-- dummy to close mkt-grid-mid that was closed early -->
+
+    </div>
+
+  </div><!-- end .wrap -->
+  </div><!-- end #page-market -->
 
   <!-- ══════════════════════════════════════════════════════
        🔮 PRICE PREDICTION PANEL
@@ -5042,6 +5249,572 @@ self.onmessage=function(e){
     clearTimeout(window._mobileResizeTimer);
     window._mobileResizeTimer = setTimeout(initMobile, 200);
   });
+
+  // ══════════════════════════════════════════════════════════
+  //  PAGE TAB SWITCHER
+  // ══════════════════════════════════════════════════════════
+  function switchTab(name) {
+    document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    document.getElementById('page-' + name).classList.add('active');
+    if(name === 'market' && !window._mktLoaded) fetchMarketDashboard();
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  MARKET DASHBOARD — DATA & RENDERING
+  // ══════════════════════════════════════════════════════════
+  let _mktLoaded = false;
+  let _moversData = { gainers:[], losers:[] };
+
+  function fmtBig(n) {
+    if(!n) return '—';
+    if(n >= 1e12) return '$' + (n/1e12).toFixed(2) + 'T';
+    if(n >= 1e9)  return '$' + (n/1e9).toFixed(2)  + 'B';
+    if(n >= 1e6)  return '$' + (n/1e6).toFixed(2)  + 'M';
+    return '$' + n.toFixed(0);
+  }
+  function fmtPct(n, plus=true) {
+    if(n === null || n === undefined || isNaN(n)) return '—';
+    const s = (n >= 0 && plus ? '+' : '') + n.toFixed(2) + '%';
+    return s;
+  }
+  function pctColor(n) {
+    return n > 0 ? 'var(--green)' : n < 0 ? 'var(--red)' : 'var(--muted)';
+  }
+
+  async function fetchMarketDashboard() {
+    const btn = document.getElementById('mktRefreshBtn');
+    const status = document.getElementById('mktStatus');
+    if(btn) { btn.disabled = true; btn.textContent = '⟳ LOADING...'; }
+    if(status) status.textContent = 'Fetching market data...';
+
+    try {
+      await Promise.allSettled([
+        fetchGlobalMetrics(),
+        fetchFundingRates(),
+        fetchOpenInterest(),
+        fetchTopMovers(),
+        fetchCryptoNews(),
+        fetchHeatmap(),
+      ]);
+      _mktLoaded = true;
+      const now = new Date();
+      const upd = document.getElementById('mktLastUpdate');
+      if(upd) upd.textContent = 'Updated: ' + now.toLocaleTimeString();
+      if(status) status.textContent = '✓ Dashboard loaded';
+    } catch(e) {
+      if(status) status.textContent = '✗ Some data failed to load';
+    }
+    if(btn) { btn.disabled = false; btn.textContent = '⟳ REFRESH DASHBOARD'; }
+  }
+
+  // ── Global metrics via CoinGecko ──────────────────────────
+  async function fetchGlobalMetrics() {
+    try {
+      const url = 'https://api.coingecko.com/api/v3/global';
+      const data = await smartFetch(url);
+      if(!data || !data.data) return;
+      const d = data.data;
+      const cap = d.total_market_cap?.usd;
+      const vol = d.total_volume?.usd;
+      const btcDom = d.market_cap_percentage?.btc;
+      const ethDom = d.market_cap_percentage?.eth;
+      const capChg = d.market_cap_change_percentage_24h_usd;
+      const active = d.active_cryptocurrencies;
+
+      const set = (id, val, color) => {
+        const el = document.getElementById(id);
+        if(el) { el.textContent = val; if(color) el.style.color = color; }
+      };
+      set('mkt-totalcap', fmtBig(cap));
+      set('mkt-totalcap-chg', fmtPct(capChg) + ' (24h)', pctColor(capChg));
+      set('mkt-btcdom', btcDom ? btcDom.toFixed(1) + '%' : '—', btcDom > 55 ? 'var(--warn)' : 'var(--accent)');
+      set('mkt-ethdom', ethDom ? ethDom.toFixed(1) + '%' : '—', 'var(--accent)');
+      set('mkt-vol24', fmtBig(vol));
+      set('mkt-vol24-sub', '24h trading volume');
+      set('mkt-active', active ? active.toLocaleString() : '—');
+      set('mkt-active-sub', 'tracked by CoinGecko');
+      set('mkt-btcdom-sub', btcDom > 55 ? '⚠️ Alt season unlikely' : btcDom < 45 ? '🔥 Alt season possible' : 'Moderate BTC control');
+    } catch(e) { console.warn('Global metrics failed:', e.message); }
+  }
+
+  // ── Funding Rates via Binance Futures ─────────────────────
+  async function fetchFundingRates() {
+    const panel = document.getElementById('fundingPanel');
+    const coins = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
+    try {
+      const data = await smartFetch('https://fapi.binance.com/fapi/v1/premiumIndex');
+      if(!Array.isArray(data)) throw new Error('bad data');
+      const rates = data
+        .filter(d => coins.includes(d.symbol))
+        .sort((a,b) => coins.indexOf(a.symbol) - coins.indexOf(b.symbol));
+
+      panel.innerHTML = rates.map(r => {
+        const rate = parseFloat(r.lastFundingRate) * 100;
+        const annualized = (rate * 3 * 365).toFixed(1);
+        const color = rate > 0.05 ? 'var(--red)' : rate > 0 ? 'var(--warn)' : rate < -0.05 ? 'var(--green)' : 'var(--muted)';
+        const signal = rate > 0.1 ? 'LONGS PAYING HIGH' : rate > 0.05 ? 'Longs paying' : rate < -0.05 ? 'SHORTS PAYING' : rate < 0 ? 'Shorts paying' : 'Neutral';
+        const barPct = Math.min(100, Math.abs(rate) / 0.15 * 100);
+        const barLeft = rate < 0 ? `right:50%;width:${barPct/2}%` : `left:50%;width:${barPct/2}%`;
+        return `<div class="fr-row">
+          <span class="fr-sym">${r.symbol.replace('USDT','')}</span>
+          <div class="fr-bar-wrap">
+            <div style="position:absolute;top:50%;transform:translateY(-50%);left:50%;width:1px;height:6px;background:rgba(255,255,255,.2)"></div>
+            <div class="fr-bar" style="${barLeft};background:${color}"></div>
+          </div>
+          <span class="fr-rate" style="color:${color};min-width:58px;text-align:right">${rate >= 0 ? '+' : ''}${rate.toFixed(4)}%</span>
+          <span class="fr-signal" style="background:${color}18;color:${color};border:1px solid ${color}40;margin-left:6px;min-width:100px;text-align:center;font-size:.52rem">${signal}</span>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Funding rates unavailable — requires Binance Futures access</div>`;
+    }
+  }
+
+  // ── Open Interest via Binance Futures ─────────────────────
+  async function fetchOpenInterest() {
+    const panel = document.getElementById('oiPanel');
+    const coins = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT'];
+    try {
+      const results = await Promise.all(
+        coins.map(sym => smartFetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${sym}`)
+          .catch(() => null))
+      );
+      panel.innerHTML = results.map((r, i) => {
+        if(!r) return '';
+        const sym = coins[i].replace('USDT','');
+        const oi = parseFloat(r.openInterest);
+        const notional = oi * (parseFloat(r.openInterest) || 1);
+        const oiStr = oi >= 1e6 ? (oi/1e6).toFixed(2)+'M' : oi >= 1e3 ? (oi/1e3).toFixed(1)+'K' : oi.toFixed(0);
+        // OI change color (we don't have historical here, so just show value)
+        return `<div class="oi-row">
+          <span style="font-family:'Orbitron',monospace;font-size:.65rem;font-weight:700;min-width:52px">${sym}</span>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);flex:1;margin:0 8px">Open Interest</span>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.65rem;color:var(--accent);font-weight:700">${oiStr} contracts</span>
+        </div>`;
+      }).join('');
+      if(!panel.innerHTML.trim()) panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">No OI data returned</div>`;
+    } catch(e) {
+      panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Open Interest unavailable</div>`;
+    }
+  }
+
+  // ── Top Movers via CoinGecko ──────────────────────────────
+  async function fetchTopMovers() {
+    try {
+      const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=percent_change_24h&per_page=250&page=1&sparkline=false&price_change_percentage=24h';
+      const data = await smartFetch(url);
+      if(!Array.isArray(data)) throw new Error('bad data');
+      const sorted = [...data].sort((a,b) => (b.price_change_percentage_24h||0) - (a.price_change_percentage_24h||0));
+      _moversData.gainers = sorted.slice(0, 10);
+      _moversData.losers = [...sorted].reverse().slice(0, 10);
+      showMovers('gainers');
+    } catch(e) {
+      const p = document.getElementById('moversPanel');
+      if(p) p.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Top movers unavailable</div>`;
+    }
+  }
+
+  function showMovers(type) {
+    document.getElementById('movers-btn-gainers').classList.toggle('active', type==='gainers');
+    document.getElementById('movers-btn-losers').classList.toggle('active', type==='losers');
+    const panel = document.getElementById('moversPanel');
+    const coins = _moversData[type];
+    if(!coins || !coins.length) {
+      panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">No data yet — click Refresh</div>`;
+      return;
+    }
+    const maxAbs = Math.max(...coins.map(c => Math.abs(c.price_change_percentage_24h||0)));
+    panel.innerHTML = coins.map(c => {
+      const chg = c.price_change_percentage_24h || 0;
+      const color = pctColor(chg);
+      const barW = maxAbs > 0 ? (Math.abs(chg)/maxAbs*100).toFixed(0) : 0;
+      const price = c.current_price >= 1 ? '$' + c.current_price.toLocaleString(undefined,{maximumFractionDigits:2}) : '$' + c.current_price.toFixed(6);
+      const vol = fmtBig(c.total_volume);
+      return `<div class="mover-row">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="mover-sym">${c.symbol.toUpperCase()}</span>
+            <span class="mover-price">${price}</span>
+            <span class="mover-chg" style="color:${color};margin-left:auto">${fmtPct(chg)}</span>
+          </div>
+          <div class="mover-bar" style="width:${barW}%;background:${color};opacity:.5"></div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:2px">Vol: ${vol}</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Crypto News via RSS proxy ─────────────────────────────
+  async function fetchCryptoNews() {
+    const panel = document.getElementById('newsPanel');
+    const sources = [
+      'https://cryptonews.com/news/feed/',
+      'https://cointelegraph.com/rss',
+      'https://decrypt.co/feed',
+    ];
+    // Use allorigins to fetch RSS feed
+    const rssUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(sources[0])}`;
+    try {
+      const raw = await fetch(rssUrl, { signal: AbortSignal.timeout(8000) });
+      const json = await raw.json();
+      const xml = json.contents;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, 'text/xml');
+      const items = Array.from(doc.querySelectorAll('item')).slice(0, 12);
+      if(!items.length) throw new Error('no items');
+      panel.innerHTML = items.map(item => {
+        const title = item.querySelector('title')?.textContent || '';
+        const link  = item.querySelector('link')?.textContent || '#';
+        const pubDate = item.querySelector('pubDate')?.textContent || '';
+        const date = pubDate ? new Date(pubDate).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+        // Simple sentiment from title keywords
+        const bullWords = /bullish|rally|surge|rise|pump|gain|breakout|ath|buy/i;
+        const bearWords = /bearish|crash|fall|drop|dump|fear|ban|sell|plunge|down/i;
+        const sentiment = bullWords.test(title) ? 'BULL' : bearWords.test(title) ? 'BEAR' : 'NEUT';
+        const sColor = sentiment==='BULL' ? 'var(--green)' : sentiment==='BEAR' ? 'var(--red)' : 'var(--warn)';
+        return `<div class="news-item">
+          <div class="news-title" onclick="window.open('${link}','_blank')">${title}</div>
+          <div class="news-meta">
+            <span>${date}</span>
+            <span class="news-sentiment" style="background:${sColor}18;color:${sColor};border:1px solid ${sColor}40">${sentiment}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } catch(e) {
+      // Fallback: show static crypto news sources links
+      panel.innerHTML = `
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);margin-bottom:10px">Live feed unavailable — quick links:</div>
+        ${['CoinTelegraph','CoinDesk','Decrypt','CryptoNews','The Block'].map((name,i) => {
+          const urls = ['https://cointelegraph.com','https://coindesk.com','https://decrypt.co','https://cryptonews.com','https://theblock.co'];
+          return `<div class="news-item"><div class="news-title" onclick="window.open('${urls[i]}','_blank')">📰 ${name} →</div></div>`;
+        }).join('')}
+      `;
+    }
+  }
+
+  // ── Heatmap via CoinGecko — canvas treemap + VP-style table ─
+  async function fetchHeatmap() {
+    const canvas = document.getElementById('heatmapCanvas');
+    const tooltip = document.getElementById('heatmapTooltip');
+    try {
+      const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h';
+      const data = await smartFetch(url);
+      if(!Array.isArray(data)) throw new Error('bad response');
+
+      // ── 1. Canvas treemap (squarified) ──────────────────────
+      if(canvas) {
+        const DPR = window.devicePixelRatio || 1;
+        const W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 800;
+        const H = 320;
+        canvas.width  = W * DPR;
+        canvas.height = H * DPR;
+        canvas.style.height = H + 'px';
+        const ctx = canvas.getContext('2d');
+        ctx.scale(DPR, DPR);
+
+        // Squarified treemap layout using market cap as weight
+        const items = data.slice(0,50).map(c => ({
+          sym: c.symbol.toUpperCase(),
+          name: c.name,
+          chg: c.price_change_percentage_24h || 0,
+          cap: c.market_cap || 1,
+          price: c.current_price,
+          vol: c.total_volume,
+        }));
+        const totalCap = items.reduce((s,c) => s + c.cap, 0);
+        const maxAbsChg = Math.max(...items.map(c => Math.abs(c.chg)), 1);
+
+        // Simple squarified treemap
+        function squarify(items, x, y, w, h) {
+          if(!items.length) return [];
+          const total = items.reduce((s,c) => s + c.cap, 0);
+          const rects = [];
+          let remaining = [...items];
+          let rx = x, ry = y, rw = w, rh = h;
+          while(remaining.length) {
+            const isHoriz = rw >= rh;
+            const shortSide = isHoriz ? rh : rw;
+            let row = [], rowSum = 0, bestRatio = Infinity;
+            for(let i = 0; i < remaining.length; i++) {
+              const tryRow = [...row, remaining[i]];
+              const trySum = rowSum + remaining[i].cap;
+              const scale = (rw * rh) / total;
+              const maxA = Math.max(...tryRow.map(c => c.cap * scale));
+              const minA = Math.min(...tryRow.map(c => c.cap * scale));
+              const ratio = Math.max(shortSide*shortSide*maxA/(trySum*trySum*scale*scale),
+                                     trySum*trySum*scale*scale/(shortSide*shortSide*minA));
+              if(ratio <= bestRatio) { row = tryRow; rowSum = trySum; bestRatio = ratio; }
+              else break;
+            }
+            const rowFrac = rowSum / total;
+            const rowLen = isHoriz ? rw * rowFrac : rh * rowFrac;  // actually thickness
+            // Actually: thickness of row
+            const thickness = isHoriz ? rh : rw;
+            const rowPx = (rowSum / total) * (isHoriz ? rw : rh);
+            let pos = isHoriz ? ry : rx;
+            for(const item of row) {
+              const frac = item.cap / rowSum;
+              const sz = frac * thickness;
+              if(isHoriz) {
+                rects.push({...item, x:rx, y:pos, w:rowPx, h:sz});
+                pos += sz;
+              } else {
+                rects.push({...item, x:pos, y:ry, w:sz, h:rowPx});
+                pos += sz;
+              }
+            }
+            if(isHoriz) { rx += rowPx; rw -= rowPx; }
+            else        { ry += rowPx; rh -= rowPx; }
+            remaining = remaining.slice(row.length);
+            total && (total - rowSum); // recalc not needed as we track remaining
+          }
+          return rects;
+        }
+
+        // Simpler row-based layout (more reliable)
+        function layoutTreemap(items, x, y, w, h) {
+          const total = items.reduce((s,c) => s + c.cap, 0);
+          const rects = [];
+          let remaining = [...items];
+          let cx = x, cy = y, cw = w, ch = h;
+          while(remaining.length > 0) {
+            const landscape = cw >= ch;
+            // Greedily fill a row/column
+            let rowItems = [], rowSum = 0;
+            let i = 0;
+            while(i < remaining.length) {
+              const candidate = [...rowItems, remaining[i]];
+              const candSum = rowSum + remaining[i].cap;
+              const totalArea = cw * ch;
+              const rowFrac = candSum / total * (landscape ? cw : ch);
+              const scale = totalArea / total;
+              const worst = (r) => {
+                const side = landscape ? ch : cw;
+                const areas = r.map(c => c.cap * scale);
+                const rowThick = (r.reduce((s,c) => s+c.cap,0) / total) * (landscape ? cw : ch);
+                const mx = Math.max(...areas), mn = Math.min(...areas);
+                return Math.max(rowThick*rowThick/mn, mx/rowThick/rowThick);
+              };
+              if(!rowItems.length || worst(candidate) <= worst(rowItems) + 0.001) {
+                rowItems.push(remaining[i]);
+                rowSum += remaining[i].cap;
+                i++;
+              } else break;
+            }
+            // place rowItems
+            const rowFrac = rowSum / total;
+            const thickness = landscape ? ch * rowFrac : cw * rowFrac;
+            let pos = landscape ? cy : cx;
+            for(const item of rowItems) {
+              const frac = item.cap / rowSum;
+              if(landscape) {
+                const sz = frac * (landscape ? cw : ch);
+                // actually needs rethinking — use simple row
+                rects.push({...item, x:cx, y:pos, w: landscape ? cw*rowFrac : frac*cw, h: landscape ? frac*ch : ch*rowFrac});
+                pos += landscape ? frac*ch : frac*cw;
+              } else {
+                rects.push({...item, x:pos, y:cy, w: frac*cw, h: ch*rowFrac});
+                pos += frac*cw;
+              }
+            }
+            if(landscape) { cy += ch*rowFrac; ch -= ch*rowFrac; total_placed = rowSum; }
+            else          { cx += cw*rowFrac; cw -= cw*rowFrac; }
+            remaining = remaining.slice(rowItems.length);
+            // recalc total for remaining
+            const newTotal = remaining.reduce((s,c) => s+c.cap, 0);
+            if(newTotal === 0) break;
+            // adjust fraction basis
+          }
+          return rects;
+        }
+
+        // Use a clean slice-and-dice layout
+        function sliceDice(items, x, y, w, h, dir=0) {
+          if(!items.length) return [];
+          if(items.length === 1) return [{...items[0], x, y, w, h}];
+          const total = items.reduce((s,c) => s+c.cap, 0);
+          const rects = [];
+          let pos = dir===0 ? x : y;
+          for(const item of items) {
+            const frac = item.cap / total;
+            if(dir===0) { rects.push({...item, x:pos, y, w:w*frac, h}); pos += w*frac; }
+            else        { rects.push({...item, x, y:pos, w, h:h*frac}); pos += h*frac; }
+          }
+          return rects;
+        }
+
+        // Binary split treemap (most visually balanced)
+        function binaryTreemap(items, x, y, w, h) {
+          if(!items.length) return [];
+          if(items.length === 1) return [{...items[0], x, y, w, h}];
+          const total = items.reduce((s,c) => s+c.cap, 0);
+          // Split into two halves by cumulative sum ~50%
+          let half = 0, splitIdx = 0;
+          for(let i = 0; i < items.length; i++) {
+            if(half + items[i].cap >= total/2 || i === items.length-2) { splitIdx = i+1; break; }
+            half += items[i].cap;
+          }
+          splitIdx = Math.max(1, Math.min(splitIdx, items.length-1));
+          const left = items.slice(0, splitIdx);
+          const right = items.slice(splitIdx);
+          const leftFrac = left.reduce((s,c) => s+c.cap,0) / total;
+          if(w >= h) {
+            return [
+              ...binaryTreemap(left,  x,              y, w*leftFrac,         h),
+              ...binaryTreemap(right, x+w*leftFrac,   y, w*(1-leftFrac),     h),
+            ];
+          } else {
+            return [
+              ...binaryTreemap(left,  x, y,              w, h*leftFrac),
+              ...binaryTreemap(right, x, y+h*leftFrac,   w, h*(1-leftFrac)),
+            ];
+          }
+        }
+
+        const rects = binaryTreemap(items, 0, 0, W, H);
+        const GAP = 2;
+
+        // Draw cells
+        ctx.clearRect(0, 0, W, H);
+        const cellData = [];
+        for(const r of rects) {
+          const chg = r.chg;
+          const intensity = Math.min(1, Math.abs(chg) / maxAbsChg);
+          const rx = r.x + GAP/2, ry = r.y + GAP/2, rw = r.w - GAP, rh = r.h - GAP;
+          if(rw < 2 || rh < 2) continue;
+
+          // Background
+          ctx.beginPath();
+          ctx.roundRect ? ctx.roundRect(rx, ry, rw, rh, 4) : ctx.rect(rx, ry, rw, rh);
+          if(chg > 0) {
+            ctx.fillStyle = `rgba(0,${80 + Math.round(intensity*175)},${60 + Math.round(intensity*40)},${0.4+intensity*0.5})`;
+          } else if(chg < 0) {
+            ctx.fillStyle = `rgba(${120+Math.round(intensity*135)},${30+Math.round(intensity*15)},${50+Math.round(intensity*35)},${0.4+intensity*0.5})`;
+          } else {
+            ctx.fillStyle = 'rgba(30,50,70,0.6)';
+          }
+          ctx.fill();
+
+          // Border
+          ctx.strokeStyle = chg > 0 ? `rgba(0,255,136,${0.15+intensity*0.5})` : chg < 0 ? `rgba(255,45,85,${0.15+intensity*0.5})` : 'rgba(255,255,255,0.08)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Text — only if cell is big enough
+          if(rw > 30 && rh > 22) {
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const cx = rx + rw/2, cy = ry + rh/2;
+            // Symbol
+            const fontSize = Math.min(13, Math.max(7, rw/6));
+            ctx.font = `700 ${fontSize}px "Orbitron", monospace`;
+            ctx.fillStyle = '#fff';
+            ctx.fillText(r.sym, cx, rh > 40 ? cy - fontSize*0.6 : cy);
+            // % change — only if tall enough
+            if(rh > 36) {
+              ctx.font = `${Math.max(6,fontSize*0.78)}px "Share Tech Mono", monospace`;
+              ctx.fillStyle = chg >= 0 ? '#00ff88' : '#ff2d55';
+              ctx.fillText((chg >= 0 ? '+' : '') + chg.toFixed(2) + '%', cx, cy + fontSize*0.7);
+            }
+          }
+          cellData.push({...r, rx, ry, rw, rh});
+        }
+
+        // Tooltip on hover
+        canvas.onmousemove = (e) => {
+          const rect = canvas.getBoundingClientRect();
+          const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+          const hit = cellData.find(c => mx>=c.rx && mx<=c.rx+c.rw && my>=c.ry && my<=c.ry+c.rh);
+          if(hit && tooltip) {
+            const chgColor = hit.chg >= 0 ? '#00ff88' : '#ff2d55';
+            tooltip.style.display = 'block';
+            tooltip.style.left = Math.min(mx+12, W-140) + 'px';
+            tooltip.style.top = Math.max(my-60, 4) + 'px';
+            tooltip.innerHTML = `<div style="color:#fff;font-weight:700;font-size:.7rem;margin-bottom:4px">${hit.sym} — ${hit.name||''}</div>
+              <div style="color:${chgColor};margin-bottom:2px">24h: ${hit.chg >= 0 ? '+' : ''}${hit.chg.toFixed(2)}%</div>
+              <div style="color:var(--muted)">Price: ${hit.price >= 1 ? '$'+hit.price.toLocaleString(undefined,{maximumFractionDigits:2}) : '$'+hit.price.toFixed(6)}</div>
+              <div style="color:var(--muted)">Vol: ${fmtBig(hit.vol)}</div>`;
+          } else if(tooltip) tooltip.style.display = 'none';
+        };
+        canvas.onmouseleave = () => { if(tooltip) tooltip.style.display = 'none'; };
+        // Click to load coin in analysis
+        canvas.onclick = (e) => {
+          const rect = canvas.getBoundingClientRect();
+          const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+          const hit = cellData.find(c => mx>=c.rx && mx<=c.rx+c.rw && my>=c.ry && my<=c.ry+c.rh);
+          if(hit) {
+            const inp = document.getElementById('symInput');
+            if(inp) { inp.value = hit.sym; switchTab('analysis'); setTimeout(()=>fetchData(),100); }
+          }
+        };
+        canvas.style.cursor = 'pointer';
+        canvas.title = 'Click any coin to load it in Analysis';
+      }
+
+      // ── 2. Summary stats ────────────────────────────────────
+      const bullCount = data.filter(c => (c.price_change_percentage_24h||0) > 0).length;
+      const bearCount = data.filter(c => (c.price_change_percentage_24h||0) < 0).length;
+      const avgChg = data.reduce((s,c) => s + (c.price_change_percentage_24h||0), 0) / data.length;
+      const sorted = [...data].sort((a,b) => (b.price_change_percentage_24h||0) - (a.price_change_percentage_24h||0));
+      const best = sorted[0], worst = sorted[sorted.length-1];
+      const mood = bullCount/data.length >= 0.7 ? '🟢 Very Bullish' : bullCount/data.length >= 0.55 ? '🟡 Bullish' : bearCount/data.length >= 0.7 ? '🔴 Very Bearish' : bearCount/data.length >= 0.55 ? '🟠 Bearish' : '⬡ Mixed';
+      const moodColor = bullCount/data.length >= 0.55 ? 'var(--green)' : bearCount/data.length >= 0.55 ? 'var(--red)' : 'var(--warn)';
+
+      const setEl = (id, val, color) => { const el=document.getElementById(id); if(el){el.textContent=val; if(color) el.style.color=color;} };
+      setEl('hm-bull', bullCount + ' / ' + data.length, 'var(--green)');
+      setEl('hm-bear', bearCount + ' / ' + data.length, 'var(--red)');
+      setEl('hm-avg', fmtPct(avgChg), pctColor(avgChg));
+      setEl('hm-best', best.symbol.toUpperCase() + ' ' + fmtPct(best.price_change_percentage_24h), 'var(--green)');
+      setEl('hm-worst', worst.symbol.toUpperCase() + ' ' + fmtPct(worst.price_change_percentage_24h), 'var(--red)');
+      setEl('hm-mood', mood, moodColor);
+
+      // ── 3. VP-style ranked tables (gainers left, losers right) ─
+      const gainers = sorted.filter(c => (c.price_change_percentage_24h||0) >= 0);
+      const losers  = [...sorted].reverse().filter(c => (c.price_change_percentage_24h||0) < 0);
+      const maxG = gainers.length ? Math.max(...gainers.map(c => c.price_change_percentage_24h||0)) : 1;
+      const maxL = losers.length  ? Math.max(...losers.map(c => Math.abs(c.price_change_percentage_24h||0))) : 1;
+
+      function vpRow(c, maxChgAbs, color) {
+        const chg = c.price_change_percentage_24h || 0;
+        const barW = (Math.abs(chg)/maxChgAbs*100).toFixed(1);
+        const price = c.current_price >= 1
+          ? '$' + c.current_price.toLocaleString(undefined,{maximumFractionDigits:2})
+          : '$' + c.current_price.toFixed(6);
+        const vol = fmtBig(c.total_volume);
+        const mcap = fmtBig(c.market_cap);
+        return `<div class="hm-row" style="cursor:pointer" onclick="(function(){const i=document.getElementById('symInput');if(i){i.value='${c.symbol.toUpperCase()}';switchTab('analysis');setTimeout(()=>fetchData(),100);}})()">
+          <span class="hm-row-sym" style="color:${color}">${c.symbol.toUpperCase()}</span>
+          <div style="flex:1;margin:0 8px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted)">${price}</span>
+              <span class="hm-row-chg" style="color:${color}">${fmtPct(chg)}</span>
+            </div>
+            <div class="hm-row-bar-wrap"><div class="hm-row-bar" style="width:${barW}%;background:${color};opacity:.7"></div></div>
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">Vol ${vol}</span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">MCap ${mcap}</span>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      const gEl = document.getElementById('hmTableGainers');
+      const lEl = document.getElementById('hmTableLosers');
+      if(gEl) gEl.innerHTML = gainers.map(c => vpRow(c, maxG, 'var(--green)')).join('');
+      if(lEl) lEl.innerHTML = losers.map(c => vpRow(c, maxL, 'var(--red)')).join('');
+
+    } catch(e) {
+      const canvas = document.getElementById('heatmapCanvas');
+      if(canvas) {
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = 'rgba(255,45,85,0.5)';
+        ctx.font = '14px Share Tech Mono';
+        ctx.fillText('Heatmap unavailable: ' + e.message, 20, 160);
+      }
+    }
+  }
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
   <button class="mobile-nav-btn active" id="mnav-home"   onclick="mobNav('home')"    aria-label="Home">
