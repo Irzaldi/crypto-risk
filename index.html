@@ -3046,8 +3046,6 @@ self.onmessage=function(e){
 
     fetchFearGreed();
 
-    runQuickPrediction(price, isBUY, isSELL, e55BelowCount);
-
     const pct=((price-open24)/open24*100);
     document.getElementById('pcPrice').textContent=fmtP(price);
     document.getElementById('pcPair').textContent=pair;
@@ -3138,6 +3136,8 @@ self.onmessage=function(e){
 
     const isBUY  = e55BelowCount === 3;
     const isSELL = e55AboveCount === 3;
+
+    runQuickPrediction(price, isBUY, isSELL, e55BelowCount);
 
     const partialExitBuy  = !isBUY && !isSELL && e55BelowCount >= 1 && e55BelowCount <= 2 && e55BelowCount > e55AboveCount;
     const partialExitSell = !isBUY && !isSELL && e55AboveCount >= 1 && e55AboveCount <= 2 && e55AboveCount > e55BelowCount;
@@ -3579,7 +3579,254 @@ self.onmessage=function(e){
     if(statusEl&&statusEl.textContent.includes('W1:')){
       statusEl.textContent=statusEl.textContent.replace(/W1:\d+ms/,`W1+W2:${totalElapsed}ms`);
     }
-  }  function _runAnalysisMainThread(pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,belowCount,aboveCount,tf,rm){
+  }
+
+  // ── Compute functions: shared between worker AND main-thread fallback ─────────
+  function fmtShort(n){if(!n||isNaN(n))return'—';if(n>=1000)return(n/1000).toFixed(1)+'K';return n.toFixed(2);}
+  
+  function computeCandlePatterns(opens,highs,lows,closes){
+    const n=closes.length;if(n<4)return null;
+    const body=i=>Math.abs(closes[i]-opens[i]),range=i=>highs[i]-lows[i];
+    const isBull=i=>closes[i]>opens[i],isBear=i=>closes[i]<opens[i];
+    const upWick=i=>isBull(i)?highs[i]-closes[i]:highs[i]-opens[i];
+    const dnWick=i=>isBull(i)?opens[i]-lows[i]:closes[i]-lows[i];
+    const c=n-1,p1=n-2,p2=n-3;
+    const isDoji=body(c)<=range(c)*0.1&&range(c)>0;
+    const dojiGravestone=isDoji&&dnWick(c)<body(c)&&upWick(c)>range(c)*0.6;
+    const dojiDragonfly=isDoji&&upWick(c)<body(c)&&dnWick(c)>range(c)*0.6;
+    let dojiSig='—',dojiDesc='No doji';
+    if(dojiGravestone){dojiSig='🔴 GRAVESTONE';dojiDesc='Bearish reversal signal';}
+    else if(dojiDragonfly){dojiSig='🟢 DRAGONFLY';dojiDesc='Bullish reversal signal';}
+    else if(isDoji){dojiSig='🟡 DOJI';dojiDesc='Market indecision';}
+    const longDnWick=dnWick(c)>=body(c)*2&&upWick(c)<=body(c)*0.5;
+    const longUpWick=upWick(c)>=body(c)*2&&dnWick(c)<=body(c)*0.5;
+    let hamSig='—',hamDesc='No pattern';
+    if(longDnWick&&isBull(c)){hamSig='🟢 HAMMER';hamDesc='Bullish reversal — long lower wick';}
+    else if(longDnWick&&isBear(c)){hamSig='🟡 HANG MAN';hamDesc='Possible reversal — confirm next candle';}
+    else if(longUpWick&&isBear(c)){hamSig='🔴 SHOOTING STAR';hamDesc='Bearish reversal — long upper wick';}
+    else if(longUpWick&&isBull(c)){hamSig='🟡 INVERTED HAMMER';hamDesc='Possible bullish reversal';}
+    const bullEngulf=isBear(p1)&&isBull(c)&&closes[c]>opens[p1]&&opens[c]<closes[p1];
+    const bearEngulf=isBull(p1)&&isBear(c)&&closes[c]<opens[p1]&&opens[c]>closes[p1];
+    let engSig='—',engDesc='No engulfing';
+    if(bullEngulf){engSig='🟢 BULL ENGULF';engDesc='Strong bullish reversal signal';}
+    else if(bearEngulf){engSig='🔴 BEAR ENGULF';engDesc='Strong bearish reversal signal';}
+    const morningStar=isBear(p2)&&body(p1)<body(p2)*0.3&&isBull(c)&&closes[c]>=(opens[p2]+closes[p2])/2;
+    const eveningStar=isBull(p2)&&body(p1)<body(p2)*0.3&&isBear(c)&&closes[c]<=(opens[p2]+closes[p2])/2;
+    let starSig='—',starDesc='No star pattern';
+    if(morningStar){starSig='🟢 MORNING STAR';starDesc='3-candle bullish reversal';}
+    else if(eveningStar){starSig='🔴 EVENING STAR';starDesc='3-candle bearish reversal';}
+    const threeWhite=isBull(p2)&&isBull(p1)&&isBull(c)&&closes[c]>closes[p1]&&closes[p1]>closes[p2]&&body(c)>range(c)*0.5;
+    const threeCrows=isBear(p2)&&isBear(p1)&&isBear(c)&&closes[c]<closes[p1]&&closes[p1]<closes[p2]&&body(c)>range(c)*0.5;
+    let threeSig='—',threeDesc='No 3-candle trend';
+    if(threeWhite){threeSig='🟢 THREE SOLDIERS';threeDesc='Strong sustained bullish move';}
+    else if(threeCrows){threeSig='🔴 THREE CROWS';threeDesc='Strong sustained bearish move';}
+    const bullHarami=isBear(p1)&&isBull(c)&&closes[c]<opens[p1]&&opens[c]>closes[p1]&&body(c)<body(p1)*0.5;
+    const bearHarami=isBull(p1)&&isBear(c)&&closes[c]>opens[p1]&&opens[c]<closes[p1]&&body(c)<body(p1)*0.5;
+    let harSig='—',harDesc='No harami';
+    if(bullHarami){harSig='🟢 BULL HARAMI';harDesc='Inside bar — bullish reversal';}
+    else if(bearHarami){harSig='🔴 BEAR HARAMI';harDesc='Inside bar — bearish reversal';}
+    const bc3=[isBull(p2),isBull(p1),isBull(c)].filter(Boolean).length;
+    let mainSig,mainDesc;
+    if(bc3===3){mainSig='🟢 3 BULLS';mainDesc='Three consecutive bullish candles';}
+    else if(bc3===0){mainSig='🔴 3 BEARS';mainDesc='Three consecutive bearish candles';}
+    else if(bc3===2&&isBull(c)){mainSig='🟢 BULL TREND';mainDesc='Mostly bullish recent candles';}
+    else if(bc3===1&&isBear(c)){mainSig='🔴 BEAR TREND';mainDesc='Mostly bearish recent candles';}
+    else{mainSig='🟡 MIXED';mainDesc='No clear candle direction';}
+    const bullPats=[bullEngulf,morningStar,threeWhite,bullHarami,dojiDragonfly,longDnWick&&isBull(c)].filter(Boolean).length;
+    const bearPats=[bearEngulf,eveningStar,threeCrows,bearHarami,dojiGravestone,longUpWick&&isBear(c)].filter(Boolean).length;
+    let ovSig,ovDesc;
+    if(bullPats>bearPats&&bullPats>0){ovSig='🟢 BULLISH PATTERNS';ovDesc=`${bullPats} bullish pattern${bullPats>1?'s':''} detected`;}
+    else if(bearPats>bullPats&&bearPats>0){ovSig='🔴 BEARISH PATTERNS';ovDesc=`${bearPats} bearish pattern${bearPats>1?'s':''} detected`;}
+    else{ovSig='⬡ NEUTRAL';ovDesc='No strong pattern signal';}
+    return{doji:[dojiSig,dojiDesc],hammer:[hamSig,hamDesc],engulf:[engSig,engDesc],star:[starSig,starDesc],three:[threeSig,threeDesc],harami:[harSig,harDesc],main:[mainSig,mainDesc],overall:[ovSig,ovDesc]};
+  }
+  function computeAdvancedPatterns(opens,highs,lows,closes){
+    const n=closes.length; if(n<30) return null;
+    const atr=()=>{let s=0;for(let i=n-14;i<n;i++)s+=highs[i]-lows[i];return s/14;};
+    const at=atr();
+    // Linear regression slope over window — uses raw index, no copies
+    const slope=(arr,start,end)=>{const ln=end-start;let sx=0,sy=0,sxy=0,sx2=0;for(let i=start;i<end;i++){const x=i-start;sx+=x;sy+=arr[i];sxy+=x*arr[i];sx2+=x*x;}const d=ln*sx2-sx*sx;return d===0?0:(ln*sxy-sx*sy)/d;};
+    // Local extrema — returns absolute indices into arr, no copies
+    const peaks=(arr,from,len,w=3)=>{const p=[];const end=from+len;for(let i=from+w;i<end-w;i++){let ok=true;for(let j=1;j<=w;j++){if(arr[i]<=arr[i-j]||arr[i]<=arr[i+j]){ok=false;break;}}if(ok)p.push(i);}return p;};
+    const troughs=(arr,from,len,w=3)=>{const t=[];const end=from+len;for(let i=from+w;i<end-w;i++){let ok=true;for(let j=1;j<=w;j++){if(arr[i]>=arr[i-j]||arr[i]>=arr[i+j]){ok=false;break;}}if(ok)t.push(i);}return t;};
+    // min/max over index range — no spread, no copy
+    const rangeMax=(arr,from,len)=>{let v=arr[from];for(let i=from+1;i<from+len;i++)if(arr[i]>v)v=arr[i];return v;};
+    const rangeMin=(arr,from,len)=>{let v=arr[from];for(let i=from+1;i<from+len;i++)if(arr[i]<v)v=arr[i];return v;};
+  
+    // ── FLAG ──────────────────────────────────────────────────────
+    let flagSig='—',flagDesc='No flag pattern';
+    {
+      const pole=20,flag=10,lookback=pole+flag;
+      if(n>=lookback){
+        const poleStart=n-lookback,poleEnd=n-flag;
+        const poleMove=(closes[poleEnd]-closes[poleStart])/closes[poleStart];
+        const flagHighSlope=slope(highs,poleEnd,n);
+        const flagLowSlope=slope(lows,poleEnd,n);
+        if(poleMove>0.05&&flagHighSlope<0&&flagLowSlope<0&&Math.abs(flagHighSlope-flagLowSlope)<at*0.05){
+          flagSig='🟢 BULL FLAG';flagDesc=`Strong pole (+${(poleMove*100).toFixed(1)}%), downward consolidation — breakout target above`;
+        } else if(poleMove<-0.05&&flagHighSlope>0&&flagLowSlope>0&&Math.abs(flagHighSlope-flagLowSlope)<at*0.05){
+          flagSig='🔴 BEAR FLAG';flagDesc=`Strong pole (${(poleMove*100).toFixed(1)}%), upward consolidation — breakdown target below`;
+        }
+      }
+    }
+  
+    // ── PENNANT ───────────────────────────────────────────────────
+    let pennantSig='—',pennantDesc='No pennant';
+    {
+      const pole=15,pLen=12,lookback=pole+pLen;
+      if(n>=lookback){
+        const poleStart=n-lookback,poleEnd=n-pLen;
+        const poleMove=(closes[poleEnd]-closes[poleStart])/closes[poleStart];
+        const hSlope=slope(highs,poleEnd,n);
+        const lSlope=slope(lows,poleEnd,n);
+        if(Math.abs(poleMove)>0.04&&hSlope<0&&lSlope>0){
+          if(poleMove>0){pennantSig='🟢 BULL PENNANT';pennantDesc='Converging highs/lows after upward pole — continuation likely';}
+          else{pennantSig='🔴 BEAR PENNANT';pennantDesc='Converging highs/lows after downward pole — continuation likely';}
+        }
+      }
+    }
+  
+    // ── WEDGE ─────────────────────────────────────────────────────
+    let wedgeSig='—',wedgeDesc='No wedge';
+    {
+      const w=25;
+      if(n>=w){
+        const hSlope=slope(highs,n-w,n);
+        const lSlope=slope(lows,n-w,n);
+        if(hSlope>0&&lSlope>0&&hSlope<lSlope){wedgeSig='🔴 RISING WEDGE';wedgeDesc='Both highs & lows rising but converging — bearish reversal signal';}
+        else if(hSlope<0&&lSlope<0&&hSlope>lSlope){wedgeSig='🟢 FALLING WEDGE';wedgeDesc='Both highs & lows falling but converging — bullish reversal signal';}
+      }
+    }
+  
+    // ── DOUBLE TOP / BOTTOM ───────────────────────────────────────
+    let doubleSig='—',doubleDesc='No double top/bottom';
+    {
+      const from=Math.max(0,n-40),len=n-from;
+      const pk=peaks(highs,from,len,4),tr=troughs(lows,from,len,4);
+      if(pk.length>=2){
+        const p1=pk[pk.length-2],p2=pk[pk.length-1];
+        const diff=Math.abs(highs[p1]-highs[p2])/highs[p1];
+        if(diff<0.02&&p2>p1+5){
+          let neckline=lows[p1];for(let i=p1;i<=p2;i++)if(lows[i]<neckline)neckline=lows[i];
+          doubleSig='🔴 DOUBLE TOP';doubleDesc=`Two peaks ~${(diff*100).toFixed(1)}% apart. Neckline ${fmtShort(neckline)}. Bearish if broken.`;
+        }
+      }
+      if(doubleSig==='—'&&tr.length>=2){
+        const t1=tr[tr.length-2],t2=tr[tr.length-1];
+        const diff=Math.abs(lows[t1]-lows[t2])/lows[t1];
+        if(diff<0.02&&t2>t1+5){
+          doubleSig='🟢 DOUBLE BOTTOM';doubleDesc=`Two troughs ~${(diff*100).toFixed(1)}% apart. Bullish reversal if neckline breaks.`;
+        }
+      }
+    }
+  
+    // ── HEAD & SHOULDERS ─────────────────────────────────────────
+    let hsSig='—',hsDesc='No H&S pattern';
+    {
+      const from=Math.max(0,n-50),len=n-from;
+      const pk=peaks(highs,from,len,3),tr=troughs(lows,from,len,3);
+      if(pk.length>=3){
+        const l=pk[pk.length-3],h=pk[pk.length-2],r=pk[pk.length-1];
+        if(highs[h]>highs[l]&&highs[h]>highs[r]&&Math.abs(highs[l]-highs[r])/highs[h]<0.03){
+          hsSig='🔴 HEAD & SHOULDERS';hsDesc='Classic top reversal — left shoulder, head, right shoulder detected';
+        }
+      }
+      if(hsSig==='—'&&tr.length>=3){
+        const l=tr[tr.length-3],h=tr[tr.length-2],r=tr[tr.length-1];
+        if(lows[h]<lows[l]&&lows[h]<lows[r]&&Math.abs(lows[l]-lows[r])/Math.abs(lows[h])<0.03){
+          hsSig='🟢 INV HEAD & SHOULDERS';hsDesc='Inverse H&S — bullish bottom reversal pattern detected';
+        }
+      }
+    }
+  
+    // ── TRIANGLE ─────────────────────────────────────────────────
+    let triSig='—',triDesc='No triangle';
+    {
+      const w=30;
+      if(n>=w){
+        const hSlope=slope(highs,n-w,n);
+        const lSlope=slope(lows,n-w,n);
+        const flat=v=>Math.abs(v)<at*0.01;
+        if(hSlope<0&&lSlope>0){triSig='🟡 SYMMETRICAL TRI';triDesc='Converging highs & rising lows — breakout imminent, direction unclear';}
+        else if(flat(hSlope)&&lSlope>0){triSig='🟢 ASCENDING TRI';triDesc='Flat resistance, rising support — typically bullish breakout';}
+        else if(hSlope<0&&flat(lSlope)){triSig='🔴 DESCENDING TRI';triDesc='Falling highs, flat support — typically bearish breakdown';}
+      }
+    }
+  
+    // ── CUP & HANDLE ─────────────────────────────────────────────
+    let cupSig='—',cupDesc='No cup & handle';
+    {
+      const w=50;
+      if(n>=w){
+        const base=n-w;
+        const lMax=rangeMax(closes,base,15),bMin=rangeMin(closes,base+15,20),rMax=rangeMax(closes,base+35,10);
+        const hMin=rangeMin(closes,base+45,5);
+        const depth=(lMax-bMin)/lMax,symm=Math.abs(lMax-rMax)/lMax,hDrop=(rMax-hMin)/rMax;
+        if(depth>0.1&&depth<0.5&&symm<0.05&&hDrop>0.02&&hDrop<0.15){
+          cupSig='🟢 CUP & HANDLE';cupDesc=`Cup depth ${(depth*100).toFixed(0)}%, handle pullback ${(hDrop*100).toFixed(1)}% — bullish continuation`;
+        }
+      }
+    }
+  
+    // ── ADVANCED OVERALL ─────────────────────────────────────────
+    const bullAdv=[flagSig.includes('BULL'),pennantSig.includes('BULL'),wedgeSig.includes('FALLING'),doubleSig.includes('DOUBLE BOT'),hsSig.includes('INV'),triSig.includes('ASCENDING'),cupSig.includes('CUP')].filter(Boolean).length;
+    const bearAdv=[flagSig.includes('BEAR'),pennantSig.includes('BEAR'),wedgeSig.includes('RISING'),doubleSig.includes('DOUBLE TOP'),hsSig.includes('HEAD & SH'),triSig.includes('DESCENDING')].filter(Boolean).length;
+    let advOvSig='⬡ NEUTRAL',advOvDesc='No dominant advanced pattern';
+    if(bullAdv>bearAdv&&bullAdv>0){advOvSig='🟢 BULLISH STRUCTURE';advOvDesc=`${bullAdv} bullish chart pattern${bullAdv>1?'s':''} detected`;}
+    else if(bearAdv>bullAdv&&bearAdv>0){advOvSig='🔴 BEARISH STRUCTURE';advOvDesc=`${bearAdv} bearish chart pattern${bearAdv>1?'s':''} detected`;}
+  
+    return{flag:[flagSig,flagDesc],pennant:[pennantSig,pennantDesc],wedge:[wedgeSig,wedgeDesc],double:[doubleSig,doubleDesc],hs:[hsSig,hsDesc],triangle:[triSig,triDesc],cup:[cupSig,cupDesc],advOverall:[advOvSig,advOvDesc]};
+  }
+  function computeKeyLevels(price,highs,lows,closes,atr){
+    if(!closes||closes.length<20)return null;
+    const n=closes.length,r=5,res=[],sup=[];
+    // Direct index loop — no slice/every array allocations per candle
+    for(let i=r;i<n-r;i++){
+      let isHigh=true,isLow=true;
+      for(let j=1;j<=r;j++){
+        if(highs[i-j]>highs[i]||highs[i+j]>highs[i]){isHigh=false;break;}
+      }
+      if(isHigh)res.push(highs[i]);
+      for(let j=1;j<=r;j++){
+        if(lows[i-j]<lows[i]||lows[i+j]<lows[i]){isLow=false;break;}
+      }
+      if(isLow)sup.push(lows[i]);
+    }
+    // Cluster: merge prices within 0.5% of each other
+    const cluster=arr=>{const m=[];arr.sort((a,b)=>a-b);for(let i=0;i<arr.length;i++){let found=false;for(let j=0;j<m.length;j++){if(Math.abs(m[j]-arr[i])/arr[i]<0.005){found=true;break;}}if(!found)m.push(arr[i]);}return m;};
+    const resLevels=cluster(res).filter(v=>v>price).sort((a,b)=>a-b).slice(0,5);
+    const supLevels=cluster(sup).filter(v=>v<price).sort((a,b)=>b-a).slice(0,5);
+    return{resLevels,supLevels};
+  }
+  function computeBacktest(closes,highs,lows,e8,e13,e55){
+    if(closes.length<60)return null;
+    // Use passed-in series or compute only if missing
+    const e8s=e8||calcEMASeries(closes,8),e21s=e13||calcEMASeries(closes,21),e55s=e55||calcEMASeries(closes,55);
+    let trades=[],inTrade=null,wins=0,losses=0,totalPnl=0,maxDD=0,peak=0;
+    for(let i=60;i<closes.length-1;i++){
+      if(!e8s[i]||!e21s[i]||!e55s[i])continue;
+      const buyS=e55s[i]<e8s[i]&&e55s[i]<e21s[i],sellS=e55s[i]>e8s[i]&&e55s[i]>e21s[i];
+      if(!inTrade&&buyS)inTrade={type:'LONG',entry:closes[i]};
+      if(!inTrade&&sellS)inTrade={type:'SHORT',entry:closes[i]};
+      if(inTrade){const ex=inTrade.type==='LONG'?sellS:buyS;if(ex||i===closes.length-2){const p=inTrade.type==='LONG'?(closes[i]-inTrade.entry)/inTrade.entry*100:(inTrade.entry-closes[i])/inTrade.entry*100;totalPnl+=p;if(p>0)wins++;else losses++;peak=Math.max(peak,totalPnl);maxDD=Math.max(maxDD,peak-totalPnl);trades.push({type:inTrade.type,pnlPct:p});inTrade=null;}}
+    }
+    const tot=wins+losses;
+    return{total:tot,wins,losses,winRate:tot>0?(wins/tot*100).toFixed(1):0,avgPnl:tot>0?(totalPnl/tot).toFixed(2):0,totalPnl,maxDD,recentTrades:trades.slice(-10).reverse()};
+  }
+  function computeVolumeProfile(closes,highs,lows,volumes){
+    if(closes.length<20)return null;
+    const BINS=12;
+    let minP=lows[0],maxP=highs[0];
+    for(let i=1;i<lows.length;i++){if(lows[i]<minP)minP=lows[i];if(highs[i]>maxP)maxP=highs[i];}
+    const step=(maxP-minP)/BINS;
+    const bins=Array(BINS).fill(0),labels=[];
+    for(let b=0;b<BINS;b++)labels.push(minP+b*step+step/2);
+    closes.forEach((c,i)=>{const bin=Math.min(BINS-1,Math.floor((c-minP)/step));if(bin>=0)bins[bin]+=(volumes[i]||0);});
+    const maxVol=Math.max(...bins),poc=labels[bins.indexOf(maxVol)];
+    return{bins,labels,maxVol,poc,curPrice:closes[closes.length-1]};
+  }
+
+  function _runAnalysisMainThread(pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,belowCount,aboveCount,tf,rm){
     const ind={rsi:calcRSI(closes),macdV:calcMACD(closes),ema8:calcEMA(closes,8),ema13:calcEMA(closes,13),ema20:calcEMA(closes,20),ema21:calcEMA(closes,21),ema50:calcEMA(closes,50),ema55:calcEMA(closes,55),ema200:calcEMA(closes,200),bbP:calcBB(closes),stoch:calcStochRSI(closes),willR:calcWilliamsR(highs,lows,closes),atr:calcATR(highs,lows,closes),adxData:calcADX(highs,lows,closes),obvData:calcOBV(closes,volumes),ichi:calcIchimoku(highs,lows,closes),st:calcSuperTrend(highs,lows,closes,CFG.stPeriod||10,CFG.stMult||3),piv:calcPivots(highs,lows,closes),div:calcDivergence(closes),vwap:calcVWAP(closes,highs,lows,volumes),mvwap:calcMVWAP(closes,highs,lows,volumes),cci:calcCCI(highs,lows,closes),mfi:calcMFI(highs,lows,closes,volumes),roc:calcROC(closes),ult:calcUltimateOscillator(highs,lows,closes),psar:calcParabolicSAR(highs,lows,closes),cmf:calcCMF(highs,lows,closes,volumes),kelt:calcKeltner(highs,lows,closes),volR:(()=>{const a=volumes.slice(-20).reduce((a,b)=>a+b,0)/20;return a>0?(volumes[volumes.length-1]/a)*100:100;})()};
     // Build score
     const {rsi,macdV,stoch,willR,bbP,div,ema8,ema13,ema21,ema55,ema200,adxData,ichi,st,piv,obvData,volR,cci,mfi,roc,ult,psar,cmf,kelt}=ind;
