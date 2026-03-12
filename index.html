@@ -747,6 +747,36 @@
   .sum-pill { font-family:'Share Tech Mono',monospace; font-size:.64rem; padding:3px 8px; border-radius:4px; border:1px solid; }
   /* On-chain grid responsive */
   @media(max-width:700px){ .oc-grid { grid-template-columns:1fr !important; } }
+  @media(max-width:900px){ #scannerTopRow,#scannerBotRow { grid-template-columns:1fr !important; } }
+  /* ── Scanner tab ── */
+  .scan-table { width:100%; border-collapse:collapse; }
+  .scan-table th { font-family:'Share Tech Mono',monospace; font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; padding:6px 10px; border-bottom:1px solid var(--border); text-align:left; cursor:pointer; white-space:nowrap; user-select:none; }
+  .scan-table th:hover { color:var(--accent); }
+  .scan-table th.sort-asc::after  { content:' ▲'; color:var(--accent); }
+  .scan-table th.sort-desc::after { content:' ▼'; color:var(--accent); }
+  .scan-table td { font-family:'Share Tech Mono',monospace; font-size:.62rem; padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+  .scan-table tr:hover td { background:rgba(0,229,255,.04); cursor:pointer; }
+  .scan-sym { font-family:'Orbitron',monospace; font-size:.68rem; font-weight:700; }
+  .scan-badge { font-size:.54rem; padding:2px 7px; border-radius:3px; font-weight:700; letter-spacing:.5px; white-space:nowrap; }
+  .scan-bar-wrap { background:rgba(255,255,255,.06); border-radius:4px; height:6px; width:80px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:6px; }
+  .scan-bar { height:100%; border-radius:4px; }
+  /* Correlation matrix */
+  .corr-matrix { display:grid; gap:3px; }
+  .corr-cell { border-radius:4px; padding:6px 4px; text-align:center; font-family:'Share Tech Mono',monospace; font-size:.58rem; font-weight:700; transition:opacity .2s; cursor:default; }
+  .corr-cell:hover { opacity:.8; }
+  .corr-label { font-family:'Share Tech Mono',monospace; font-size:.55rem; color:var(--muted); padding:4px 2px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* BTC dom / alt season */
+  .cycle-gauge { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .cycle-arc-wrap { position:relative; width:120px; height:68px; }
+  .cycle-value { font-family:'Orbitron',monospace; font-size:1.4rem; font-weight:700; }
+  .cycle-label { font-family:'Share Tech Mono',monospace; font-size:.62rem; color:var(--muted); }
+  /* Macro pulse */
+  .macro-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,255,255,.05); }
+  .macro-row:last-child { border-bottom:none; }
+  .macro-name { font-family:'Share Tech Mono',monospace; font-size:.62rem; min-width:120px; color:var(--muted); }
+  .macro-val  { font-family:'Orbitron',monospace; font-size:.78rem; font-weight:700; min-width:80px; }
+  .macro-signal { font-family:'Share Tech Mono',monospace; font-size:.58rem; padding:2px 8px; border-radius:3px; }
+  .macro-impact { font-family:'Share Tech Mono',monospace; font-size:.58rem; color:var(--muted); flex:1; }
 
   /* Dashboard grid */
   .mkt-grid-top { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
@@ -844,6 +874,7 @@
     <button class="page-tab active" onclick="switchTab('analysis')" id="tab-analysis">🔬 Analysis</button>
     <button class="page-tab" onclick="switchTab('market')" id="tab-market">🌐 Market Dashboard</button>
     <button class="page-tab" onclick="switchTab('onchain')" id="tab-onchain">🔎 On-Chain &amp; Macro</button>
+    <button class="page-tab" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner &amp; Macro</button>
   </div>
 
   <!-- ══ PAGE: Analysis ══ -->
@@ -1715,6 +1746,125 @@
 
   </div><!-- end .wrap -->
   </div><!-- end #page-onchain -->
+
+  <!-- ══ PAGE: Scanner & Macro ══ -->
+  <div class="page-content" id="page-scanner">
+  <div class="wrap">
+
+    <!-- Refresh bar -->
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+      <button class="mkt-refresh-btn" id="scanRefreshBtn" onclick="runScanner(true)">⟳ SCAN ALL</button>
+      <label style="display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--muted);cursor:pointer;user-select:none">
+        <input type="checkbox" id="scanAutoToggle" onchange="toggleScanAuto()" style="accent-color:var(--accent)">
+        AUTO-SCAN
+      </label>
+      <select id="scanAutoInterval" onchange="toggleScanAuto()" style="background:var(--panel);border:1px solid var(--border);color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:.58rem;padding:3px 6px;border-radius:5px;cursor:pointer">
+        <option value="60" selected>1 min</option>
+        <option value="120">2 min</option>
+        <option value="300">5 min</option>
+      </select>
+      <span id="scanStatus" style="font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--muted)">Ready — click Scan All</span>
+      <span id="scanCountdown" style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--accent)"></span>
+      <span id="scanLastUpdate" style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--muted);margin-left:auto"></span>
+    </div>
+
+    <!-- Row 1: Scanner table | BTC Dom + Alt Season -->
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:14px;margin-bottom:14px" id="scannerTopRow">
+
+      <div class="panel">
+        <div class="ptitle">📡 Signal Scanner
+          <span style="font-size:.5rem;color:var(--muted);margin-left:6px">watchlist · TradingLab EMA strategy · click row to load</span>
+          <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <button class="ind-tab active" id="scan-filter-all"  onclick="filterScanner('all')">All</button>
+            <button class="ind-tab"        id="scan-filter-buy"  onclick="filterScanner('buy')">🟢 BUY</button>
+            <button class="ind-tab"        id="scan-filter-sell" onclick="filterScanner('sell')">🔴 SELL</button>
+            <button class="ind-tab"        id="scan-filter-neut" onclick="filterScanner('neut')">🟡 NEUTRAL</button>
+          </span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="scan-table" id="scanTable">
+            <thead>
+              <tr>
+                <th onclick="sortScanner('sym')">SYMBOL</th>
+                <th onclick="sortScanner('price')">PRICE</th>
+                <th onclick="sortScanner('pct')">24H%</th>
+                <th onclick="sortScanner('score')">SCORE</th>
+                <th onclick="sortScanner('sig')">SIGNAL</th>
+                <th onclick="sortScanner('rsi')">RSI</th>
+                <th onclick="sortScanner('trend')">TREND</th>
+                <th>LOAD</th>
+              </tr>
+            </thead>
+            <tbody id="scanTbody">
+              <tr><td colspan="8" style="color:var(--muted);padding:20px;text-align:center">Click SCAN ALL to run signals on your watchlist</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="scanSummaryBar" style="display:flex;gap:8px;flex-wrap:wrap;padding-top:10px;margin-top:6px;border-top:1px solid rgba(255,255,255,.05)"></div>
+      </div>
+
+      <div class="panel" style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div class="ptitle" style="margin-bottom:10px">🔶 BTC Dominance</div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <div class="cycle-gauge">
+              <canvas id="btcDomArc" width="120" height="68"></canvas>
+              <div class="cycle-value" id="btcDomVal">—</div>
+              <div class="cycle-label" id="btcDomLabel">loading...</div>
+            </div>
+            <div style="flex:1">
+              <div id="btcDomSparkline" style="margin-bottom:6px"></div>
+              <div id="btcDomSignal" style="font-family:'Share Tech Mono',monospace;font-size:.62rem;line-height:1.6"></div>
+            </div>
+          </div>
+        </div>
+        <div style="border-top:1px solid rgba(255,255,255,.06);padding-top:14px">
+          <div class="ptitle" style="margin-bottom:10px">🌊 Altcoin Season Index</div>
+          <div style="display:flex;align-items:center;gap:16px">
+            <div class="cycle-gauge">
+              <canvas id="altSeasonArc" width="120" height="68"></canvas>
+              <div class="cycle-value" id="altSeasonVal">—</div>
+              <div class="cycle-label" id="altSeasonLabel">loading...</div>
+            </div>
+            <div style="flex:1">
+              <div id="altSeasonBar" style="margin-bottom:8px"></div>
+              <div id="altSeasonSignal" style="font-family:'Share Tech Mono',monospace;font-size:.62rem;line-height:1.6"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Row 2: Correlation Matrix | Macro Pulse -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px" id="scannerBotRow">
+
+      <div class="panel">
+        <div class="ptitle">🗺️ Cross-Asset Correlation
+          <span style="font-size:.5rem;color:var(--muted);margin-left:6px">30-day return correlation · crypto vs macro</span>
+        </div>
+        <div id="corrMatrixPanel">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--muted)">Run scanner to compute correlations</div>
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-top:8px">
+          🟢 strong positive &nbsp;|&nbsp; 🔴 strong inverse &nbsp;|&nbsp; ⬛ uncorrelated
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="ptitle">🌐 Macro Pulse
+          <span style="font-size:.5rem;color:var(--muted);margin-left:6px">macro forces affecting crypto, forex &amp; stocks</span>
+        </div>
+        <div id="macroPulsePanel">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--muted)">Loading macro data...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- end .wrap -->
+  </div><!-- end #page-scanner -->
+
 
   <!-- ══════════════════════════════════════════════════════
        🔮 PRICE PREDICTION PANEL
@@ -5527,7 +5677,8 @@ self.onmessage=function(e){
         _startMktTimers(sec);
       }
       // Pause onchain timer while away
-      if(_ocTimer) { _clearOcTimers(); }
+      if(_ocTimer)   { _clearOcTimers(); }
+      if(_scanTimer) { _clearScanTimers(); }
     } else if(name === 'onchain') {
       if(!window._onchainLoaded) fetchOnChainDashboard(false);
       // Resume oc auto-refresh if toggle is on
@@ -5537,12 +5688,22 @@ self.onmessage=function(e){
         _startOcTimers(sec);
       }
       // Pause market timer while away
-      if(_mktTimer) { _clearMktTimers(); }
+      if(_mktTimer)  { _clearMktTimers(); }
+      if(_scanTimer) { _clearScanTimers(); }
+    } else if(name === 'scanner') {
+      if(!window._scanLoaded) runScanner(false);
+      const scOn = document.getElementById('scanAutoToggle');
+      if(scOn && scOn.checked && !_scanTimer) {
+        const sec = parseInt(document.getElementById('scanAutoInterval').value) || 60;
+        _startScanTimers(sec);
+      }
+      if(_mktTimer)  { _clearMktTimers(); }
+      if(_ocTimer)   { _clearOcTimers(); }
     } else {
-      // Analysis tab — pause both dashboard timers
+      // Analysis tab — pause all dashboard timers
       _clearMktTimers();
       _clearOcTimers();
-      // But keep checkboxes so they auto-resume on switch back
+      _clearScanTimers();
     }
   }
 
@@ -6429,6 +6590,570 @@ self.onmessage=function(e){
       '</div>';
     }).join('');
   }
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  SCANNER & MACRO TAB
+  //  4 panels: Signal Scanner · BTC Dominance · Alt Season · Corr Matrix · Macro Pulse
+  // ══════════════════════════════════════════════════════════════════════
+  window._scanLoaded    = false;
+  let _scanResults      = [];   // [{sym, price, pct, score, sig, color, rsi, trend, closes}]
+  let _scanSortKey      = 'score';
+  let _scanSortDir      = -1;   // -1=desc
+  let _scanFilter       = 'all';
+  let _scanTimer        = null, _scanCdTimer = null, _scanCdSec = 0;
+  let _macroPrices      = {};   // {sym: closes[]}
+
+  // ── Auto-refresh ─────────────────────────────────────────────────────
+  function _startScanTimers(sec) {
+    _clearScanTimers();
+    _scanCdSec = sec;
+    _scanTimer = setInterval(function() { runScanner(true); _scanCdSec = sec; }, sec * 1000);
+    _scanCdTimer = setInterval(function() {
+      _scanCdSec--;
+      const el = document.getElementById('scanCountdown');
+      if(el) el.textContent = _scanCdSec > 0 ? '↻ ' + _scanCdSec + 's' : '';
+    }, 1000);
+  }
+  function _clearScanTimers() {
+    clearInterval(_scanTimer); clearInterval(_scanCdTimer);
+    _scanTimer = _scanCdTimer = null;
+    const el = document.getElementById('scanCountdown'); if(el) el.textContent = '';
+  }
+  function toggleScanAuto() {
+    const on  = document.getElementById('scanAutoToggle').checked;
+    const sec = parseInt(document.getElementById('scanAutoInterval').value) || 60;
+    if(on) _startScanTimers(sec); else _clearScanTimers();
+  }
+
+  // ── Main scan orchestrator ────────────────────────────────────────────
+  async function runScanner(bust) {
+    const btn = document.getElementById('scanRefreshBtn');
+    const st  = document.getElementById('scanStatus');
+    if(btn) { btn.disabled = true; btn.textContent = '⟳ SCANNING...'; }
+    if(st)  st.textContent = 'Fetching candle data for watchlist...';
+
+    // Show skeleton rows
+    const tbody = document.getElementById('scanTbody');
+    if(tbody) tbody.innerHTML = watchlist.map(function(s) {
+      return '<tr><td class="scan-sym">'+s+'</td><td colspan="7" style="color:var(--muted)">'+_skel(1)+'</td></tr>';
+    }).join('');
+
+    // Fetch all symbols in parallel
+    const results = await Promise.allSettled(watchlist.map(function(sym) {
+      return _scanFetchOne(sym);
+    }));
+
+    _scanResults = results
+      .map(function(r) { return r.status === 'fulfilled' ? r.value : null; })
+      .filter(Boolean);
+
+    window._scanLoaded = true;
+    renderScanTable();
+    renderScanSummary();
+
+    // Now compute correlations & macro (reuses fetched closes)
+    fetchBtcDominance(bust);
+    computeCorrMatrix();
+    fetchMacroPulse(bust);
+
+    const upd = document.getElementById('scanLastUpdate');
+    if(upd) upd.textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    if(st)  st.textContent = '✓ Scanned ' + _scanResults.length + ' symbols';
+    if(btn) { btn.disabled = false; btn.textContent = '⟳ SCAN ALL'; }
+  }
+
+  // ── Fetch one symbol for scanner ─────────────────────────────────────
+  async function _scanFetchOne(sym) {
+    let closes = [], highs = [], lows = [], volumes = [], price = null, pct = null;
+
+    if(FOREX_PAIRS[sym]) {
+      const d = await tryForex(sym);
+      closes = d.closes; highs = d.highs; lows = d.lows; volumes = d.volumes;
+      price = d.price;
+      pct = d.opens.length ? (d.price - d.opens[d.opens.length-1]) / d.opens[d.opens.length-1] * 100 : 0;
+    } else if(COMMODITY_PAIRS[sym]) {
+      const d = await tryCommodity(sym);
+      closes = d.closes; highs = d.highs; lows = d.lows; volumes = d.volumes;
+      price = d.price;
+      pct = d.opens.length ? (d.price - d.opens[d.opens.length-1]) / d.opens[d.opens.length-1] * 100 : 0;
+    } else if(sym === 'ANTAM' || window._customStocks?.[sym]) {
+      const d = sym === 'ANTAM' ? await tryANTAM() : await tryCustomStock(sym, window._customStocks[sym]);
+      closes = d.closes; highs = d.highs; lows = d.lows; volumes = d.volumes;
+      price = d.price;
+      pct = d.opens.length ? (d.price - d.opens[d.opens.length-1]) / d.opens[d.opens.length-1] * 100 : 0;
+    } else {
+      const [ticker, klines] = await Promise.all([
+        smartFetch('https://api.binance.com/api/v3/ticker/24hr?symbol='+sym+'USDT'),
+        smartFetch('https://api.binance.com/api/v3/klines?symbol='+sym+'USDT&interval=1h&limit=200'),
+      ]);
+      if(ticker.code) throw new Error('bad ticker');
+      closes  = klines.map(function(k){ return +k[4]; });
+      highs   = klines.map(function(k){ return +k[2]; });
+      lows    = klines.map(function(k){ return +k[3]; });
+      volumes = klines.map(function(k){ return +k[5]; });
+      price = +ticker.lastPrice;
+      pct   = +ticker.priceChangePercent;
+      // Cache closes for correlation matrix
+      _macroPrices[sym] = closes;
+    }
+
+    const mtf  = calcMTFScore(closes, highs, lows, volumes);
+    const rsi  = closes.length >= 14 ? _scanCalcRSI(closes) : null;
+    const trend = _scanTrend(closes);
+
+    return { sym, price, pct, score: mtf.score, sig: mtf.sig, color: mtf.color,
+             rsi, trend, closes, highs, lows, volumes };
+  }
+
+  // ── RSI for scanner (simple, standalone) ─────────────────────────────
+  function _scanCalcRSI(closes, period) {
+    period = period || 14;
+    if(closes.length < period + 1) return null;
+    const slice = closes.slice(-period - 1);
+    let gains = 0, losses = 0;
+    for(let i = 1; i < slice.length; i++) {
+      const d = slice[i] - slice[i-1];
+      if(d > 0) gains += d; else losses -= d;
+    }
+    if(losses === 0) return 100;
+    const rs = (gains / period) / (losses / period);
+    return Math.round(100 - 100 / (1 + rs));
+  }
+
+  // ── Trend summary from EMAs ───────────────────────────────────────────
+  function _scanTrend(closes) {
+    if(closes.length < 21) return '—';
+    const e8  = calcEMA(closes, 8);
+    const e21 = calcEMA(closes, 21);
+    const e55 = calcEMA(closes, 55);
+    const p   = closes[closes.length - 1];
+    if(p > e8 && e8 > e21 && e21 > e55) return '↑↑ STRONG UP';
+    if(p > e21 && e21 > e55)             return '↑ UP';
+    if(p < e8 && e8 < e21 && e21 < e55) return '↓↓ STRONG DOWN';
+    if(p < e21 && e21 < e55)             return '↓ DOWN';
+    return '↔ SIDEWAYS';
+  }
+
+  // ── Render scanner table ──────────────────────────────────────────────
+  function renderScanTable() {
+    const tbody = document.getElementById('scanTbody');
+    if(!tbody) return;
+
+    let rows = _scanResults.slice();
+
+    // Filter
+    if(_scanFilter === 'buy')  rows = rows.filter(function(r){ return r.sig.includes('BUY'); });
+    if(_scanFilter === 'sell') rows = rows.filter(function(r){ return r.sig.includes('SELL'); });
+    if(_scanFilter === 'neut') rows = rows.filter(function(r){ return r.sig.includes('NEUTRAL'); });
+
+    // Sort
+    rows.sort(function(a, b) {
+      let av = a[_scanSortKey], bv = b[_scanSortKey];
+      if(_scanSortKey === 'sym') { av = a.sym; bv = b.sym; return _scanSortDir * av.localeCompare(bv); }
+      if(_scanSortKey === 'sig') { av = a.sig; bv = b.sig; return _scanSortDir * av.localeCompare(bv); }
+      if(_scanSortKey === 'trend') { av = a.trend||''; bv = b.trend||''; return _scanSortDir * av.localeCompare(bv); }
+      av = av == null ? -999 : +av;
+      bv = bv == null ? -999 : +bv;
+      return _scanSortDir * (av - bv);
+    });
+
+    // Update sort header indicators
+    document.querySelectorAll('.scan-table th').forEach(function(th) {
+      th.classList.remove('sort-asc','sort-desc');
+    });
+    const thMap = { sym:0, price:1, pct:2, score:3, sig:4, rsi:5, trend:6 };
+    const thIdx = thMap[_scanSortKey];
+    const ths = document.querySelectorAll('#scanTable thead th');
+    if(ths[thIdx]) ths[thIdx].classList.add(_scanSortDir === -1 ? 'sort-desc' : 'sort-asc');
+
+    if(!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);padding:16px;text-align:center">No results match filter</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map(function(r) {
+      const isForex = FOREX_PAIRS[r.sym] || COMMODITY_PAIRS[r.sym] || r.sym==='ANTAM' || window._customStocks?.[r.sym];
+      const priceStr = isForex ? (r.price != null ? r.price.toFixed(4) : '—')
+                                : (r.price != null ? fmtP(r.price) : '—');
+      const pctColor = r.pct > 0 ? 'var(--green)' : r.pct < 0 ? 'var(--red)' : 'var(--muted)';
+      const pctStr   = r.pct != null ? (r.pct > 0 ? '+' : '') + r.pct.toFixed(2) + '%' : '—';
+      const scoreW   = r.score != null ? r.score : 0;
+      const scoreColor = scoreW >= 70 ? 'var(--green)' : scoreW <= 30 ? 'var(--red)' : 'var(--warn)';
+      const rsiColor = r.rsi == null ? 'var(--muted)' : r.rsi >= 70 ? 'var(--red)' : r.rsi <= 30 ? 'var(--green)' : 'var(--accent)';
+      const trendColor = r.trend && r.trend.startsWith('↑') ? 'var(--green)' : r.trend && r.trend.startsWith('↓') ? 'var(--red)' : 'var(--muted)';
+
+      const sigBg = r.sig.includes('BUY') ? 'rgba(0,255,136,.15)' : r.sig.includes('SELL') ? 'rgba(255,45,85,.15)' : 'rgba(255,184,0,.1)';
+      const sigBorder = r.sig.includes('BUY') ? 'rgba(0,255,136,.4)' : r.sig.includes('SELL') ? 'rgba(255,45,85,.4)' : 'rgba(255,184,0,.3)';
+
+      const loadClick = 'document.getElementById(\'symbolInput\').value=\''+r.sym+'\';switchTab(\'analysis\');setTimeout(function(){fetchData();},80)';
+
+      return '<tr onclick="'+loadClick+'" title="Click to load '+r.sym+' in Analysis">'+
+        '<td><span class="scan-sym" style="color:var(--accent)">'+r.sym+'</span></td>'+
+        '<td>'+priceStr+'</td>'+
+        '<td style="color:'+pctColor+'">'+pctStr+'</td>'+
+        '<td>'+
+          '<span style="color:'+scoreColor+';font-weight:700">'+( r.score != null ? r.score : '—')+'</span>'+
+          '<span class="scan-bar-wrap"><span class="scan-bar" style="width:'+scoreW+'%;background:'+scoreColor+'"></span></span>'+
+        '</td>'+
+        '<td><span class="scan-badge" style="background:'+sigBg+';color:'+r.color+';border:1px solid '+sigBorder+'">'+r.sig+'</span></td>'+
+        '<td style="color:'+rsiColor+'">'+( r.rsi != null ? r.rsi : '—')+'</td>'+
+        '<td style="color:'+trendColor+'">'+( r.trend || '—')+'</td>'+
+        '<td><button class="mkt-refresh-btn" style="padding:3px 8px;font-size:.52rem" onclick="event.stopPropagation();'+loadClick+'">→</button></td>'+
+      '</tr>';
+    }).join('');
+  }
+
+  function sortScanner(key) {
+    if(_scanSortKey === key) _scanSortDir *= -1; else { _scanSortKey = key; _scanSortDir = -1; }
+    renderScanTable();
+  }
+  function filterScanner(f) {
+    _scanFilter = f;
+    ['all','buy','sell','neut'].forEach(function(k) {
+      const b = document.getElementById('scan-filter-'+k);
+      if(b) b.classList.toggle('active', k === f);
+    });
+    renderScanTable();
+  }
+
+  function renderScanSummary() {
+    const el = document.getElementById('scanSummaryBar');
+    if(!el) return;
+    const buys  = _scanResults.filter(function(r){ return r.sig.includes('BUY'); }).length;
+    const sells = _scanResults.filter(function(r){ return r.sig.includes('SELL'); }).length;
+    const neuts = _scanResults.filter(function(r){ return r.sig.includes('NEUTRAL'); }).length;
+    const total = _scanResults.length;
+    const bullPct = total ? Math.round(buys/total*100) : 0;
+    el.innerHTML =
+      '<span class="sum-pill" style="color:var(--green);border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.08)">🟢 BUY: '+buys+'</span>'+
+      '<span class="sum-pill" style="color:var(--red);border-color:rgba(255,45,85,.4);background:rgba(255,45,85,.08)">🔴 SELL: '+sells+'</span>'+
+      '<span class="sum-pill" style="color:var(--warn);border-color:rgba(255,184,0,.3);background:rgba(255,184,0,.06)">🟡 NEUTRAL: '+neuts+'</span>'+
+      '<span class="sum-pill" style="color:var(--muted);border-color:rgba(255,255,255,.15)">Bullish bias: '+bullPct+'%</span>';
+  }
+
+  // ══ BTC DOMINANCE + ALTCOIN SEASON ══════════════════════════════════
+  async function fetchBtcDominance(bust) {
+    try {
+      const TTL = 10 * 60 * 1000;
+      let global = _mktGet('globalMetrics', TTL);
+      if(!global || bust) {
+        global = await smartFetch('https://api.coingecko.com/api/v3/global');
+        _mktSet('globalMetrics', global);
+      }
+      const dom = global?.data?.market_cap_percentage?.btc;
+      if(!dom) throw new Error('no dom');
+
+      _drawArcGauge('btcDomArc', dom, 100,
+        dom > 60 ? '#ff8c00' : dom > 50 ? '#ffd700' : dom > 40 ? '#9acd32' : '#00ff88');
+      const domEl = document.getElementById('btcDomVal');
+      const lblEl = document.getElementById('btcDomLabel');
+      if(domEl) { domEl.textContent = dom.toFixed(1)+'%'; domEl.style.color = dom > 55 ? '#ff8c00' : '#00ff88'; }
+      if(lblEl) lblEl.textContent = dom > 60 ? 'BTC Season 🔶' : dom > 50 ? 'BTC Leaning' : dom > 40 ? 'Mixed Market' : 'Alt Season 🌊';
+
+      // 30-day sparkline from CoinGecko global history
+      let hist;
+      try {
+        hist = _mktGet('domHistory', 60*60*1000);
+        if(!hist || bust) {
+          hist = await smartFetch('https://api.coingecko.com/api/v3/global/market_cap_chart?days=30');
+          _mktSet('domHistory', hist);
+        }
+      } catch(_) {}
+
+      if(hist?.market_cap_percentage) {
+        const btcHist = hist.market_cap_percentage.btc || [];
+        const spEl = document.getElementById('btcDomSparkline');
+        if(spEl && btcHist.length) {
+          const vals = btcHist.map(function(d){ return d[1]; });
+          const min  = Math.min.apply(null, vals);
+          const max  = Math.max.apply(null, vals);
+          spEl.innerHTML = '<div style="display:flex;align-items:flex-end;gap:1px;height:30px">'+
+            vals.map(function(v) {
+              const h = Math.max(3, Math.round((v-min)/(max-min+0.001)*30));
+              const c = v > 55 ? '#ff8c00' : v > 45 ? '#ffd700' : '#00ff88';
+              return '<div style="flex:1;height:'+h+'px;background:'+c+';border-radius:1px;opacity:.8"></div>';
+            }).join('')+'</div>'+
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);margin-top:2px">30-day dominance trend</div>';
+        }
+      }
+
+      const sigEl = document.getElementById('btcDomSignal');
+      if(sigEl) {
+        const imp = dom > 60 ? ['Bitcoin heavily dominates — alts lagging, BTC season',
+                                  'Alts typically underperform BTC when dominance >60%',
+                                  'Strategy: favour BTC positions over altcoins']
+                 : dom > 50 ? ['BTC holds majority — moderate alt season risk',
+                                  'Alts can still run but BTC leading',
+                                  'Strategy: selective alt exposure with BTC hedge']
+                 : dom > 40 ? ['Mixed market — neither BTC nor alts dominating',
+                                  'Alt season possible if dominance drops further',
+                                  'Strategy: diversified approach']
+                            : ['Alt season territory — altcoins outperforming BTC',
+                                  'High-cap alts (ETH, SOL) leading market gains',
+                                  'Strategy: alt-heavy allocation may outperform'];
+        sigEl.innerHTML = imp.map(function(t, i) {
+          return '<div style="color:'+(i===0?'var(--text)':'var(--muted)')+'">'+t+'</div>';
+        }).join('');
+      }
+
+      // Now compute Alt Season Index using top-50 coins
+      fetchAltSeasonIndex(bust);
+
+    } catch(e) {
+      console.warn('BTC dom failed:', e.message);
+    }
+  }
+
+  async function fetchAltSeasonIndex(bust) {
+    try {
+      const TTL = 15 * 60 * 1000;
+      let coins = _mktGet('cgMarkets', TTL);
+      if(!coins || bust) {
+        coins = await smartFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=90d');
+        _mktSet('cgMarkets', coins);
+      }
+      if(!Array.isArray(coins)) throw new Error('bad data');
+
+      // Altcoin season: % of top 50 altcoins (excl BTC) that outperformed BTC in 90d
+      const btc   = coins.find(function(c){ return c.id === 'bitcoin'; });
+      const btcChg = btc ? (btc.price_change_percentage_90d_in_currency || 0) : 0;
+      const alts   = coins.filter(function(c){ return c.id !== 'bitcoin'; }).slice(0, 50);
+      const outperforming = alts.filter(function(c){
+        const chg = c.price_change_percentage_90d_in_currency || 0;
+        return chg > btcChg;
+      }).length;
+      const idx = Math.round(outperforming / alts.length * 100);
+
+      const color = idx >= 75 ? '#00ff88' : idx >= 55 ? '#9acd32' : idx >= 40 ? '#ffd700' : idx >= 25 ? '#ff8c00' : '#ff2d55';
+      const label = idx >= 75 ? 'Alt Season 🌊' : idx >= 55 ? 'Alt Leaning' : idx >= 40 ? 'Neutral' : idx >= 25 ? 'BTC Leaning' : 'BTC Season 🔶';
+
+      _drawArcGauge('altSeasonArc', idx, 100, color);
+      const valEl = document.getElementById('altSeasonVal');
+      const lblEl = document.getElementById('altSeasonLabel');
+      if(valEl) { valEl.textContent = idx; valEl.style.color = color; }
+      if(lblEl) lblEl.textContent = label;
+
+      // Bar showing breakdown
+      const barEl = document.getElementById('altSeasonBar');
+      if(barEl) {
+        barEl.innerHTML =
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+            '<div style="flex:1;height:10px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden">'+
+              '<div style="width:'+idx+'%;height:100%;background:'+color+';border-radius:5px;transition:width .6s"></div>'+
+            '</div>'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.62rem;color:'+color+'">'+outperforming+'/'+alts.length+'</span>'+
+          '</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.56rem;color:var(--muted)">alts outperforming BTC (90d)</div>';
+      }
+
+      const sigEl = document.getElementById('altSeasonSignal');
+      if(sigEl) {
+        const note = idx >= 75 ? '🌊 Classic alt season — most alts beating BTC'
+                   : idx >= 55 ? '📈 Alts gaining momentum vs BTC'
+                   : idx >= 40 ? '⚖️ Balanced — watch for breakout direction'
+                   : idx >= 25 ? '🔶 BTC leading — alts struggling to keep pace'
+                                : '🔶 BTC season — only BTC making gains';
+        sigEl.innerHTML = '<div>'+note+'</div>'+
+          '<div style="color:var(--muted);margin-top:2px">Based on 90d perf · top 50 by market cap</div>';
+      }
+
+    } catch(e) { console.warn('Alt season failed:', e.message); }
+  }
+
+  // ── Arc gauge canvas helper ───────────────────────────────────────────
+  function _drawArcGauge(canvasId, val, max, color) {
+    const cv = document.getElementById(canvasId);
+    if(!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = 120, H = 68, cx = 60, cy = 62, r = 46;
+    ctx.clearRect(0, 0, W, H);
+    // bg arc
+    ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, 0);
+    ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.stroke();
+    // value arc
+    const angle = Math.PI + (val / max) * Math.PI;
+    ctx.beginPath(); ctx.arc(cx, cy, r, Math.PI, angle);
+    ctx.lineWidth = 8; ctx.strokeStyle = color;
+    ctx.lineCap = 'round'; ctx.stroke();
+    // tick mark labels
+    ctx.fillStyle = 'rgba(255,255,255,.3)'; ctx.font = '9px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('0', cx - r - 4, cy + 2);
+    ctx.fillText('100', cx + r + 8, cy + 2);
+  }
+
+  // ══ CROSS-ASSET CORRELATION MATRIX ══════════════════════════════════
+  // Assets: watchlist cryptos + macro proxies (DXY, Gold, S&P, Oil)
+  async function computeCorrMatrix() {
+    const panel = document.getElementById('corrMatrixPanel');
+    if(!panel) return;
+    panel.innerHTML = _skel(4);
+
+    // Macro assets to fetch
+    const MACRO = [
+      { sym: 'DXY',  yahoo: 'DX-Y.NYB', label: 'DXY',   note: 'US Dollar Index'   },
+      { sym: 'GOLD', yahoo: 'GC=F',      label: 'Gold',  note: 'Gold Futures'      },
+      { sym: 'SPY',  yahoo: 'SPY',       label: 'S&P500',note: 'S&P 500 ETF'       },
+      { sym: 'OIL',  yahoo: 'CL=F',      label: 'Oil',   note: 'WTI Crude Futures' },
+    ];
+
+    // Fetch macro closes via Yahoo Finance
+    await Promise.allSettled(MACRO.map(async function(m) {
+      try {
+        const url = 'https://query1.finance.yahoo.com/v8/finance/chart/'+m.yahoo+'?interval=1d&range=60d';
+        const d   = await smartFetch(url);
+        const closes = _parseYahooChart(d);
+        if(closes && closes.length > 10) _macroPrices[m.sym] = closes.map(function(c){ return c.close; });
+      } catch(_) {}
+    }));
+
+    // Pick assets with enough data: scanner results + macro
+    const scanCryptos = _scanResults.filter(function(r){ return r.closes && r.closes.length >= 30; }).slice(0, 8);
+    const allAssets = [];
+    scanCryptos.forEach(function(r) { allAssets.push({ sym: r.sym, closes: r.closes, isMacro: false }); });
+    MACRO.forEach(function(m) {
+      if(_macroPrices[m.sym] && _macroPrices[m.sym].length >= 30) {
+        allAssets.push({ sym: m.label, closes: _macroPrices[m.sym], isMacro: true });
+      }
+    });
+
+    if(allAssets.length < 2) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;color:var(--muted)">Need at least 2 assets with data to compute correlation</div>';
+      return;
+    }
+
+    // Compute Pearson correlation on daily returns
+    function toReturns(closes) {
+      const r = [];
+      for(let i = 1; i < closes.length; i++) {
+        r.push((closes[i] - closes[i-1]) / (closes[i-1] || 1));
+      }
+      return r;
+    }
+    function pearson(a, b) {
+      const n = Math.min(a.length, b.length, 60);
+      const as = a.slice(-n), bs = b.slice(-n);
+      const ma = as.reduce(function(s,v){ return s+v; }, 0) / n;
+      const mb = bs.reduce(function(s,v){ return s+v; }, 0) / n;
+      let num = 0, da = 0, db = 0;
+      for(let i = 0; i < n; i++) {
+        num += (as[i]-ma)*(bs[i]-mb);
+        da  += (as[i]-ma)**2;
+        db  += (bs[i]-mb)**2;
+      }
+      return da && db ? num / Math.sqrt(da*db) : 0;
+    }
+
+    const returns = allAssets.map(function(a) { return toReturns(a.closes); });
+    const n = allAssets.length;
+    const cols = Math.min(n, 8); // cap at 8 for readability
+    const assets = allAssets.slice(0, cols);
+    const rets   = returns.slice(0, cols);
+
+    // Build grid
+    const cellSize = Math.floor(Math.min(480, panel.offsetWidth || 480) / (cols + 1)) - 3;
+    const fontSize = cellSize < 40 ? '.5rem' : '.56rem';
+
+    let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;font-family:Share Tech Mono,monospace">';
+    // Header row
+    html += '<tr><td style="width:'+cellSize+'px"></td>';
+    assets.forEach(function(a) {
+      html += '<td style="width:'+cellSize+'px;text-align:center;font-size:'+fontSize+';color:'+(a.isMacro?'#ff8c00':'var(--accent)')+';padding:2px;vertical-align:bottom;max-width:'+cellSize+'px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+a.sym+'">'+a.sym+'</td>';
+    });
+    html += '</tr>';
+
+    assets.forEach(function(a, i) {
+      html += '<tr><td style="font-size:'+fontSize+';color:'+(a.isMacro?'#ff8c00':'var(--accent)')+';padding:2px;white-space:nowrap;max-width:'+cellSize+'px;overflow:hidden;text-overflow:ellipsis" title="'+a.sym+'">'+a.sym+'</td>';
+      assets.forEach(function(b, j) {
+        if(i === j) {
+          html += '<td style="width:'+cellSize+'px;height:'+cellSize+'px;background:rgba(0,229,255,.15);border-radius:3px;text-align:center;font-size:'+fontSize+';color:var(--accent);font-weight:700;vertical-align:middle">1.00</td>';
+          return;
+        }
+        const c = pearson(rets[i], rets[j]);
+        const abs = Math.abs(c);
+        const r = c > 0 ? Math.round(c*255)   : 0;
+        const g = c > 0 ? Math.round(abs*100)  : Math.round(abs*80);
+        const bl = c < 0 ? Math.round(abs*200) : 0;
+        const alpha = 0.15 + abs * 0.65;
+        const bg = 'rgba('+r+','+g+','+bl+','+alpha.toFixed(2)+')';
+        const txtColor = abs > 0.5 ? '#fff' : 'var(--text)';
+        html += '<td style="width:'+cellSize+'px;height:'+cellSize+'px;background:'+bg+';border-radius:3px;text-align:center;font-size:'+fontSize+';color:'+txtColor+';font-weight:'+( abs>0.6?'700':'400')+';vertical-align:middle;cursor:default" title="'+a.sym+' vs '+b.sym+': '+(c>=0?'+':'')+c.toFixed(3)+'">'+( c >= 0 ? '+' : '')+c.toFixed(2)+'</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</table></div>';
+    panel.innerHTML = html;
+  }
+
+  // ══ MACRO PULSE ══════════════════════════════════════════════════════
+  // Shows: DXY strength, Gold, S&P trend, 10Y yield, VIX, BTC/Gold ratio
+  async function fetchMacroPulse(bust) {
+    const panel = document.getElementById('macroPulsePanel');
+    if(!panel) return;
+    panel.innerHTML = _skel(5);
+
+    const TTL = 15 * 60 * 1000;
+    const ASSETS = [
+      { id: 'DXY',   yahoo: 'DX-Y.NYB', label: 'US Dollar (DXY)',   flip: true,  note: 'Strong USD = bearish crypto/EM' },
+      { id: 'GOLD',  yahoo: 'GC=F',     label: 'Gold (XAU/USD)',    flip: false, note: 'Risk-off hedge, positive for BTC' },
+      { id: 'SPY',   yahoo: 'SPY',      label: 'S&P 500',           flip: false, note: 'Risk-on = positive for crypto' },
+      { id: 'OIL',   yahoo: 'CL=F',     label: 'WTI Crude Oil',     flip: false, note: 'Inflation proxy, watch Fed reaction' },
+      { id: 'VIX',   yahoo: '^VIX',     label: 'VIX Fear Index',    flip: true,  note: 'High VIX = risk-off, crypto sells' },
+      { id: 'TNX',   yahoo: '^TNX',     label: '10Y Treasury Yield',flip: true,  note: 'Rising yields = pressure on crypto' },
+      { id: 'USDIDR',yahoo: 'IDR=X',    label: 'USD/IDR',           flip: false, note: 'Local FX context for IDR traders' },
+    ];
+
+    const results = await Promise.allSettled(ASSETS.map(async function(a) {
+      const cacheKey = 'macro_'+a.id;
+      let closes = _mktGet(cacheKey, TTL);
+      if(!closes || bust) {
+        const url = 'https://query1.finance.yahoo.com/v8/finance/chart/'+a.yahoo+'?interval=1d&range=30d';
+        const d   = await smartFetch(url);
+        const parsed = _parseYahooChart(d);
+        if(!parsed || !parsed.length) throw new Error('no data');
+        closes = parsed.map(function(c){ return c.close; });
+        _mktSet(cacheKey, closes);
+      }
+      const price   = closes[closes.length - 1];
+      const prev5   = closes[closes.length - 6] || closes[0];
+      const prev20  = closes[closes.length - 21] || closes[0];
+      const chg1w   = (price - prev5)  / prev5  * 100;
+      const chg1m   = (price - prev20) / prev20 * 100;
+      const trend   = _scanTrend(closes);
+      const rsi     = _scanCalcRSI(closes);
+      return Object.assign({}, a, { price, chg1w, chg1m, trend, rsi, closes });
+    }));
+
+    const rows = results.map(function(r) { return r.status === 'fulfilled' ? r.value : null; }).filter(Boolean);
+
+    if(!rows.length) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;color:var(--muted)">Macro data unavailable — check network</div>';
+      return;
+    }
+
+    panel.innerHTML = rows.map(function(r) {
+      const isUp  = r.chg1w > 0;
+      const cryptoImpact = r.flip ? !isUp : isUp; // flip=true means asset rising is bearish for crypto
+      const impColor  = cryptoImpact ? 'var(--green)' : 'var(--red)';
+      const impLabel  = cryptoImpact ? '✅ Crypto positive' : '⚠️ Crypto negative';
+      const chgColor  = isUp ? 'var(--green)' : 'var(--red)';
+      const priceStr  = r.id==='VIX'||r.id==='TNX' ? r.price.toFixed(2)
+                      : r.id==='USDIDR'             ? r.price.toLocaleString('id-ID',{maximumFractionDigits:0})
+                      : r.price >= 1000             ? r.price.toFixed(0)
+                      :                               r.price.toFixed(2);
+      const rsiStr    = r.rsi ? ' · RSI '+r.rsi : '';
+      const trendStr  = r.trend ? ' · '+r.trend : '';
+
+      return '<div class="macro-row">'+
+        '<span class="macro-name" title="'+r.note+'">'+r.label+'</span>'+
+        '<span class="macro-val" style="color:'+chgColor+'">'+priceStr+'</span>'+
+        '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:'+chgColor+';min-width:54px">'+(r.chg1w>0?'+':'')+r.chg1w.toFixed(1)+'% 1w</span>'+
+        '<span class="macro-signal" style="background:'+(cryptoImpact?'rgba(0,255,136,.1)':'rgba(255,45,85,.1)')+';color:'+impColor+';border:1px solid '+(cryptoImpact?'rgba(0,255,136,.3)':'rgba(255,45,85,.3)')+'">'+impLabel+'</span>'+
+        '<span class="macro-impact">'+r.note+trendStr+rsiStr+'</span>'+
+      '</div>';
+    }).join('');
+  }
+
+
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
   <button class="mobile-nav-btn active" id="mnav-home"   onclick="mobNav('home')"    aria-label="Home">
