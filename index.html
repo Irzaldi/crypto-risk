@@ -19,7 +19,7 @@
   :root {
     --bg:#03070d; --panel:#060c14; --border:#0d1f30;
     --accent:#00e5ff; --green:#00ff88; --red:#ff2d55;
-    --warn:#ffb800; --text:#b8ccd8; --muted:#3a5060;
+    --warn:#ffb800; --text:#ccdde8; --muted:#7a9ab8;
   }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-serif; min-height:100vh; background-image:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(0,229,255,0.05) 0%,transparent 60%); }
@@ -705,46 +705,46 @@
   .mkt-metrics { display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-bottom:14px; }
   .mkt-card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:12px 14px; position:relative; overflow:hidden; }
   .mkt-card::before { content:''; position:absolute; top:0; left:0; right:0; height:1.5px; background:linear-gradient(90deg,transparent,var(--accent),transparent); opacity:.2; }
-  .mkt-card-label { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
+  .mkt-card-label { font-family:'Share Tech Mono',monospace; font-size:.62rem; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:5px; }
   .mkt-card-value { font-family:'Orbitron',monospace; font-size:.95rem; font-weight:700; color:var(--accent); }
-  .mkt-card-sub { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--muted); margin-top:3px; }
+  .mkt-card-sub { font-family:'Share Tech Mono',monospace; font-size:.65rem; color:var(--muted); margin-top:3px; }
   @media(max-width:900px){ .mkt-metrics { grid-template-columns:repeat(3,1fr); } }
   @media(max-width:700px){ .mkt-metrics { grid-template-columns:repeat(2,1fr); } }
   /* Trending panel rows */
   .trend-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); cursor:pointer; gap:8px; }
   .trend-row:last-child { border-bottom:none; }
   .trend-row:hover .trend-sym { color:var(--accent); }
-  .trend-rank { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); min-width:16px; }
+  .trend-rank { font-family:'Share Tech Mono',monospace; font-size:.63rem; color:var(--muted); min-width:16px; }
   .trend-sym { font-family:'Orbitron',monospace; font-size:.65rem; font-weight:700; color:var(--text); min-width:48px; }
-  .trend-name { font-family:'Share Tech Mono',monospace; font-size:.58rem; color:var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .trend-score { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--warn); }
+  .trend-name { font-family:'Share Tech Mono',monospace; font-size:.67rem; color:var(--muted); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .trend-score { font-family:'Share Tech Mono',monospace; font-size:.65rem; color:var(--warn); }
   /* News source badge */
-  .news-src { font-family:'Share Tech Mono',monospace; font-size:.5rem; padding:1px 5px; border-radius:3px; margin-left:4px; font-weight:700; letter-spacing:.5px; }
+  .news-src { font-family:'Share Tech Mono',monospace; font-size:.6rem; padding:1px 5px; border-radius:3px; margin-left:4px; font-weight:700; letter-spacing:.5px; }
   /* Liquidation rows */
   .liq-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); font-family:'Share Tech Mono',monospace; font-size:.58rem; }
   .liq-row:last-child { border-bottom:none; }
-  .liq-side { font-weight:700; font-size:.55rem; padding:1px 6px; border-radius:3px; min-width:36px; text-align:center; }
+  .liq-side { font-weight:700; font-size:.63rem; padding:1px 6px; border-radius:3px; min-width:36px; text-align:center; }
   .liq-sym  { font-family:'Orbitron',monospace; font-size:.6rem; font-weight:700; min-width:52px; }
   .liq-amt  { flex:1; color:var(--text); }
-  .liq-time { color:var(--muted); font-size:.52rem; }
+  .liq-time { color:var(--muted); font-size:.62rem; }
   /* Exchange volume rows */
   .exch-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
   .exch-row:last-child { border-bottom:none; }
   .exch-name { font-family:'Orbitron',monospace; font-size:.6rem; font-weight:700; min-width:90px; color:var(--text); }
   .exch-bar-wrap { flex:1; height:10px; background:rgba(255,255,255,.06); border-radius:5px; overflow:hidden; }
   .exch-bar { height:100%; border-radius:5px; background:linear-gradient(90deg,var(--accent),rgba(0,229,255,.5)); transition:width .6s ease; }
-  .exch-vol { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--muted); min-width:70px; text-align:right; }
-  .exch-rank { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); min-width:16px; }
+  .exch-vol { font-family:'Share Tech Mono',monospace; font-size:.65rem; color:var(--muted); min-width:70px; text-align:right; }
+  .exch-rank { font-family:'Share Tech Mono',monospace; font-size:.62rem; color:var(--muted); min-width:16px; }
   /* Whale alert rows */
   .whale-row { display:flex; align-items:flex-start; gap:8px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.04); }
   .whale-row:last-child { border-bottom:none; }
   .whale-icon { font-size:.9rem; min-width:20px; }
   .whale-body { flex:1; min-width:0; }
-  .whale-title { font-family:'Share Tech Mono',monospace; font-size:.6rem; color:var(--text); line-height:1.4; }
-  .whale-meta  { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; }
+  .whale-title { font-family:'Share Tech Mono',monospace; font-size:.68rem; color:var(--text); line-height:1.4; }
+  .whale-meta  { font-family:'Share Tech Mono',monospace; font-size:.62rem; color:var(--muted); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; }
   .whale-amt   { font-family:'Orbitron',monospace; font-size:.6rem; font-weight:700; }
   /* Summary mini-pills */
-  .sum-pill { font-family:'Share Tech Mono',monospace; font-size:.54rem; padding:3px 8px; border-radius:4px; border:1px solid; }
+  .sum-pill { font-family:'Share Tech Mono',monospace; font-size:.64rem; padding:3px 8px; border-radius:4px; border:1px solid; }
   /* On-chain grid responsive */
   @media(max-width:700px){ .oc-grid { grid-template-columns:1fr !important; } }
 
@@ -779,9 +779,9 @@
   /* News feed */
   .news-item { padding:10px 0; border-bottom:1px solid rgba(255,255,255,.04); }
   .news-item:last-child { border-bottom:none; }
-  .news-title { font-size:.78rem; font-weight:600; color:var(--text); line-height:1.4; margin-bottom:4px; cursor:pointer; }
+  .news-title { font-size:.82rem; font-weight:600; color:var(--text); line-height:1.4; margin-bottom:4px; cursor:pointer; }
   .news-title:hover { color:var(--accent); }
-  .news-meta { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); display:flex; gap:10px; }
+  .news-meta { font-family:'Share Tech Mono',monospace; font-size:.64rem; color:var(--muted); display:flex; gap:10px; }
   .news-sentiment { padding:1px 6px; border-radius:10px; font-size:.52rem; }
   .news-scroll { max-height:320px; overflow-y:auto; padding-right:4px; }
   .news-scroll::-webkit-scrollbar { width:3px; }
@@ -3426,7 +3426,7 @@ self.onmessage=function(e){
       mtfPromisesEarly = Promise.all(mtfTFs.map((tf, i) => fetchMTFCandles(sym2, tf).then(parsed => ({ id: mtfIds[i], parsed }))));
     }
 
-    fetchFearGreed();
+    _fetchFearGreedAnalysis();
 
     const pct=((price-open24)/open24*100);
     document.getElementById('pcPrice').textContent=fmtP(price);
@@ -4279,7 +4279,7 @@ self.onmessage=function(e){
     de.textContent=desc;
   }
 
-  async function fetchFearGreed() {
+  async function _fetchFearGreedAnalysis() {
     try {
       const data = await smartFetch('https://api.alternative.me/fng/?limit=7&format=json');
       if(!data||!data.data||!data.data.length) return;
@@ -5625,7 +5625,13 @@ self.onmessage=function(e){
       const TTL = 60 * 60 * 1000; // 1h cache (updates once daily)
       let data = !bust && _mktGet('fearGreed', TTL);
       if(!data) {
-        data = await smartFetch('https://api.alternative.me/fng/?limit=8&format=json');
+        // alternative.me supports direct CORS — skip proxy for speed
+        try {
+          const r = await fetch('https://api.alternative.me/fng/?limit=8&format=json', {signal:AbortSignal.timeout(5000)});
+          if(r.ok) data = await r.json();
+        } catch(_) {
+          data = await smartFetch('https://api.alternative.me/fng/?limit=8&format=json');
+        }
         _mktSet('fearGreed', data);
       }
       if(!data?.data?.length) return;
@@ -5839,8 +5845,15 @@ self.onmessage=function(e){
   function _renderHeatmap(data, tooltip) {
     const canvas=document.getElementById('heatmapCanvas');
     if(!canvas)return;
-    const W=canvas.offsetWidth||(canvas.parentElement&&canvas.parentElement.offsetWidth)||0;
-    if(W<10){requestAnimationFrame(function(){_renderHeatmap(data,tooltip);});return;}
+    const W = canvas.offsetWidth
+          || (canvas.parentElement && canvas.parentElement.offsetWidth)
+          || 800; // fallback width so canvas always renders
+    // Only defer if truly 0 (hidden tab) — but cap at 30 attempts to avoid infinite loop
+    if(W < 10) {
+      if(!_renderHeatmap._tries) _renderHeatmap._tries = 0;
+      if(++_renderHeatmap._tries < 30) { requestAnimationFrame(function(){_renderHeatmap(data,tooltip);}); return; }
+      _renderHeatmap._tries = 0; // reset, render anyway with fallback
+    }
     const DPR=window.devicePixelRatio||1,H=320;
     canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.height=H+'px';
     const ctx=canvas.getContext('2d');ctx.scale(DPR,DPR);
@@ -5951,12 +5964,12 @@ self.onmessage=function(e){
     try {
       let all = !bust && _mktGet('liqData', TTL);
       if(!all) {
+        // forceOrders: no startTime (causes rejection), limit=20 per symbol, parallel
         const urls = SYMS.map(function(s) {
-          return 'https://fapi.binance.com/fapi/v1/forceOrders?symbol='+s+'&limit=50&startTime='+(Date.now()-4*60*60*1000);
+          return 'https://fapi.binance.com/fapi/v1/forceOrders?symbol='+s+'&limit=20';
         });
-        let results;
-        try   { results = await workerBatch(urls); }
-        catch (e) { results = await Promise.all(urls.map(function(u){ return smartFetch(u).catch(function(){return null;}); })); }
+        // Try individual smartFetch in parallel (avoids worker fapi routing issues)
+        let results = await Promise.all(urls.map(function(u){ return smartFetch(u).catch(function(){return null;}); }));
 
         all = {};
         SYMS.forEach(function(sym, i) {
@@ -6131,11 +6144,16 @@ self.onmessage=function(e){
   // CoinGecko /exchanges — free, no key, returns volume_btc per exchange
   async function fetchExchangeVolumes(bust) {
     const panel = document.getElementById('exchPanel');
-    const TTL   = 10 * 60 * 1000;
+    const TTL   = 30 * 60 * 1000; // CoinGecko /exchanges is heavily rate-limited
     try {
       let data = !bust && _mktGet('exchVols', TTL);
       if(!data) {
-        data = await smartFetch('https://api.coingecko.com/api/v3/exchanges?per_page=12&page=1');
+        // Try direct fetch first — CoinGecko CORS open, avoids proxy rate limit
+        try {
+          const r = await fetch('https://api.coingecko.com/api/v3/exchanges?per_page=12&page=1', {signal:AbortSignal.timeout(8000)});
+          if(r.ok) data = await r.json();
+        } catch(_) {}
+        if(!data) data = await smartFetch('https://api.coingecko.com/api/v3/exchanges?per_page=12&page=1');
         _mktSet('exchVols', data);
       }
       if(!Array.isArray(data)) throw new Error('bad data');
@@ -6188,51 +6206,52 @@ self.onmessage=function(e){
       if(!allWhales) {
         allWhales = [];
 
-        // Source 1: whale-alert.io RSS via allorigins (free, no key needed)
+        // Source 1: Blockchain.info recent BTC large transactions (no auth needed)
         try {
-          const rss = 'https://whale-alert.io/feeds/transactions';
-          let xml = null;
-          try { const r = await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(rss), {signal:AbortSignal.timeout(8000)}); xml = (await r.json()).contents; } catch(_){}
-          if(xml) {
-            const doc = new DOMParser().parseFromString(xml, 'text/xml');
-            Array.from(doc.querySelectorAll('item')).slice(0,30).forEach(function(item) {
-              const title = item.querySelector('title') ? item.querySelector('title').textContent : '';
-              const link  = item.querySelector('link')  ? item.querySelector('link').textContent  : '';
-              const pub   = item.querySelector('pubDate') ? item.querySelector('pubDate').textContent : '';
-              const ts    = pub ? new Date(pub).getTime() : Date.now();
-              // Parse title: "123,456,789 USD (1,000 BTC) transferred from unknown to Binance"
-              const amtMatch = title.match(/\$([\d,]+)/);
-              const symMatch = title.match(/\([\d,.]+ ([A-Z]+)\)/);
-              const dirMatch = title.match(/from (.+?) to (.+)$/i);
-              const usd = amtMatch ? parseInt(amtMatch[1].replace(/,/g,'')) : 0;
-              if(usd < 500000) return; // skip < $500K
+          const r = await fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://blockchain.info/unconfirmed-transactions?format=json&limit=50'), {signal:AbortSignal.timeout(7000)});
+          const j = await r.json();
+          const txs = JSON.parse(j.contents);
+          if(txs && txs.txs) {
+            txs.txs.forEach(function(tx) {
+              const outUsd = tx.out ? tx.out.reduce(function(s,o){return s+(o.value||0);},0)/1e8 : 0;
+              // outUsd is in BTC — need price estimate (use 80000 as rough constant)
+              const btcVal = outUsd;
+              const estUsd = btcVal * 80000;
+              if(btcVal < 10) return; // skip < 10 BTC
+              const inputs  = tx.inputs  ? tx.inputs[0]  : null;
+              const outputs = tx.out     ? tx.out[0]     : null;
+              const fromAddr = inputs  && inputs.prev_out  ? inputs.prev_out.addr  || '?' : '?';
+              const toAddr   = outputs ? outputs.addr || '?' : '?';
               allWhales.push({
                 type: 'onchain',
-                title: title,
-                link:  link,
-                usd:   usd,
-                sym:   symMatch ? symMatch[1] : 'UNKNOWN',
-                from:  dirMatch ? dirMatch[1].trim() : '?',
-                to:    dirMatch ? dirMatch[2].trim() : '?',
-                ts:    ts,
-                src:   'whale-alert.io',
+                title: btcVal.toFixed(2)+' BTC transferred on-chain',
+                link:  'https://www.blockchain.com/btc/tx/'+tx.hash,
+                usd:   estUsd,
+                sym:   'BTC',
+                from:  fromAddr.slice(0,10)+'…',
+                to:    toAddr.slice(0,10)+'…',
+                ts:    (tx.time||0)*1000 || Date.now(),
+                src:   'blockchain.info',
               });
             });
           }
-        } catch(_){}
+        } catch(_) {}
 
-        // Source 2: Binance large recent trades for BTC+ETH as on-exchange whale proxy
+        // Source 2: Binance large recent trades BTC + ETH (parallel, small limit)
         try {
-          const btcTrades = await smartFetch('https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=1000');
-          if(Array.isArray(btcTrades)) {
-            const bigTrades = btcTrades.filter(function(t){ return parseFloat(t.qty) >= 5; }); // >= 5 BTC
-            bigTrades.slice(0, 15).forEach(function(t) {
+          const [btcTrades, ethTrades] = await Promise.all([
+            smartFetch('https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=200').catch(function(){return [];}),
+            smartFetch('https://api.binance.com/api/v3/trades?symbol=ETHUSDT&limit=200').catch(function(){return [];}),
+          ]);
+          [[btcTrades,'BTC',10],[ethTrades,'ETH',100]].forEach(function(entry) {
+            const trades=entry[0], sym=entry[1], minQty=entry[2];
+            if(!Array.isArray(trades)) return;
+            trades.filter(function(t){ return parseFloat(t.qty) >= minQty; }).slice(0,10).forEach(function(t) {
               const usd = parseFloat(t.price) * parseFloat(t.qty);
               allWhales.push({
                 type:  'exchange',
-                title: (t.isBuyerMaker ? 'Large SELL' : 'Large BUY') + ' on Binance BTCUSDT',
-                usd:   usd,
-                sym:   'BTC',
+                title: (t.isBuyerMaker ? 'Large SELL' : 'Large BUY')+' · '+parseFloat(t.qty).toFixed(2)+' '+sym+' on Binance',
+                usd:   usd, sym: sym,
                 from:  t.isBuyerMaker ? 'Seller' : 'Buyer',
                 to:    'Binance Spot',
                 ts:    t.time,
@@ -6242,7 +6261,7 @@ self.onmessage=function(e){
                 src:   'Binance',
               });
             });
-          }
+          });
         } catch(_){}
 
         // Sort by time desc, dedupe
