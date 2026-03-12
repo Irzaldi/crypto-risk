@@ -720,6 +720,33 @@
   .trend-score { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--warn); }
   /* News source badge */
   .news-src { font-family:'Share Tech Mono',monospace; font-size:.5rem; padding:1px 5px; border-radius:3px; margin-left:4px; font-weight:700; letter-spacing:.5px; }
+  /* Liquidation rows */
+  .liq-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); font-family:'Share Tech Mono',monospace; font-size:.58rem; }
+  .liq-row:last-child { border-bottom:none; }
+  .liq-side { font-weight:700; font-size:.55rem; padding:1px 6px; border-radius:3px; min-width:36px; text-align:center; }
+  .liq-sym  { font-family:'Orbitron',monospace; font-size:.6rem; font-weight:700; min-width:52px; }
+  .liq-amt  { flex:1; color:var(--text); }
+  .liq-time { color:var(--muted); font-size:.52rem; }
+  /* Exchange volume rows */
+  .exch-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .exch-row:last-child { border-bottom:none; }
+  .exch-name { font-family:'Orbitron',monospace; font-size:.6rem; font-weight:700; min-width:90px; color:var(--text); }
+  .exch-bar-wrap { flex:1; height:10px; background:rgba(255,255,255,.06); border-radius:5px; overflow:hidden; }
+  .exch-bar { height:100%; border-radius:5px; background:linear-gradient(90deg,var(--accent),rgba(0,229,255,.5)); transition:width .6s ease; }
+  .exch-vol { font-family:'Share Tech Mono',monospace; font-size:.56rem; color:var(--muted); min-width:70px; text-align:right; }
+  .exch-rank { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); min-width:16px; }
+  /* Whale alert rows */
+  .whale-row { display:flex; align-items:flex-start; gap:8px; padding:7px 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .whale-row:last-child { border-bottom:none; }
+  .whale-icon { font-size:.9rem; min-width:20px; }
+  .whale-body { flex:1; min-width:0; }
+  .whale-title { font-family:'Share Tech Mono',monospace; font-size:.6rem; color:var(--text); line-height:1.4; }
+  .whale-meta  { font-family:'Share Tech Mono',monospace; font-size:.52rem; color:var(--muted); margin-top:2px; display:flex; gap:8px; flex-wrap:wrap; }
+  .whale-amt   { font-family:'Orbitron',monospace; font-size:.6rem; font-weight:700; }
+  /* Summary mini-pills */
+  .sum-pill { font-family:'Share Tech Mono',monospace; font-size:.54rem; padding:3px 8px; border-radius:4px; border:1px solid; }
+  /* On-chain grid responsive */
+  @media(max-width:700px){ .oc-grid { grid-template-columns:1fr !important; } }
 
   /* Dashboard grid */
   .mkt-grid-top { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
@@ -816,6 +843,7 @@
   <div class="page-tabs">
     <button class="page-tab active" onclick="switchTab('analysis')" id="tab-analysis">🔬 Analysis</button>
     <button class="page-tab" onclick="switchTab('market')" id="tab-market">🌐 Market Dashboard</button>
+    <button class="page-tab" onclick="switchTab('onchain')" id="tab-onchain">🔎 On-Chain &amp; Macro</button>
   </div>
 
   <!-- ══ PAGE: Analysis ══ -->
@@ -1588,6 +1616,85 @@
 
   </div><!-- end .wrap -->
   </div><!-- end #page-market -->
+
+  <!-- ══ PAGE: On-Chain & Macro ══ -->
+  <div class="page-content" id="page-onchain">
+  <div class="wrap">
+
+    <!-- Refresh bar -->
+    <div class="mkt-refresh-bar" style="margin-bottom:14px">
+      <button class="mkt-refresh-btn" id="onchainRefreshBtn" onclick="fetchOnChainDashboard(true)">⟳ REFRESH</button>
+      <span class="mkt-status" id="onchainStatus">Click refresh to load live data</span>
+      <span class="mkt-last-update" id="onchainLastUpdate"></span>
+    </div>
+
+    <!-- Row 1: Liquidations | Economic Calendar -->
+    <div class="oc-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+      <!-- Liquidations -->
+      <div class="panel">
+        <div class="ptitle">📉 Recent Liquidations
+          <span style="font-size:.5rem;color:var(--muted);margin-left:6px">Binance Futures forced orders</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <button class="ind-tab active" id="liq-btn-all"   onclick="filterLiqs('all')">All</button>
+          <button class="ind-tab"        id="liq-btn-BTCUSDT" onclick="filterLiqs('BTCUSDT')">BTC</button>
+          <button class="ind-tab"        id="liq-btn-ETHUSDT" onclick="filterLiqs('ETHUSDT')">ETH</button>
+          <button class="ind-tab"        id="liq-btn-SOLUSDT" onclick="filterLiqs('SOLUSDT')">SOL</button>
+        </div>
+        <!-- Summary bar -->
+        <div id="liqSummary" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap"></div>
+        <div id="liqPanel" class="news-scroll" style="max-height:340px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Economic Calendar -->
+      <div class="panel">
+        <div class="ptitle">📅 Economic Calendar
+          <span style="font-size:.5rem;color:var(--muted);margin-left:6px">macro events affecting crypto</span>
+        </div>
+        <div id="calPanel" class="news-scroll" style="max-height:400px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Row 2: Exchange Volume | Whale Alerts -->
+    <div class="oc-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+
+      <!-- Exchange Volume Split -->
+      <div class="panel">
+        <div class="ptitle">🏦 Exchange Volume
+          <span style="font-size:.5rem;color:var(--muted);margin-left:6px">24h BTC-equivalent · top 10 exchanges</span>
+        </div>
+        <div id="exchPanel">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Whale Alerts -->
+      <div class="panel">
+        <div class="ptitle">🐳 Whale Alerts
+          <span style="font-size:.5rem;color:var(--muted);margin-left:6px">large on-chain movements</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+          <button class="ind-tab active" id="whale-btn-all"  onclick="filterWhales('all')">All Chains</button>
+          <button class="ind-tab"        id="whale-btn-BTC"  onclick="filterWhales('BTC')">BTC</button>
+          <button class="ind-tab"        id="whale-btn-ETH"  onclick="filterWhales('ETH')">ETH</button>
+        </div>
+        <!-- Whale stats summary -->
+        <div id="whaleSummary" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap"></div>
+        <div id="whalePanel" class="news-scroll" style="max-height:340px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- end .wrap -->
+  </div><!-- end #page-onchain -->
 
   <!-- ══════════════════════════════════════════════════════
        🔮 PRICE PREDICTION PANEL
@@ -5335,7 +5442,8 @@ self.onmessage=function(e){
     document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
     document.getElementById('page-' + name).classList.add('active');
-    if(name === 'market' && !window._mktLoaded) fetchMarketDashboard();
+    if(name === 'market'  && !window._mktLoaded)    fetchMarketDashboard();
+    if(name === 'onchain' && !window._onchainLoaded) fetchOnChainDashboard();
   }
 
   // ══════════════════════════════════════════════════════════
@@ -5801,7 +5909,402 @@ self.onmessage=function(e){
     if(gEl)gEl.innerHTML=gainers.map(function(c){return vpRow(c,maxG,'var(--green)');}).join('');
     if(lEl)lEl.innerHTML=losers.map(function(c){return vpRow(c,maxL,'var(--red)');}).join('');
   }
-</script><!-- ══ MOBILE BOTTOM NAV ══ -->
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ON-CHAIN & MACRO TAB
+  //  4 panels: Liquidations · Economic Calendar · Exchange Volume · Whale Alerts
+  // ══════════════════════════════════════════════════════════════════════════
+  window._onchainLoaded = false;
+  let _liqAllData  = {};   // keyed by symbol
+  let _whaleAllData = [];  // all whale rows
+
+  async function fetchOnChainDashboard(bust) {
+    const btn    = document.getElementById('onchainRefreshBtn');
+    const status = document.getElementById('onchainStatus');
+    if(btn)    { btn.disabled = true; btn.textContent = '⟳ LOADING...'; }
+    if(status) status.textContent = 'Fetching on-chain data...';
+
+    ['liqPanel','exchPanel','whalePanel'].forEach(function(id) {
+      const el = document.getElementById(id); if(el) el.innerHTML = _skel(6);
+    });
+
+    await Promise.allSettled([
+      fetchLiquidations(bust),
+      fetchEconomicCalendar(bust),
+      fetchExchangeVolumes(bust),
+      fetchWhaleAlerts(bust),
+    ]);
+
+    window._onchainLoaded = true;
+    const upd = document.getElementById('onchainLastUpdate');
+    if(upd) upd.textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    if(status) status.textContent = '✓ On-chain data loaded';
+    if(btn) { btn.disabled = false; btn.textContent = '⟳ REFRESH'; }
+  }
+
+  // ─── LIQUIDATIONS ────────────────────────────────────────────────────────
+  // Uses Binance Futures /fapi/v1/forceOrders — no API key required
+  async function fetchLiquidations(bust) {
+    const panel = document.getElementById('liqPanel');
+    const TTL   = 2 * 60 * 1000; // 2min (data changes fast)
+    const SYMS  = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT'];
+    try {
+      let all = !bust && _mktGet('liqData', TTL);
+      if(!all) {
+        const urls = SYMS.map(function(s) {
+          return 'https://fapi.binance.com/fapi/v1/forceOrders?symbol='+s+'&limit=50&startTime='+(Date.now()-4*60*60*1000);
+        });
+        let results;
+        try   { results = await workerBatch(urls); }
+        catch (e) { results = await Promise.all(urls.map(function(u){ return smartFetch(u).catch(function(){return null;}); })); }
+
+        all = {};
+        SYMS.forEach(function(sym, i) {
+          const rows = results[i];
+          if(!Array.isArray(rows)) return;
+          all[sym] = rows.map(function(r) {
+            return {
+              sym:   sym,
+              side:  r.side,          // BUY = short liquidated, SELL = long liquidated
+              price: parseFloat(r.averagePrice||r.price||0),
+              qty:   parseFloat(r.origQty||0),
+              usd:   parseFloat(r.averagePrice||r.price||0) * parseFloat(r.origQty||0),
+              time:  parseInt(r.time||r.updateTime||0),
+            };
+          }).filter(function(r){ return r.usd > 0; });
+        });
+        _mktSet('liqData', all);
+        _liqAllData = all;
+      } else {
+        _liqAllData = all;
+      }
+
+      filterLiqs('all');
+      _renderLiqSummary();
+    } catch(e) {
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Liquidations unavailable — needs Binance Futures access</div>';
+    }
+  }
+
+  function _renderLiqSummary() {
+    const el = document.getElementById('liqSummary');
+    if(!el) return;
+    let totalLong = 0, totalShort = 0, totalUsd = 0;
+    Object.values(_liqAllData).forEach(function(rows) {
+      rows.forEach(function(r) {
+        totalUsd += r.usd;
+        if(r.side === 'SELL') totalLong  += r.usd; // SELL = long liqd
+        else                  totalShort += r.usd; // BUY  = short liqd
+      });
+    });
+    const fmt = function(n){ return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n.toFixed(0); };
+    el.innerHTML =
+      '<span class="sum-pill" style="color:var(--red);border-color:rgba(255,45,85,.4);background:rgba(255,45,85,.08)">🔴 Longs liqd: $'+fmt(totalLong)+'</span>'+
+      '<span class="sum-pill" style="color:var(--green);border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.08)">🟢 Shorts liqd: $'+fmt(totalShort)+'</span>'+
+      '<span class="sum-pill" style="color:var(--muted);border-color:rgba(255,255,255,.15)">Total: $'+fmt(totalUsd)+' (4h)</span>';
+  }
+
+  function filterLiqs(sym) {
+    ['all','BTCUSDT','ETHUSDT','SOLUSDT'].forEach(function(s) {
+      const btn = document.getElementById('liq-btn-'+s);
+      if(btn) btn.classList.toggle('active', s === sym);
+    });
+    const panel = document.getElementById('liqPanel');
+    let rows = [];
+    if(sym === 'all') {
+      Object.values(_liqAllData).forEach(function(arr){ rows = rows.concat(arr); });
+    } else {
+      rows = _liqAllData[sym] || [];
+    }
+    rows.sort(function(a,b){ return b.time - a.time; });
+    rows = rows.slice(0, 60);
+    if(!rows.length) { panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No liquidations in last 4h</div>'; return; }
+
+    const now = Date.now();
+    panel.innerHTML = rows.map(function(r) {
+      const isLong  = r.side === 'SELL'; // SELL side = long position was liquidated
+      const color   = isLong ? 'var(--red)' : 'var(--green)';
+      const label   = isLong ? 'LONG LIQ' : 'SHORT LIQ';
+      const bgColor = isLong ? 'rgba(255,45,85,.12)' : 'rgba(0,255,136,.12)';
+      const ageMin  = Math.round((now - r.time) / 60000);
+      const ageStr  = ageMin < 2 ? 'just now' : ageMin < 60 ? ageMin+'m ago' : Math.round(ageMin/60)+'h ago';
+      const usdStr  = r.usd >= 1e6 ? '$'+(r.usd/1e6).toFixed(2)+'M' : r.usd >= 1e3 ? '$'+(r.usd/1e3).toFixed(1)+'K' : '$'+r.usd.toFixed(0);
+      const large   = r.usd >= 500000;
+      return '<div class="liq-row" style="'+(large?'background:'+bgColor+';border-radius:4px;padding-left:6px;':'')+'">'+(large?'<span style="font-size:.7rem">⚡</span>':'')+
+        '<span class="liq-side" style="background:'+bgColor+';color:'+color+';border:1px solid '+color+'44">'+label+'</span>'+
+        '<span class="liq-sym">'+r.sym.replace('USDT','')+'</span>'+
+        '<span class="liq-amt" style="color:'+color+';font-weight:'+(large?'700':'400')+'">'+usdStr+'</span>'+
+        '<span class="liq-time">@ $'+r.price.toLocaleString(undefined,{maximumFractionDigits:2})+' · '+ageStr+'</span>'+
+      '</div>';
+    }).join('');
+  }
+
+  // ─── ECONOMIC CALENDAR ────────────────────────────────────────────────────
+  // Hardcoded recurring macro events + live BTC halving / futures expiry dates
+  async function fetchEconomicCalendar(bust) {
+    const panel = document.getElementById('calPanel');
+    const TTL   = 60 * 60 * 1000; // 1h cache
+    try {
+      const cached = !bust && _mktGet('econCal', TTL);
+      if(cached) { panel.innerHTML = cached; return; }
+
+      const now = new Date();
+      const year = now.getFullYear();
+
+      // Impact levels: H=high, M=medium
+      // Build upcoming events for the next ~90 days
+      const events = [
+        // FOMC Meetings 2025/2026
+        { date:'2025-12-18', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
+        { date:'2026-01-29', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
+        { date:'2026-03-19', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
+        { date:'2026-05-07', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
+        { date:'2026-06-18', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
+        // US CPI (approx 2nd week each month)
+        { date:'2026-01-15', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
+        { date:'2026-02-12', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
+        { date:'2026-03-12', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
+        { date:'2026-04-14', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
+        { date:'2026-05-13', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
+        // US Jobs (NFP — first Friday each month)
+        { date:'2026-01-09', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
+        { date:'2026-02-06', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
+        { date:'2026-03-06', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
+        { date:'2026-04-03', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
+        // GDP
+        { date:'2026-01-30', label:'US GDP Advance Estimate',   impact:'M', cat:'MACRO', note:'Q4 2025 GDP — signals economic health' },
+        { date:'2026-04-29', label:'US GDP Advance Estimate',   impact:'M', cat:'MACRO', note:'Q1 2026 GDP — signals economic health' },
+        // Crypto-specific
+        { date:'2028-04-17', label:'BTC Halving (est.)',        impact:'H', cat:'CRYPTO', note:'Next Bitcoin block reward halving ~2028' },
+        // CME Futures Expiry (last Friday of each month)
+        { date:'2026-01-30', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
+        { date:'2026-02-27', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
+        { date:'2026-03-27', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
+        { date:'2026-04-24', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
+        { date:'2026-06-26', label:'CME BTC Quarterly Expiry',  impact:'H', cat:'CRYPTO', note:'Quarterly expiry — high significance' },
+        { date:'2026-09-25', label:'CME BTC Quarterly Expiry',  impact:'H', cat:'CRYPTO', note:'Quarterly expiry — high significance' },
+        { date:'2026-12-25', label:'CME BTC Quarterly Expiry',  impact:'H', cat:'CRYPTO', note:'Quarterly expiry — high significance' },
+      ];
+
+      // Filter to next 90 days, sort by date
+      const cutoff = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+      const upcoming = events
+        .map(function(e) { return Object.assign({}, e, { d: new Date(e.date) }); })
+        .filter(function(e) { return e.d >= now && e.d <= cutoff; })
+        .sort(function(a,b) { return a.d - b.d; });
+
+      const catColor = { FED:'#ff8c00', MACRO:'var(--accent)', CRYPTO:'var(--green)' };
+      const impColor = { H:'var(--red)', M:'var(--warn)' };
+
+      const rendered = upcoming.map(function(e) {
+        const daysLeft = Math.ceil((e.d - now) / (24*60*60*1000));
+        const isToday  = daysLeft <= 1;
+        const isSoon   = daysLeft <= 7;
+        const cc = catColor[e.cat] || 'var(--muted)';
+        const ic = impColor[e.impact] || 'var(--muted)';
+        const dateStr = e.d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+        const daysStr = isToday ? '⚡ TODAY' : isSoon ? daysLeft+'d' : daysLeft+'d';
+        return '<div class="liq-row" style="'+(isToday?'background:rgba(255,45,85,.08);border-radius:4px;padding:4px 6px;':isSoon?'background:rgba(255,140,0,.05);border-radius:4px;padding:2px 6px;':'')+'align-items:flex-start">'+
+          '<div style="flex:1;min-width:0">'+
+            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
+              '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:'+cc+'">['+e.cat+']</span>'+
+              '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text)">'+e.label+'</span>'+
+              '<span style="font-family:Share Tech Mono,monospace;font-size:.5rem;padding:1px 5px;border-radius:3px;background:'+ic+'22;color:'+ic+';border:1px solid '+ic+'44;margin-left:auto">'+e.impact+' IMPACT</span>'+
+            '</div>'+
+            '<div style="display:flex;gap:10px">'+
+              '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted)">'+dateStr+'</span>'+
+              '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:'+(isSoon?ic:'var(--muted)')+'">'+daysStr+' away</span>'+
+              '<span style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);flex:1">'+e.note+'</span>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+
+      panel.innerHTML = rendered || '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No events in next 90 days</div>';
+      _mktSet('econCal', rendered);
+    } catch(e) {
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Calendar unavailable</div>';
+    }
+  }
+
+  // ─── EXCHANGE VOLUME SPLIT ────────────────────────────────────────────────
+  // CoinGecko /exchanges — free, no key, returns volume_btc per exchange
+  async function fetchExchangeVolumes(bust) {
+    const panel = document.getElementById('exchPanel');
+    const TTL   = 10 * 60 * 1000;
+    try {
+      let data = !bust && _mktGet('exchVols', TTL);
+      if(!data) {
+        data = await smartFetch('https://api.coingecko.com/api/v3/exchanges?per_page=12&page=1');
+        _mktSet('exchVols', data);
+      }
+      if(!Array.isArray(data)) throw new Error('bad data');
+
+      const valid = data.filter(function(e){ return e.trade_volume_24h_btc > 0; });
+      const maxVol = Math.max.apply(null, valid.map(function(e){ return e.trade_volume_24h_btc; }));
+      const totalVol = valid.reduce(function(s,e){ return s + e.trade_volume_24h_btc; }, 0);
+
+      // Trust score color
+      function trustColor(score) {
+        if(score >= 9) return 'var(--green)';
+        if(score >= 7) return 'var(--warn)';
+        return 'var(--red)';
+      }
+
+      panel.innerHTML = valid.slice(0,10).map(function(e, i) {
+        const pct = (e.trade_volume_24h_btc / totalVol * 100).toFixed(1);
+        const barW = (e.trade_volume_24h_btc / maxVol * 100).toFixed(1);
+        const vol  = e.trade_volume_24h_btc >= 1e6
+          ? (e.trade_volume_24h_btc/1e6).toFixed(1)+'M BTC'
+          : (e.trade_volume_24h_btc/1e3).toFixed(1)+'K BTC';
+        const name = e.name || e.id;
+        const trust = e.trust_score || 0;
+        return '<div class="exch-row">'+
+          '<span class="exch-rank" style="color:var(--muted)">'+(i+1)+'</span>'+
+          '<span class="exch-name">'+name+'</span>'+
+          '<div class="exch-bar-wrap"><div class="exch-bar" style="width:'+barW+'%"></div></div>'+
+          '<span class="exch-vol">'+vol+' <span style="color:var(--muted)">('+pct+'%)</span></span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:'+trustColor(trust)+';min-width:28px;text-align:right" title="Trust score: '+trust+'/10">★'+trust+'</span>'+
+        '</div>';
+      }).join('');
+
+      // Add total
+      panel.innerHTML += '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);padding-top:8px;border-top:1px solid rgba(255,255,255,.06);margin-top:4px">'+
+        'Total (top 10): '+totalVol.toFixed(0)+' BTC · source: CoinGecko'+
+      '</div>';
+    } catch(e) {
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Exchange volumes unavailable</div>';
+    }
+  }
+
+  // ─── WHALE ALERTS ─────────────────────────────────────────────────────────
+  // Uses Binance large trades for BTC/ETH as a proxy + blockchain.info RSS
+  // Also polls whale-alert.io RSS feed via allorigins for on-chain movements
+  async function fetchWhaleAlerts(bust) {
+    const panel = document.getElementById('whalePanel');
+    const TTL   = 3 * 60 * 1000;
+    try {
+      let allWhales = !bust && _mktGet('whaleData', TTL);
+      if(!allWhales) {
+        allWhales = [];
+
+        // Source 1: whale-alert.io RSS via allorigins (free, no key needed)
+        try {
+          const rss = 'https://whale-alert.io/feeds/transactions';
+          let xml = null;
+          try { const r = await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(rss), {signal:AbortSignal.timeout(8000)}); xml = (await r.json()).contents; } catch(_){}
+          if(xml) {
+            const doc = new DOMParser().parseFromString(xml, 'text/xml');
+            Array.from(doc.querySelectorAll('item')).slice(0,30).forEach(function(item) {
+              const title = item.querySelector('title') ? item.querySelector('title').textContent : '';
+              const link  = item.querySelector('link')  ? item.querySelector('link').textContent  : '';
+              const pub   = item.querySelector('pubDate') ? item.querySelector('pubDate').textContent : '';
+              const ts    = pub ? new Date(pub).getTime() : Date.now();
+              // Parse title: "123,456,789 USD (1,000 BTC) transferred from unknown to Binance"
+              const amtMatch = title.match(/\$([\d,]+)/);
+              const symMatch = title.match(/\([\d,.]+ ([A-Z]+)\)/);
+              const dirMatch = title.match(/from (.+?) to (.+)$/i);
+              const usd = amtMatch ? parseInt(amtMatch[1].replace(/,/g,'')) : 0;
+              if(usd < 500000) return; // skip < $500K
+              allWhales.push({
+                type: 'onchain',
+                title: title,
+                link:  link,
+                usd:   usd,
+                sym:   symMatch ? symMatch[1] : 'UNKNOWN',
+                from:  dirMatch ? dirMatch[1].trim() : '?',
+                to:    dirMatch ? dirMatch[2].trim() : '?',
+                ts:    ts,
+                src:   'whale-alert.io',
+              });
+            });
+          }
+        } catch(_){}
+
+        // Source 2: Binance large recent trades for BTC+ETH as on-exchange whale proxy
+        try {
+          const btcTrades = await smartFetch('https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=1000');
+          if(Array.isArray(btcTrades)) {
+            const bigTrades = btcTrades.filter(function(t){ return parseFloat(t.qty) >= 5; }); // >= 5 BTC
+            bigTrades.slice(0, 15).forEach(function(t) {
+              const usd = parseFloat(t.price) * parseFloat(t.qty);
+              allWhales.push({
+                type:  'exchange',
+                title: (t.isBuyerMaker ? 'Large SELL' : 'Large BUY') + ' on Binance BTCUSDT',
+                usd:   usd,
+                sym:   'BTC',
+                from:  t.isBuyerMaker ? 'Seller' : 'Buyer',
+                to:    'Binance Spot',
+                ts:    t.time,
+                side:  t.isBuyerMaker ? 'sell' : 'buy',
+                qty:   parseFloat(t.qty),
+                price: parseFloat(t.price),
+                src:   'Binance',
+              });
+            });
+          }
+        } catch(_){}
+
+        // Sort by time desc, dedupe
+        allWhales.sort(function(a,b){ return b.ts - a.ts; });
+        _mktSet('whaleData', allWhales);
+        _whaleAllData = allWhales;
+      } else {
+        _whaleAllData = allWhales;
+      }
+
+      _renderWhaleSummary();
+      filterWhales('all');
+    } catch(e) {
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Whale data unavailable</div>';
+    }
+  }
+
+  function _renderWhaleSummary() {
+    const el = document.getElementById('whaleSummary');
+    if(!el) return;
+    const total = _whaleAllData.reduce(function(s,w){ return s + w.usd; }, 0);
+    const buys  = _whaleAllData.filter(function(w){ return w.side === 'buy'; }).reduce(function(s,w){ return s + w.usd; }, 0);
+    const sells = _whaleAllData.filter(function(w){ return w.side === 'sell'; }).reduce(function(s,w){ return s + w.usd; }, 0);
+    const fmt = function(n){ return n>=1e9?'$'+(n/1e9).toFixed(1)+'B':n>=1e6?'$'+(n/1e6).toFixed(1)+'M':'$'+(n/1e3).toFixed(0)+'K'; };
+    el.innerHTML =
+      (buys  > 0 ? '<span class="sum-pill" style="color:var(--green);border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.08)">🟢 Buy: '+fmt(buys)+'</span>' : '')+
+      (sells > 0 ? '<span class="sum-pill" style="color:var(--red);border-color:rgba(255,45,85,.4);background:rgba(255,45,85,.08)">🔴 Sell: '+fmt(sells)+'</span>' : '')+
+      '<span class="sum-pill" style="color:var(--muted);border-color:rgba(255,255,255,.15)">'+_whaleAllData.length+' alerts</span>';
+  }
+
+  function filterWhales(chain) {
+    ['all','BTC','ETH'].forEach(function(c) {
+      const btn = document.getElementById('whale-btn-'+c);
+      if(btn) btn.classList.toggle('active', c === chain);
+    });
+    const panel = document.getElementById('whalePanel');
+    let rows = chain === 'all' ? _whaleAllData : _whaleAllData.filter(function(w){ return w.sym === chain; });
+    rows = rows.slice(0, 50);
+    if(!rows.length) { panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No whale activity detected</div>'; return; }
+    const now = Date.now();
+    panel.innerHTML = rows.map(function(w) {
+      const ageMin = Math.round((now - w.ts) / 60000);
+      const ageStr = ageMin < 2 ? 'just now' : ageMin < 60 ? ageMin+'m ago' : Math.round(ageMin/60)+'h ago';
+      const usdStr = w.usd >= 1e9 ? '$'+(w.usd/1e9).toFixed(2)+'B' : w.usd >= 1e6 ? '$'+(w.usd/1e6).toFixed(2)+'M' : '$'+(w.usd/1e3).toFixed(0)+'K';
+      const isBuy  = w.side === 'buy' || (w.from && /unknown|wallet/i.test(w.from) && w.to && /exchange|binance|coinbase/i.test(w.to));
+      const icon   = w.type === 'exchange' ? (isBuy ? '🟢' : '🔴') : '🐳';
+      const amtColor = w.usd >= 5e6 ? 'var(--warn)' : w.usd >= 1e6 ? 'var(--text)' : 'var(--muted)';
+      const clickLink = w.link ? ' style="cursor:pointer" onclick="window.open(\''+w.link+'\')"' : '';
+      return '<div class="whale-row"'+clickLink+'>'+
+        '<span class="whale-icon">'+icon+'</span>'+
+        '<div class="whale-body">'+
+          '<div class="whale-title">'+w.title+'</div>'+
+          '<div class="whale-meta">'+
+            '<span class="whale-amt" style="color:'+amtColor+'">'+usdStr+'</span>'+
+            '<span>'+ageStr+'</span>'+
+            '<span style="color:var(--accent)">'+w.sym+'</span>'+
+            '<span style="color:var(--muted)">via '+w.src+'</span>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
 <nav class="mobile-nav" id="mobileNav" style="display:none">
   <button class="mobile-nav-btn active" id="mnav-home"   onclick="mobNav('home')"    aria-label="Home">
     <span class="nav-icon">🏠</span><span>HOME</span>
