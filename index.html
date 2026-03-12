@@ -6684,7 +6684,7 @@ self.onmessage=function(e){
     } else {
       const [ticker, klines] = await Promise.all([
         smartFetch('https://api.binance.com/api/v3/ticker/24hr?symbol='+sym+'USDT'),
-        smartFetch('https://api.binance.com/api/v3/klines?symbol='+sym+'USDT&interval=1h&limit=200'),
+        smartFetch('https://api.binance.com/api/v3/klines?symbol='+sym+'USDT&interval=1h&limit=500'),
       ]);
       if(ticker.code) throw new Error('bad ticker');
       closes  = klines.map(function(k){ return +k[4]; });
@@ -6777,7 +6777,7 @@ self.onmessage=function(e){
                                 : (r.price != null ? fmtP(r.price) : '—');
       const pctColor = r.pct > 0 ? 'var(--green)' : r.pct < 0 ? 'var(--red)' : 'var(--muted)';
       const pctStr   = r.pct != null ? (r.pct > 0 ? '+' : '') + r.pct.toFixed(2) + '%' : '—';
-      const scoreW   = r.score != null ? r.score : 0;
+      const scoreW   = r.score != null ? Math.max(r.score, r.sig.includes('BUY')?15:r.sig.includes('SELL')?5:10) : 0;
       const scoreColor = scoreW >= 70 ? 'var(--green)' : scoreW <= 30 ? 'var(--red)' : 'var(--warn)';
       const rsiColor = r.rsi == null ? 'var(--muted)' : r.rsi >= 70 ? 'var(--red)' : r.rsi <= 30 ? 'var(--green)' : 'var(--accent)';
       const trendColor = r.trend && r.trend.startsWith('↑') ? 'var(--green)' : r.trend && r.trend.startsWith('↓') ? 'var(--red)' : 'var(--muted)';
@@ -6999,10 +6999,9 @@ self.onmessage=function(e){
     // Fetch macro closes via Yahoo Finance
     await Promise.allSettled(MACRO.map(async function(m) {
       try {
-        const url = 'https://query1.finance.yahoo.com/v8/finance/chart/'+m.yahoo+'?interval=1d&range=60d';
-        const d   = await smartFetch(url);
-        const closes = _parseYahooChart(d);
-        if(closes && closes.length > 10) _macroPrices[m.sym] = closes.map(function(c){ return c.close; });
+        const ohlcv = await _yahooRace(m.yahoo, '1d', '60d');
+        const parsed = ohlcv.ohlcv;
+        if(parsed && parsed.closes && parsed.closes.length > 10) _macroPrices[m.sym] = parsed.closes;
       } catch(_) {}
     }));
 
@@ -7099,18 +7098,17 @@ self.onmessage=function(e){
       { id: 'OIL',   yahoo: 'CL=F',     label: 'WTI Crude Oil',     flip: false, note: 'Inflation proxy, watch Fed reaction' },
       { id: 'VIX',   yahoo: '^VIX',     label: 'VIX Fear Index',    flip: true,  note: 'High VIX = risk-off, crypto sells' },
       { id: 'TNX',   yahoo: '^TNX',     label: '10Y Treasury Yield',flip: true,  note: 'Rising yields = pressure on crypto' },
-      { id: 'USDIDR',yahoo: 'IDR=X',    label: 'USD/IDR',           flip: false, note: 'Local FX context for IDR traders' },
+      { id: 'USDIDR',yahoo: 'USDIDR=X', label: 'USD/IDR',           flip: false, note: 'Local FX context for IDR traders' },
     ];
 
     const results = await Promise.allSettled(ASSETS.map(async function(a) {
       const cacheKey = 'macro_'+a.id;
       let closes = _mktGet(cacheKey, TTL);
       if(!closes || bust) {
-        const url = 'https://query1.finance.yahoo.com/v8/finance/chart/'+a.yahoo+'?interval=1d&range=30d';
-        const d   = await smartFetch(url);
-        const parsed = _parseYahooChart(d);
-        if(!parsed || !parsed.length) throw new Error('no data');
-        closes = parsed.map(function(c){ return c.close; });
+        const ohlcv = await _yahooRace(a.yahoo, '1d', '60d');
+        const parsed = ohlcv.ohlcv;
+        if(!parsed || !parsed.closes || !parsed.closes.length) throw new Error('no data');
+        closes = parsed.closes;
         _mktSet(cacheKey, closes);
       }
       const price   = closes[closes.length - 1];
