@@ -1481,9 +1481,7 @@
     </div>
   </div>
 
-  </div><!-- end .wrap -->
-
-  </div><!-- end #page-analysis -->
+  </div><!-- end .wrap / end #page-analysis -->
 
   <!-- ══ PAGE: Market Dashboard ══ -->
   <div class="page-content" id="page-market">
@@ -5162,7 +5160,7 @@ self.onmessage=function(e){
   document.getElementById('rmAccount').addEventListener('input',calcRisk);
   document.getElementById('rmRisk').addEventListener('input',calcRisk);
   renderJournal();
-  fetchFearGreed();
+  fetchFearGreed(false);
   updateSessionPnL();
 
   let _resizeTimer;
@@ -5521,7 +5519,7 @@ self.onmessage=function(e){
 
     // Pause timers for background tabs, resume for active tab
     if(name === 'market') {
-      if(!window._mktLoaded) fetchMarketDashboard();
+      if(!window._mktLoaded) fetchMarketDashboard(false);
       // Resume mkt auto-refresh if toggle is on
       const mktOn = document.getElementById('mktAutoToggle');
       if(mktOn && mktOn.checked && !_mktTimer) {
@@ -5531,7 +5529,7 @@ self.onmessage=function(e){
       // Pause onchain timer while away
       if(_ocTimer) { _clearOcTimers(); }
     } else if(name === 'onchain') {
-      if(!window._onchainLoaded) fetchOnChainDashboard();
+      if(!window._onchainLoaded) fetchOnChainDashboard(false);
       // Resume oc auto-refresh if toggle is on
       const ocOn = document.getElementById('ocAutoToggle');
       if(ocOn && ocOn.checked && !_ocTimer) {
@@ -5594,6 +5592,8 @@ self.onmessage=function(e){
     try {
       let data=!bust&&_mktGet('globalMetrics',5*60*1000);
       if(!data){data=await smartFetch('https://api.coingecko.com/api/v3/global');_mktSet('globalMetrics',data);}
+      // Cache BTC price globally for whale value estimates
+      if(data?.data?.market_cap_percentage?.btc) { try { const _bp = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT',{signal:AbortSignal.timeout(3000)}); if(_bp.ok){const _bj=await _bp.json(); window._lastBtcPrice=parseFloat(_bj.price);} } catch(_){} }
       if(!data || !data.data) return;
       const d = data.data;
       const cap = d.total_market_cap?.usd;
@@ -5704,7 +5704,7 @@ self.onmessage=function(e){
       const vol = fmtBig(c.total_volume);
       const sym = c.symbol.toUpperCase();
       return `<div class="mover-row" style="cursor:pointer" title="Click to load ${sym} in Analysis"
-        onclick="(function(){const i=document.getElementById('symInput');if(i){i.value='${sym}';switchTab('analysis');setTimeout(()=>fetchData(),150);}})()">
+        onclick="(function(){const i=document.getElementById('symbolInput');if(i){i.value='${sym}';switchTab('analysis');setTimeout(()=>fetchData(),150);}})()">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px">
             <span class="mover-sym">${sym}</span>
@@ -5811,7 +5811,7 @@ self.onmessage=function(e){
         const chgStr = priceChange != null ? (priceChange >= 0 ? '+' : '') + priceChange.toFixed(1) + '%' : '';
         const chgColor = priceChange > 0 ? 'var(--green)' : priceChange < 0 ? 'var(--red)' : 'var(--muted)';
         const hotness = i < 3 ? '🔥' : i < 6 ? '📈' : '·';
-        return '<div class="trend-row" title="Click to load '+sym+' in Analysis" onclick="(function(){var inp=document.getElementById(\'symInput\');if(inp){inp.value=\''+sym+'\';switchTab(\'analysis\');setTimeout(function(){fetchData();},100);}})()">'+
+        return '<div class="trend-row" title="Click to load '+sym+' in Analysis" onclick="(function(){var inp=document.getElementById(\'symbolInput\');if(inp){inp.value=\''+sym+'\';switchTab(\'analysis\');setTimeout(function(){fetchData();},100);}})()">'+
           '<span class="trend-rank">'+hotness+'</span>'+
           '<span class="trend-sym">'+sym+'</span>'+
           '<span class="trend-name">'+name+'</span>'+
@@ -5996,7 +5996,7 @@ self.onmessage=function(e){
     canvas.onclick=function(e){
       const rc=canvas.getBoundingClientRect(),mx=e.clientX-rc.left,my=e.clientY-rc.top;
       const hit=cellData.find(function(c){return mx>=c.rx&&mx<=c.rx+c.rw&&my>=c.ry&&my<=c.ry+c.rh;});
-      if(hit){const inp=document.getElementById('symInput');if(inp){inp.value=hit.sym;switchTab('analysis');setTimeout(function(){fetchData();},100);}}
+      if(hit){const inp=document.getElementById('symbolInput');if(inp){inp.value=hit.sym;switchTab('analysis');setTimeout(function(){fetchData();},100);}}
     };
     canvas.style.cursor='pointer';canvas.title='Click any coin to load in Analysis';
     const bull=data.filter(function(c){return(c.price_change_percentage_24h||0)>0;}).length;
@@ -6017,7 +6017,7 @@ self.onmessage=function(e){
       const chg=c.price_change_percentage_24h||0,bw=(Math.abs(chg)/mca*100).toFixed(1);
       const pr=c.current_price>=1?'$'+c.current_price.toLocaleString(undefined,{maximumFractionDigits:2}):'$'+c.current_price.toFixed(6);
       const sym=c.symbol.toUpperCase();
-      const onclick='(function(){var i=document.getElementById(\'symInput\');if(i){i.value=\''+sym+'\';switchTab(\'analysis\');setTimeout(function(){fetchData();},100);}})()';
+      const onclick='(function(){var i=document.getElementById(\'symbolInput\');if(i){i.value=\''+sym+'\';switchTab(\'analysis\');setTimeout(function(){fetchData();},100);}})()';
       return '<div class="hm-row" style="cursor:pointer" onclick="'+onclick+'"><span class="hm-row-sym" style="color:'+col+'">'+sym+'</span><div style="flex:1;margin:0 8px"><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-family:Share Tech Mono,monospace;font-size:.56rem;color:var(--muted)">'+pr+'</span><span class="hm-row-chg" style="color:'+col+'">'+fmtPct(chg)+'</span></div><div class="hm-row-bar-wrap"><div class="hm-row-bar" style="width:'+bw+'%;background:'+col+';opacity:.7"></div></div><div style="display:flex;justify-content:space-between;margin-top:2px"><span style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted)">Vol '+fmtBig(c.total_volume)+'</span><span style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted)">MCap '+fmtBig(c.market_cap)+'</span></div></div></div>';
     }
     const gEl=document.getElementById('hmTableGainers'),lEl=document.getElementById('hmTableLosers');
@@ -6316,9 +6316,12 @@ self.onmessage=function(e){
           if(txs && txs.txs) {
             txs.txs.forEach(function(tx) {
               const outUsd = tx.out ? tx.out.reduce(function(s,o){return s+(o.value||0);},0)/1e8 : 0;
-              // outUsd is in BTC — need price estimate (use 80000 as rough constant)
+              // Use live BTC price if available, fallback to last known or 80000
               const btcVal = outUsd;
-              const estUsd = btcVal * 80000;
+              const _btcPx = (window.currentPrice && /^BTC/.test(document.getElementById('symbolInput')?.value||'BTC'))
+                ? window.currentPrice
+                : (window._lastBtcPrice || 80000);
+              const estUsd = btcVal * _btcPx;
               if(btcVal < 10) return; // skip < 10 BTC
               const inputs  = tx.inputs  ? tx.inputs[0]  : null;
               const outputs = tx.out     ? tx.out[0]     : null;
