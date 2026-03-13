@@ -7124,6 +7124,45 @@ self.onmessage=function(e){
     if(on) _startScanTimers(sec); else _clearScanTimers();
   }
 
+  // ── Scanner symbol result cache (5-min TTL per symbol) ───────────────
+  const _scanCache = {};
+  const _SCAN_TTL  = 5 * 60 * 1000; // 5 minutes
+
+  function _scanCacheGet(sym) {
+    const entry = _scanCache[sym];
+    if(!entry) return null;
+    if(Date.now() - entry.ts > _SCAN_TTL) { delete _scanCache[sym]; return null; }
+    return entry.data;
+  }
+  function _scanCacheSet(sym, data) {
+    _scanCache[sym] = { ts: Date.now(), data };
+  }
+
+  // ── Concurrency-limited parallel fetch (max N at a time) ─────────────
+  async function _pLimit(tasks, limit, onProgress) {
+    const results = new Array(tasks.length).fill(null);
+    let idx = 0, done = 0;
+    await new Promise(function(resolve) {
+      function next() {
+        if(idx >= tasks.length) return;
+        const i = idx++;
+        tasks[i]().then(function(v) {
+          results[i] = { status: 'fulfilled', value: v };
+        }).catch(function(e) {
+          results[i] = { status: 'rejected', reason: e };
+        }).finally(function() {
+          done++;
+          if(onProgress) onProgress(done, tasks.length);
+          if(done === tasks.length) resolve();
+          else next();
+        });
+      }
+      // Launch initial batch
+      for(let i = 0; i < Math.min(limit, tasks.length); i++) next();
+    });
+    return results;
+  }
+
   // ── Main scan orchestrator ────────────────────────────────────────────
   async function runScanner(bust) {
     const btn = document.getElementById('scanRefreshBtn');
@@ -7134,17 +7173,51 @@ self.onmessage=function(e){
     // Show skeleton rows
     const tbody = document.getElementById('scanTbody');
     if(tbody) tbody.innerHTML = watchlist.map(function(s) {
-      return '<tr><td class="scan-sym">'+s+'</td><td colspan="7" style="color:var(--muted)">'+_skel(1)+'</td></tr>';
+      return '<tr id="scan-row-'+s+'"><td class="scan-sym">'+s+'</td><td colspan="7" style="color:var(--muted)">'+_skel(1)+'</td></tr>';
     }).join('');
 
-    // Fetch all symbols in parallel
-    const results = await Promise.allSettled(watchlist.map(function(sym) {
-      return _scanFetchOne(sym);
-    }));
+    // Separate cached vs needs-fetch symbols
+    const cached  = [], toFetch = [];
+    watchlist.forEach(function(sym) {
+      const hit = !bust && _scanCacheGet(sym);
+      if(hit) cached.push({ status:'fulfilled', value: hit });
+      else    toFetch.push(sym);
+    });
 
-    _scanResults = results
-      .map(function(r) { return r.status === 'fulfilled' ? r.value : null; })
-      .filter(Boolean);
+    // Update status with cache hit info
+    if(st && cached.length) {
+      st.textContent = cached.length + '/' + watchlist.length + ' cached — fetching ' + toFetch.length + ' fresh...';
+    }
+
+    // Fetch uncached symbols with concurrency limit of 5
+    const CONCURRENCY = 5;
+    let fetchedCount = 0;
+    const fetched = await _pLimit(
+      toFetch.map(function(sym) {
+        return function() { return _scanFetchOne(sym); };
+      }),
+      CONCURRENCY,
+      function(done, total) {
+        fetchedCount = done;
+        if(st) st.textContent = 'Scanned ' + (cached.length + done) + '/' + watchlist.length + ' symbols...';
+      }
+    );
+
+    // Cache successful fresh results
+    toFetch.forEach(function(sym, i) {
+      const r = fetched[i];
+      if(r && r.status === 'fulfilled' && r.value) _scanCacheSet(sym, r.value);
+    });
+
+    // Merge: keep watchlist order — cached symbols slot in by their original position
+    let cachedIdx = 0;
+    _scanResults = watchlist.map(function(sym) {
+      const hit = !bust && _scanCacheGet(sym);
+      if(hit) return hit; // already cached (including ones we just set)
+      const fi = toFetch.indexOf(sym);
+      const r  = fi >= 0 ? fetched[fi] : null;
+      return r && r.status === 'fulfilled' ? r.value : null;
+    }).filter(Boolean);
 
     window._scanLoaded = true;
     renderScanTable();
