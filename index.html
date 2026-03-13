@@ -748,6 +748,10 @@
   /* On-chain grid responsive */
   @media(max-width:700px){ .oc-grid { grid-template-columns:1fr !important; } }
   @media(max-width:900px){ #scannerTopRow,#scannerBotRow { grid-template-columns:1fr !important; } }
+  /* ── Position Size Calculator ── */
+  .ps-result-card { background:rgba(0,229,255,.04); border:1px solid var(--border); border-radius:6px; padding:8px 10px; }
+  .ps-result-label { font-family:'Share Tech Mono',monospace; font-size:.54rem; color:var(--muted); margin-bottom:3px; }
+  .ps-result-val { font-family:'Orbitron',monospace; font-size:.9rem; font-weight:700; color:var(--accent); }
   /* ── Scanner tab ── */
   .scan-table { width:100%; border-collapse:collapse; }
   .scan-table th { font-family:'Share Tech Mono',monospace; font-size:.58rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; padding:6px 10px; border-bottom:1px solid var(--border); text-align:left; cursor:pointer; white-space:nowrap; user-select:none; }
@@ -1095,7 +1099,54 @@
     </div>
   </div>
 
-  <!-- ── Watchlist ── -->
+  <!-- ── Position Size Calculator ── -->
+  <div class="panel" style="margin-bottom:14px;border-color:rgba(0,229,255,.2)">
+    <div class="ptitle">📐 Position Size Calculator
+      <span style="font-size:.5rem;color:var(--muted);margin-left:6px">auto-fills from current symbol · ATR-based stop</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:12px">
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-bottom:4px">ACCOUNT SIZE (USD)</div>
+        <input id="psAccount" type="number" placeholder="e.g. 10000" value="10000"
+          style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:6px 8px;border-radius:5px;box-sizing:border-box"
+          oninput="calcPositionSize()">
+      </div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-bottom:4px">RISK PER TRADE (%)</div>
+        <input id="psRisk" type="number" placeholder="e.g. 1" value="1" min="0.1" max="20" step="0.1"
+          style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:6px 8px;border-radius:5px;box-sizing:border-box"
+          oninput="calcPositionSize()">
+      </div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-bottom:4px">ENTRY PRICE</div>
+        <input id="psEntry" type="number" placeholder="auto-filled" step="any"
+          style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:6px 8px;border-radius:5px;box-sizing:border-box"
+          oninput="calcPositionSize()">
+      </div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-bottom:4px">STOP LOSS PRICE
+          <button onclick="psUseATR()" style="background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:.48rem;padding:1px 5px;border-radius:3px;cursor:pointer;margin-left:4px">ATR AUTO</button>
+        </div>
+        <input id="psStop" type="number" placeholder="e.g. 83000" step="any"
+          style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:6px 8px;border-radius:5px;box-sizing:border-box"
+          oninput="calcPositionSize()">
+      </div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-bottom:4px">TAKE PROFIT PRICE</div>
+        <input id="psTP" type="number" placeholder="optional" step="any"
+          style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:6px 8px;border-radius:5px;box-sizing:border-box"
+          oninput="calcPositionSize()">
+      </div>
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-bottom:4px">LEVERAGE (×)</div>
+        <input id="psLeverage" type="number" placeholder="1" value="1" min="1" max="125" step="1"
+          style="width:100%;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:6px 8px;border-radius:5px;box-sizing:border-box"
+          oninput="calcPositionSize()">
+      </div>
+    </div>
+    <div id="psResult" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px"></div>
+    <div id="psWarning" style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--warn);margin-top:8px"></div>
+  </div>
   <div class="panel" style="margin-bottom:14px;border-color:rgba(0,229,255,.2)">
     <div class="ptitle">⭐ Watchlist <span style="font-size:.52rem;color:var(--muted);font-weight:400">— Click any coin to analyze it</span>
       <button class="wl-add-btn" style="margin-left:auto;padding:4px 10px;font-size:.52rem" onclick="refreshWatchlist()">⟳ REFRESH</button>
@@ -1449,6 +1500,55 @@
     <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-top:8px">⚠️ Alerts only work while this tab is open. Browser notifications will fire when price crosses your level.</div>
   </div>
 
+
+  <!-- ── Position Size Calculator ── -->
+  <div class="panel" style="margin-top:14px;border-color:rgba(0,229,255,.2)">
+    <div class="ptitle">📐 Position Size Calculator</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label class="rm-label" for="ps-account">Account Size (USD)</label>
+        <input type="number" id="ps-account" placeholder="10000" class="alert-input" style="width:100%" step="any" oninput="calcPosSize()" value="10000">
+      </div>
+      <div>
+        <label class="rm-label" for="ps-risk">Risk % per Trade</label>
+        <input type="number" id="ps-risk" placeholder="1" class="alert-input" style="width:100%" step="0.1" oninput="calcPosSize()" value="1">
+      </div>
+      <div>
+        <label class="rm-label" for="ps-entry">Entry Price</label>
+        <input type="number" id="ps-entry" placeholder="Auto-fill from chart" class="alert-input" style="width:100%" step="any" oninput="calcPosSize()">
+      </div>
+      <div>
+        <label class="rm-label" for="ps-sl">Stop Loss Price</label>
+        <input type="number" id="ps-sl" placeholder="Stop loss level" class="alert-input" style="width:100%" step="any" oninput="calcPosSize()">
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>
+        <label class="rm-label" for="ps-tp">Take Profit (optional)</label>
+        <input type="number" id="ps-tp" placeholder="Target price" class="alert-input" style="width:100%" step="any" oninput="calcPosSize()">
+      </div>
+      <div>
+        <label class="rm-label" for="ps-lev">Leverage (1=spot)</label>
+        <input type="number" id="ps-lev" placeholder="1" class="alert-input" style="width:100%" min="1" step="1" oninput="calcPosSize()" value="1">
+      </div>
+      <div style="grid-column:span 2;display:flex;align-items:flex-end">
+        <button class="alert-add-btn" onclick="psFillFromChart()" style="width:100%">↑ Auto-fill Entry from Chart</button>
+      </div>
+    </div>
+    <!-- Results grid -->
+    <div id="posSizeResults" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px">
+      <div class="ps-result-card" id="psr-possize"><div class="ps-result-label">Position Size (USD)</div><div class="ps-result-val">—</div></div>
+      <div class="ps-result-card" id="psr-coins"><div class="ps-result-label">Qty (coins/units)</div><div class="ps-result-val">—</div></div>
+      <div class="ps-result-card" id="psr-risk"><div class="ps-result-label">Max Loss (USD)</div><div class="ps-result-val">—</div></div>
+      <div class="ps-result-card" id="psr-rr"><div class="ps-result-label">Risk:Reward</div><div class="ps-result-val">—</div></div>
+      <div class="ps-result-card" id="psr-slpct"><div class="ps-result-label">SL Distance %</div><div class="ps-result-val">—</div></div>
+      <div class="ps-result-card" id="psr-tppct"><div class="ps-result-label">TP Distance %</div><div class="ps-result-val">—</div></div>
+      <div class="ps-result-card" id="psr-break"><div class="ps-result-label">Breakeven (with fees)</div><div class="ps-result-val">—</div></div>
+      <div class="ps-result-card" id="psr-margin"><div class="ps-result-label">Margin Required</div><div class="ps-result-val">—</div></div>
+    </div>
+    <div id="posSizeSignal" style="margin-top:10px;font-family:'Share Tech Mono',monospace;font-size:.6rem;line-height:1.8"></div>
+  </div>
+
   <!-- ── Export Panel ── -->
   <div class="panel" style="margin-top:14px">
     <div class="ptitle">📤 Export Analysis</div>
@@ -1510,7 +1610,16 @@
         </tbody>
       </table>
     </div>
-  </div>
+    <!-- Equity Curve -->
+    <div id="equityCurveWrap" style="display:none;margin-top:14px;border-top:1px solid rgba(255,255,255,.06);padding-top:12px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:10px">
+        📈 EQUITY CURVE
+        <span id="equityCurveStat" style="color:var(--accent)"></span>
+        <span id="equityCurveWR"   style="color:var(--muted)"></span>
+      </div>
+      <canvas id="equityCurveCanvas" height="90" style="width:100%;display:block;border-radius:4px"></canvas>
+    </div>
+  </div><!-- end Trade Journal panel -->
 
   </div><!-- end .wrap / end #page-analysis -->
 
@@ -1554,6 +1663,7 @@
           </div>
         </div>
         <div id="mkt-fng-sparkline" style="margin-top:6px;height:22px"></div>
+        <div id="mkt-fng-history" style="margin-top:8px"></div>
       </div>
     </div>
 
@@ -1562,7 +1672,7 @@
 
       <!-- Funding Rates -->
       <div class="panel">
-        <div class="ptitle">💸 Funding Rates <span style="font-size:.5rem;font-weight:400;color:var(--muted);letter-spacing:1px;margin-left:4px">8h rate · positive = longs pay</span></div>
+        <div class="ptitle">💸 Funding Rates <span style="font-size:.5rem;font-weight:400;color:var(--muted);letter-spacing:1px;margin-left:4px">8h rate · 7-day trend</span></div>
         <div id="fundingPanel">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
         </div>
@@ -1578,10 +1688,14 @@
 
       <!-- Top Movers -->
       <div class="panel">
-        <div class="ptitle">🚀 Top Movers <span style="font-size:.5rem;color:var(--muted);margin-left:4px">24h % change</span></div>
-        <div style="display:flex;gap:6px;margin-bottom:10px">
+        <div class="ptitle">🚀 Top Movers <span style="font-size:.5rem;color:var(--muted);margin-left:4px" id="movers-tf-label">24h % change</span></div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
           <button class="ind-tab active" id="movers-btn-gainers" onclick="showMovers('gainers')">📈 Gainers</button>
           <button class="ind-tab" id="movers-btn-losers" onclick="showMovers('losers')">📉 Losers</button>
+          <span style="width:1px;background:var(--border);margin:0 2px"></span>
+          <button class="ind-tab active" id="movers-tf-1h"  onclick="setMoversTF('1h')">1H</button>
+          <button class="ind-tab"        id="movers-tf-24h" onclick="setMoversTF('24h')">24H</button>
+          <button class="ind-tab"        id="movers-tf-7d"  onclick="setMoversTF('7d')">7D</button>
         </div>
         <div id="moversPanel"><div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div></div>
       </div>
@@ -1704,6 +1818,9 @@
       <div class="panel">
         <div class="ptitle">📅 Economic Calendar
           <span style="font-size:.5rem;color:var(--muted);margin-left:6px">macro events affecting crypto</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap" id="cal-tabs-row">
+          <!-- Filter tab buttons are rendered dynamically by fetchEconomicCalendar() -->
         </div>
         <div id="calPanel" class="news-scroll" style="max-height:400px">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
@@ -3600,6 +3717,7 @@ self.onmessage=function(e){
 
     const pct=((price-open24)/open24*100);
     document.getElementById('pcPrice').textContent=fmtP(price);
+    window._lastAnalysisPrice = price;
     document.getElementById('pcPair').textContent=pair;
     const ce=document.getElementById('pc24h');
     ce.textContent=(pct>=0?'+':'')+pct.toFixed(2)+'%';
@@ -3840,6 +3958,11 @@ self.onmessage=function(e){
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
     const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
+
+    // Store ATR for position size calculator
+    if(atr) window._lastATR = atr;
+    // Auto-fill entry price if field is empty
+    psAutoFill();
 
     // ── Indicator bars ──────────────────────────────────────────────────────
     if(rsi!==null){const c=rsi<30?'var(--green)':rsi>70?'var(--red)':'var(--warn)';setInd('rsiBar','rsiVal','rsiBadge',rsi,c,rsi.toFixed(1),rsi<30?'bull':rsi>70?'bear':'neut',rsi<30?'OVERSOLD':rsi>70?'OVERBOUGHT':rsi>=50?'BULLISH':'BEARISH');}
@@ -4537,6 +4660,103 @@ self.onmessage=function(e){
     }
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  POSITION SIZE CALCULATOR
+  // ═══════════════════════════════════════════════════════════
+  function calcPositionSize() {
+    const account  = parseFloat(document.getElementById('psAccount')?.value) || 0;
+    const riskPct  = parseFloat(document.getElementById('psRisk')?.value)    || 1;
+    const entry    = parseFloat(document.getElementById('psEntry')?.value)   || 0;
+    const stop     = parseFloat(document.getElementById('psStop')?.value)    || 0;
+    const tp       = parseFloat(document.getElementById('psTP')?.value)      || 0;
+    const leverage = Math.max(1, parseFloat(document.getElementById('psLeverage')?.value) || 1);
+    const result   = document.getElementById('psResult');
+    const warn     = document.getElementById('psWarning');
+    if(!result) return;
+    if(!account || !entry || !stop) {
+      result.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Enter account size, entry price and stop loss to calculate</div>';
+      if(warn) warn.textContent = '';
+      return;
+    }
+    if((entry > stop && stop > 0 && entry <= stop) || entry === stop) {
+      result.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--red)">Entry and stop loss cannot be equal</div>';
+      return;
+    }
+
+    const riskAmt      = account * (riskPct / 100);                     // $ at risk
+    const stopDist     = Math.abs(entry - stop);                        // distance to stop
+    const stopDistPct  = stopDist / entry * 100;
+    const positionUSD  = (riskAmt / stopDist) * entry;                  // total position USD
+    const positionCoins = riskAmt / stopDist;                           // coins/units to buy
+    const marginReq    = positionUSD / leverage;                        // margin needed
+    const rr           = tp ? Math.abs(tp - entry) / stopDist : null;  // R:R ratio
+    const potentialPnl = tp ? positionCoins * Math.abs(tp - entry) : null;
+    const isLong       = entry > stop;
+    const direction    = isLong ? '📈 LONG' : '📉 SHORT';
+
+    // Format helpers
+    const sym = (document.getElementById('symbolInput')?.value || 'COIN').toUpperCase();
+    const isFxOrStock = FOREX_PAIRS[sym] || COMMODITY_PAIRS[sym] || window._customStocks?.[sym];
+    const priceStr = (v) => isFxOrStock ? v.toFixed(4) : v >= 1000 ? '$'+v.toLocaleString(undefined,{maximumFractionDigits:2}) : '$'+v.toFixed(4);
+    const usdStr   = (v) => '$' + v.toLocaleString(undefined,{maximumFractionDigits:2});
+
+    // Warning logic
+    const warnings = [];
+    if(stopDistPct > 10) warnings.push('⚠️ Stop is '+stopDistPct.toFixed(1)+'% away — very wide stop, consider tighter entry');
+    if(riskPct > 3)      warnings.push('⚠️ Risking '+riskPct+'% per trade exceeds the recommended 1-2% maximum');
+    if(leverage > 10)    warnings.push('⚠️ '+leverage+'× leverage is extremely high — liquidation risk is significant');
+    if(positionUSD > account * 2) warnings.push('⚠️ Position size exceeds 2× account — requires margin/leverage');
+    if(warn) warn.innerHTML = warnings.map(function(w){ return '<div>'+w+'</div>'; }).join('');
+
+    const cards = [
+      { label: 'Direction',        val: direction,                       color: isLong ? 'var(--green)' : 'var(--red)' },
+      { label: 'Max Risk (USD)',    val: usdStr(riskAmt),                 color: 'var(--red)' },
+      { label: 'Position Size',    val: positionCoins.toFixed(4)+' '+sym, color: 'var(--accent)' },
+      { label: 'Position (USD)',   val: usdStr(positionUSD),              color: 'var(--text)' },
+      { label: 'Margin Required',  val: usdStr(marginReq),               color: leverage > 1 ? 'var(--warn)' : 'var(--text)' },
+      { label: 'Stop Distance',    val: priceStr(stopDist)+' ('+stopDistPct.toFixed(2)+'%)', color: 'var(--muted)' },
+      rr ? { label: 'R:R Ratio',   val: '1 : '+rr.toFixed(2),           color: rr >= 2 ? 'var(--green)' : rr >= 1 ? 'var(--warn)' : 'var(--red)' } : null,
+      potentialPnl ? { label: 'Potential Profit', val: usdStr(potentialPnl), color: 'var(--green)' } : null,
+    ].filter(Boolean);
+
+    result.innerHTML = cards.map(function(c) {
+      return '<div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:6px;padding:8px 10px">'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);margin-bottom:3px;text-transform:uppercase">'+c.label+'</div>'+
+        '<div style="font-family:Orbitron,monospace;font-size:.72rem;font-weight:700;color:'+c.color+'">'+c.val+'</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  // Auto-fill entry price from current loaded symbol
+  // Called from _applyWave1 after each new symbol fetch
+  function psAutoFill() {
+    const entryEl = document.getElementById('psEntry');
+    if(!entryEl) return;
+    if(currentPrice && currentPrice > 0) {
+      entryEl.value = currentPrice >= 1 ? currentPrice.toFixed(2) : currentPrice.toFixed(6);
+    }
+    calcPositionSize();
+  }
+
+  // ATR-based stop: use 1.5× current ATR as stop distance
+  function psUseATR() {
+    const entryEl = document.getElementById('psEntry');
+    const stopEl  = document.getElementById('psStop');
+    if(!entryEl || !stopEl) return;
+    const entry = parseFloat(entryEl.value) || currentPrice;
+    if(!entry) { alert('Load a symbol first to get ATR data'); return; }
+    // Get ATR from last computed indicators (stored on window by Wave1)
+    const atr = window._lastATR;
+    if(!atr || atr <= 0) {
+      stopEl.value = (entry * 0.98).toFixed(entry >= 1000 ? 0 : 6); // fallback: 2%
+    } else {
+      const isLong = true; // assume long by default
+      stopEl.value = (entry - 1.5 * atr).toFixed(entry >= 1000 ? 0 : 6);
+    }
+    if(!entryEl.value) entryEl.value = entry;
+    calcPositionSize();
+  }
+
   let priceAlerts=[];
   function addAlert(){
     const dir=document.getElementById('alertDir').value;
@@ -4713,6 +4933,91 @@ self.onmessage=function(e){
         <td style="padding:6px 8px"><span style="color:var(--red);cursor:pointer" onclick="deleteJournalTrade(${t.id})">✕</span></td>
       </tr>`;
     }).join('');
+
+    // Draw equity curve after table renders
+    requestAnimationFrame(function(){ drawEquityCurve(); });
+  }
+
+  function drawEquityCurve() {
+    const closed = tradeJournal.filter(function(t){ return t.pnl !== null && t.status !== 'OPEN'; });
+    const wrap = document.getElementById('equityCurveWrap');
+    const cv   = document.getElementById('equityCurveCanvas');
+    if(!wrap || !cv) return;
+
+    if(closed.length < 2) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+
+    // Build cumulative PnL series (oldest→newest, journal stores newest first)
+    const ordered = closed.slice().reverse();
+    let cum = 0;
+    const points = [0, ...ordered.map(function(t){ cum += (t.pnl || 0); return cum; })];
+    const labels = ['Start', ...ordered.map(function(t){ return t.pair; })];
+
+    // Stats
+    const final = points[points.length - 1];
+    const wins  = ordered.filter(function(t){ return t.status === 'WIN'; }).length;
+    const wr    = Math.round(wins / ordered.length * 100);
+    const maxDD = (function() {
+      let peak = 0, dd = 0;
+      points.forEach(function(v){ if(v > peak) peak = v; dd = Math.min(dd, v - peak); });
+      return dd;
+    })();
+
+    const statEl = document.getElementById('equityCurveStat');
+    const wrEl   = document.getElementById('equityCurveWR');
+    if(statEl) { statEl.textContent = (final >= 0 ? '+' : '') + '$' + final.toFixed(2); statEl.style.color = final >= 0 ? 'var(--green)' : 'var(--red)'; }
+    if(wrEl)   wrEl.textContent = '· Win rate ' + wr + '% · Max DD $' + maxDD.toFixed(2);
+
+    // Draw on canvas
+    const W = cv.offsetWidth || 600;
+    cv.width  = W;
+    cv.height = 90;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, W, 90);
+
+    const minV = Math.min(0, ...points);
+    const maxV = Math.max(0, ...points);
+    const range = maxV - minV || 1;
+    const pad = { l: 8, r: 8, t: 8, b: 8 };
+    const chartW = W - pad.l - pad.r;
+    const chartH = 90 - pad.t - pad.b;
+
+    const toX = function(i)  { return pad.l + (i / (points.length - 1)) * chartW; };
+    const toY = function(v)  { return pad.t + chartH - ((v - minV) / range) * chartH; };
+    const zeroY = toY(0);
+
+    // Zero line
+    ctx.beginPath();
+    ctx.moveTo(pad.l, zeroY); ctx.lineTo(W - pad.r, zeroY);
+    ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.stroke(); ctx.setLineDash([]);
+
+    // Fill under curve
+    const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + chartH);
+    grad.addColorStop(0, final >= 0 ? 'rgba(0,255,136,.25)' : 'rgba(255,45,85,.25)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(toX(0), zeroY);
+    points.forEach(function(v, i){ ctx.lineTo(toX(i), toY(v)); });
+    ctx.lineTo(toX(points.length - 1), zeroY);
+    ctx.closePath();
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    points.forEach(function(v, i){ i === 0 ? ctx.moveTo(toX(i), toY(v)) : ctx.lineTo(toX(i), toY(v)); });
+    ctx.strokeStyle = final >= 0 ? '#00ff88' : '#ff2d55';
+    ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+    // Dots at each trade
+    points.forEach(function(v, i) {
+      if(i === 0) return;
+      const t = ordered[i - 1];
+      const dotColor = t.status === 'WIN' ? '#00ff88' : '#ff2d55';
+      ctx.beginPath();
+      ctx.arc(toX(i), toY(v), 3, 0, Math.PI * 2);
+      ctx.fillStyle = dotColor; ctx.fill();
+    });
   }
 
   function exportJournalCSV(){
@@ -4927,6 +5232,14 @@ self.onmessage=function(e){
     const p = document.getElementById('settingsPanel');
     p.style.display = p.style.display==='none' ? 'block' : 'none';
   }
+
+  // Theme toggle — button is hidden (dark-only UI) but function must exist
+  function toggleTheme() {
+    // Dark mode only — this is a stub to prevent errors if the button becomes visible
+    const btn = document.getElementById('themeBtn');
+    if(btn) btn.textContent = '🌙 DARK';
+  }
+
   applySettings();
 
   function drawMiniChart(opens, closes, highs, lows, e8arr, e21arr, e55arr, e200arr, sym, tf) {
@@ -5712,6 +6025,7 @@ self.onmessage=function(e){
   // ══════════════════════════════════════════════════════════
   let _mktLoaded = false;
   let _moversData = { gainers:[], losers:[] };
+  let _moversTF = '1h'; // '1h' | '24h' | '7d'
 
   const _mktCache = {};
   function _mktGet(k,ms){const h=_mktCache[k];return(h&&Date.now()-h.ts<ms)?h.data:null;}
@@ -5740,7 +6054,7 @@ self.onmessage=function(e){
     if(status) status.textContent='Fetching market data...';
     ['fundingPanel','oiPanel','moversPanel','trendingPanel'].forEach(function(id){const el=document.getElementById(id);if(el)el.innerHTML=_skel(6);});
     const cgTTL=3*60*1000, cgCached=!bust&&_mktGet('cgMarkets',cgTTL);
-    const cgP=cgCached?Promise.resolve(cgCached):smartFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h').then(function(d){if(!Array.isArray(d))throw new Error('bad');_mktSet('cgMarkets',d);return d;});
+    const cgP=cgCached?Promise.resolve(cgCached):smartFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=1h%2C24h%2C7d').then(function(d){if(!Array.isArray(d))throw new Error('bad');_mktSet('cgMarkets',d);return d;});
     await Promise.allSettled([fetchGlobalMetrics(bust),fetchFearGreed(bust),fetchFundingRates(bust),fetchOpenInterestBatch(bust),_fetchTopMovers(cgP),fetchTrending(bust),fetchCryptoNews(bust),_fetchHeatmap(cgP)]);
     _mktLoaded=true;
     const upd=document.getElementById('mktLastUpdate');if(upd)upd.textContent='Updated: '+new Date().toLocaleTimeString();
@@ -5751,7 +6065,7 @@ self.onmessage=function(e){
   // ── Global metrics via CoinGecko ──────────────────────────
   async function fetchGlobalMetrics(bust) {
     try {
-      let data=!bust&&_mktGet('globalMetrics',5*60*1000);
+      let data=!bust&&_mktGet('globalMetrics',10*60*1000);
       if(!data){data=await smartFetch('https://api.coingecko.com/api/v3/global');_mktSet('globalMetrics',data);}
       // Cache BTC price globally for whale value estimates
       if(data?.data?.market_cap_percentage?.btc) { try { const _bp = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT',{signal:AbortSignal.timeout(3000)}); if(_bp.ok){const _bj=await _bp.json(); window._lastBtcPrice=parseFloat(_bj.price);} } catch(_){} }
@@ -5785,32 +6099,63 @@ self.onmessage=function(e){
     const panel = document.getElementById('fundingPanel');
     const coins = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT'];
     try {
-      let data=!bust&&_mktGet('fundingRates',30*60*1000);
-      if(!data){data=await smartFetch('https://fapi.binance.com/fapi/v1/premiumIndex');_mktSet('fundingRates',data);}
+      let data = !bust && _mktGet('fundingRates', 30*60*1000);
+      if(!data) {
+        data = await smartFetch('https://fapi.binance.com/fapi/v1/premiumIndex');
+        _mktSet('fundingRates', data);
+      }
       if(!Array.isArray(data)) throw new Error('bad data');
-      const rates = data
-        .filter(d => coins.includes(d.symbol))
-        .sort((a,b) => coins.indexOf(a.symbol) - coins.indexOf(b.symbol));
+      const rates = data.filter(function(d){ return coins.includes(d.symbol); })
+                        .sort(function(a,b){ return coins.indexOf(a.symbol)-coins.indexOf(b.symbol); });
 
-      panel.innerHTML = rates.map(r => {
-        const rate = parseFloat(r.lastFundingRate) * 100;
-        const annualized = (rate * 3 * 365).toFixed(1);
-        const color = rate > 0.05 ? 'var(--red)' : rate > 0 ? 'var(--warn)' : rate < -0.05 ? 'var(--green)' : 'var(--muted)';
-        const signal = rate > 0.1 ? 'LONGS PAYING HIGH' : rate > 0.05 ? 'Longs paying' : rate < -0.05 ? 'SHORTS PAYING' : rate < 0 ? 'Shorts paying' : 'Neutral';
-        const barPct = Math.min(100, Math.abs(rate) / 0.15 * 100);
-        const barLeft = rate < 0 ? `right:50%;width:${barPct/2}%` : `left:50%;width:${barPct/2}%`;
-        return `<div class="fr-row">
-          <span class="fr-sym">${r.symbol.replace('USDT','')}</span>
-          <div class="fr-bar-wrap">
-            <div style="position:absolute;top:50%;transform:translateY(-50%);left:50%;width:1px;height:6px;background:rgba(255,255,255,.2)"></div>
-            <div class="fr-bar" style="${barLeft};background:${color}"></div>
-          </div>
-          <span class="fr-rate" style="color:${color};min-width:58px;text-align:right">${rate >= 0 ? '+' : ''}${rate.toFixed(4)}%</span>
-          <span class="fr-signal" style="background:${color}18;color:${color};border:1px solid ${color}40;margin-left:6px;min-width:100px;text-align:center;font-size:.52rem">${signal}</span>
-        </div>`;
+      // Fetch 7-day funding rate history per coin (21 periods = ~7 days of 8h intervals)
+      const histKey = 'fundingHist';
+      let histMap = !bust && _mktGet(histKey, 4*60*60*1000); // 4h cache for history
+      if(!histMap) {
+        const histResults = await Promise.allSettled(coins.map(function(sym) {
+          return smartFetch('https://fapi.binance.com/fapi/v1/fundingRate?symbol='+sym+'&limit=21');
+        }));
+        histMap = {};
+        coins.forEach(function(sym, i) {
+          if(histResults[i].status==='fulfilled' && Array.isArray(histResults[i].value)) {
+            histMap[sym] = histResults[i].value.map(function(r){ return parseFloat(r.fundingRate)*100; });
+          }
+        });
+        _mktSet(histKey, histMap);
+      }
+
+      panel.innerHTML = rates.map(function(r) {
+        const rate    = parseFloat(r.lastFundingRate) * 100;
+        const color   = rate > 0.05 ? 'var(--red)' : rate > 0 ? 'var(--warn)' : rate < -0.05 ? 'var(--green)' : 'var(--muted)';
+        const signal  = rate > 0.1 ? 'LONGS HIGH' : rate > 0.05 ? 'Longs pay' : rate < -0.05 ? 'SHORTS PAY' : rate < 0 ? 'Shorts pay' : 'Neutral';
+        const barPct  = Math.min(100, Math.abs(rate) / 0.15 * 100);
+        const barLeft = rate < 0 ? 'right:50%;width:'+(barPct/2)+'%' : 'left:50%;width:'+(barPct/2)+'%';
+        // Sparkline
+        const hist = histMap && histMap[r.symbol] ? histMap[r.symbol] : [];
+        let sparkHtml = '';
+        if(hist.length > 2) {
+          const maxAbs = Math.max(0.01, ...hist.map(function(v){ return Math.abs(v); }));
+          sparkHtml = '<div style="display:flex;align-items:center;gap:1px;height:18px;margin-left:6px">' +
+            hist.map(function(v) {
+              const h = Math.max(2, Math.round(Math.abs(v)/maxAbs*18));
+              const c = v > 0.05 ? '#ff2d55' : v > 0 ? '#ff8c00' : v < -0.05 ? '#00ff88' : 'rgba(255,255,255,.3)';
+              const base = v >= 0 ? 'margin-top:auto' : 'margin-bottom:auto';
+              return '<div style="width:4px;height:'+h+'px;background:'+c+';border-radius:1px;'+base+';opacity:.8" title="'+v.toFixed(4)+'%"></div>';
+            }).join('') + '</div>';
+        }
+        return '<div class="fr-row" style="align-items:center">'+
+          '<span class="fr-sym">'+r.symbol.replace('USDT','')+'</span>'+
+          '<div class="fr-bar-wrap">'+
+            '<div style="position:absolute;top:50%;transform:translateY(-50%);left:50%;width:1px;height:6px;background:rgba(255,255,255,.2)"></div>'+
+            '<div class="fr-bar" style="'+barLeft+';background:'+color+'"></div>'+
+          '</div>'+
+          '<span class="fr-rate" style="color:'+color+';min-width:54px;text-align:right">'+(rate>=0?'+':'')+rate.toFixed(4)+'%</span>'+
+          '<span class="fr-signal" style="background:'+color+'18;color:'+color+';border:1px solid '+color+'40;margin-left:6px;min-width:84px;text-align:center;font-size:.52rem">'+signal+'</span>'+
+          sparkHtml+
+        '</div>';
       }).join('');
     } catch(e) {
-      panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Funding rates unavailable — requires Binance Futures access</div>`;
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Funding rates unavailable — requires Binance Futures access</div>';
     }
   }
 
@@ -5841,10 +6186,37 @@ self.onmessage=function(e){
       const data=await cgP;
       if(!Array.isArray(data))throw new Error('bad data');
       const sorted=data.slice().sort(function(a,b){return(b.price_change_percentage_24h||0)-(a.price_change_percentage_24h||0);});
-      _moversData.gainers=sorted.slice(0,10);
-      _moversData.losers=sorted.slice().reverse().slice(0,10);
+      // Cache all 3 timeframes
+      function sortByTF(tf) {
+        const field = tf==='1h' ? 'price_change_percentage_1h_in_currency'
+                    : tf==='7d' ? 'price_change_percentage_7d_in_currency'
+                    : 'price_change_percentage_24h';
+        return data.slice().sort(function(a,b){ return (b[field]||0)-(a[field]||0); });
+      }
+      _moversData._all = data;
+      _moversData.gainers = sortByTF(_moversTF).slice(0,10);
+      _moversData.losers  = sortByTF(_moversTF).reverse().slice(0,10);
       showMovers('gainers');
     }catch(e){const p=document.getElementById('moversPanel');if(p)p.innerHTML='<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Top movers unavailable</div>';}
+  }
+
+  function setMoversTF(tf) {
+    _moversTF = tf;
+    ['1h','24h','7d'].forEach(function(t){
+      const b = document.getElementById('movers-tf-'+t);
+      if(b) b.classList.toggle('active', t===tf);
+    });
+    const lbl = document.getElementById('movers-tf-label');
+    if(lbl) lbl.textContent = tf==='1h'?'1h % change':tf==='7d'?'7d % change':'24h % change';
+    if(_moversData._all && _moversData._all.length) {
+      const field = tf==='1h'?'price_change_percentage_1h_in_currency':tf==='7d'?'price_change_percentage_7d_in_currency':'price_change_percentage_24h';
+      const sorted = _moversData._all.slice().sort(function(a,b){return(b[field]||0)-(a[field]||0);});
+      _moversData.gainers = sorted.slice(0,10);
+      _moversData.losers  = sorted.slice().reverse().slice(0,10);
+    }
+    // keep current gainers/losers tab active
+    const activeType = document.getElementById('movers-btn-gainers').classList.contains('active') ? 'gainers' : 'losers';
+    showMovers(activeType);
   }
 
   function showMovers(type) {
@@ -5856,9 +6228,12 @@ self.onmessage=function(e){
       panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">No data yet — click Refresh</div>`;
       return;
     }
-    const maxAbs = Math.max(...coins.map(c => Math.abs(c.price_change_percentage_24h||0)));
+    const chgField = _moversTF==='1h' ? 'price_change_percentage_1h_in_currency'
+                  : _moversTF==='7d' ? 'price_change_percentage_7d_in_currency'
+                  : 'price_change_percentage_24h';
+    const maxAbs = Math.max(...coins.map(c => Math.abs(c[chgField]||0)));
     panel.innerHTML = coins.map(c => {
-      const chg = c.price_change_percentage_24h || 0;
+      const chg = c[chgField] || 0;
       const color = pctColor(chg);
       const barW = maxAbs > 0 ? (Math.abs(chg)/maxAbs*100).toFixed(0) : 0;
       const price = c.current_price >= 1 ? '$' + c.current_price.toLocaleString(undefined,{maximumFractionDigits:2}) : '$' + c.current_price.toFixed(6);
@@ -5890,10 +6265,10 @@ self.onmessage=function(e){
       if(!data) {
         // alternative.me supports direct CORS — skip proxy for speed
         try {
-          const r = await fetch('https://api.alternative.me/fng/?limit=8&format=json', {signal:AbortSignal.timeout(5000)});
+          const r = await fetch('https://api.alternative.me/fng/?limit=30&format=json', {signal:AbortSignal.timeout(5000)});
           if(r.ok) data = await r.json();
         } catch(_) {
-          data = await smartFetch('https://api.alternative.me/fng/?limit=8&format=json');
+          data = await smartFetch('https://api.alternative.me/fng/?limit=30&format=json');
         }
         _mktSet('fearGreed', data);
       }
@@ -5902,7 +6277,7 @@ self.onmessage=function(e){
       const latest = data.data[0];
       const val = parseInt(latest.value);
       const label = latest.value_classification;
-      const history = data.data.slice(0,8).reverse(); // oldest→newest
+      const history = data.data.slice(0,30).reverse(); // oldest→newest (up to 30 days)
 
       // Color gradient: 0=extreme fear(red) → 50=neutral(yellow) → 100=greed(green)
       const fgColor = val <= 25 ? '#ff2d55' : val <= 45 ? '#ff8c00' : val <= 55 ? '#ffd700' : val <= 75 ? '#9acd32' : '#00ff88';
@@ -5931,17 +6306,41 @@ self.onmessage=function(e){
         ctx.fillStyle=fgColor; ctx.fill();
       }
 
-      // Draw 7-day sparkline (mini bar chart)
+      // Draw 7-day sparkline (first 8 bars, mini)
+      const recent8 = history.slice(-8);
       const spEl = document.getElementById('mkt-fng-sparkline');
-      if(spEl && history.length > 1) {
-        const maxV = 100, barW = Math.floor(100/history.length);
+      if(spEl && recent8.length > 1) {
         spEl.innerHTML = '<div style="display:flex;align-items:flex-end;gap:2px;height:22px">' +
-          history.map(function(d) {
+          recent8.map(function(d) {
             const v = parseInt(d.value);
-            const h = Math.max(3, Math.round(v/maxV*22));
+            const h = Math.max(3, Math.round(v/100*22));
             const c = v<=25?'#ff2d55':v<=45?'#ff8c00':v<=55?'#ffd700':v<=75?'#9acd32':'#00ff88';
             return '<div style="flex:1;height:'+h+'px;background:'+c+';border-radius:1px 1px 0 0;opacity:.8" title="'+d.value_classification+' ('+d.value+')"></div>';
           }).join('') + '</div>';
+      }
+      // Draw 30-day history chart
+      const histEl = document.getElementById('mkt-fng-history');
+      if(histEl && history.length > 7) {
+        const minV = Math.min.apply(null, history.map(function(d){ return parseInt(d.value); }));
+        const maxV = Math.max.apply(null, history.map(function(d){ return parseInt(d.value); }));
+        const range = maxV - minV || 1;
+        histEl.innerHTML =
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);margin-bottom:3px">30-day sentiment history</div>'+
+          '<div style="display:flex;align-items:flex-end;gap:1px;height:32px;background:rgba(255,255,255,.03);border-radius:4px;padding:4px">' +
+            history.map(function(d,i) {
+              const v = parseInt(d.value);
+              const h = Math.max(3, Math.round((v-minV)/range*28)+2);
+              const c = v<=25?'#ff2d55':v<=45?'#ff8c00':v<=55?'#ffd700':v<=75?'#9acd32':'#00ff88';
+              const isLast = i === history.length - 1;
+              const ts = new Date(parseInt(d.timestamp)*1000);
+              const dateStr = ts.toLocaleDateString(undefined,{month:'short',day:'numeric'});
+              return '<div style="flex:1;height:'+h+'px;background:'+c+';border-radius:1px 1px 0 0;opacity:'+(isLast?'1':'.6')+';'+(isLast?'outline:1px solid '+c+';outline-offset:1px':'')+'" title="'+dateStr+': '+d.value_classification+' ('+d.value+')"></div>';
+            }).join('') +
+          '</div>'+
+          '<div style="display:flex;justify-content:space-between;font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);margin-top:2px">'+
+            '<span>'+new Date(parseInt(history[0].timestamp)*1000).toLocaleDateString(undefined,{month:'short',day:'numeric'})+'</span>'+
+            '<span>Today: '+val+' ('+label+')</span>'+
+          '</div>';
       }
     } catch(e) { console.warn('Fear & Greed failed:', e.message); }
   }
@@ -6319,88 +6718,188 @@ self.onmessage=function(e){
   // Hardcoded recurring macro events + live BTC halving / futures expiry dates
   async function fetchEconomicCalendar(bust) {
     const panel = document.getElementById('calPanel');
-    const TTL   = 60 * 60 * 1000; // 1h cache
     try {
-      const cached = !bust && _mktGet('econCal', TTL);
-      if(cached) { panel.innerHTML = cached; return; }
-
+      // Calendar is 100% static data — no API needed, always fast to build
+      // Don't cache rendered HTML since _calEvents must be live for tab switching
       const now = new Date();
-      const year = now.getFullYear();
 
-      // Impact levels: H=high, M=medium
-      // Build upcoming events for the next ~90 days
       const events = [
-        // FOMC Meetings 2025/2026
-        { date:'2025-12-18', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
-        { date:'2026-01-29', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
-        { date:'2026-03-19', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
-        { date:'2026-05-07', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
-        { date:'2026-06-18', label:'FOMC Rate Decision',        impact:'H', cat:'FED',   note:'Federal Reserve interest rate announcement' },
-        // US CPI (approx 2nd week each month)
-        { date:'2026-01-15', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
-        { date:'2026-02-12', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
-        { date:'2026-03-12', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
-        { date:'2026-04-14', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
-        { date:'2026-05-13', label:'US CPI Inflation Report',   impact:'H', cat:'MACRO', note:'Consumer Price Index — major crypto mover' },
-        // US Jobs (NFP — first Friday each month)
-        { date:'2026-01-09', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
-        { date:'2026-02-06', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
-        { date:'2026-03-06', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
-        { date:'2026-04-03', label:'US Non-Farm Payrolls',      impact:'M', cat:'MACRO', note:'Employment data — affects risk appetite' },
-        // GDP
-        { date:'2026-01-30', label:'US GDP Advance Estimate',   impact:'M', cat:'MACRO', note:'Q4 2025 GDP — signals economic health' },
-        { date:'2026-04-29', label:'US GDP Advance Estimate',   impact:'M', cat:'MACRO', note:'Q1 2026 GDP — signals economic health' },
-        // Crypto-specific
-        { date:'2028-04-17', label:'BTC Halving (est.)',        impact:'H', cat:'CRYPTO', note:'Next Bitcoin block reward halving ~2028' },
-        // CME Futures Expiry (last Friday of each month)
-        { date:'2026-01-30', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
-        { date:'2026-02-27', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
-        { date:'2026-03-27', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
-        { date:'2026-04-24', label:'CME BTC Futures Expiry',    impact:'M', cat:'CRYPTO', note:'Monthly BTC futures expiry — expect volatility' },
-        { date:'2026-06-26', label:'CME BTC Quarterly Expiry',  impact:'H', cat:'CRYPTO', note:'Quarterly expiry — high significance' },
-        { date:'2026-09-25', label:'CME BTC Quarterly Expiry',  impact:'H', cat:'CRYPTO', note:'Quarterly expiry — high significance' },
-        { date:'2026-12-25', label:'CME BTC Quarterly Expiry',  impact:'H', cat:'CRYPTO', note:'Quarterly expiry — high significance' },
+        // ── FOMC ──
+        { date:'2026-03-19', label:'FOMC Rate Decision',           impact:'H', cat:'FED',      note:'Federal Reserve interest rate announcement' },
+        { date:'2026-05-07', label:'FOMC Rate Decision',           impact:'H', cat:'FED',      note:'Federal Reserve interest rate announcement' },
+        { date:'2026-06-18', label:'FOMC Rate Decision',           impact:'H', cat:'FED',      note:'Federal Reserve interest rate announcement' },
+        { date:'2026-07-30', label:'FOMC Rate Decision',           impact:'H', cat:'FED',      note:'Federal Reserve interest rate announcement' },
+        { date:'2026-09-17', label:'FOMC Rate Decision',           impact:'H', cat:'FED',      note:'Federal Reserve interest rate announcement' },
+        { date:'2026-11-05', label:'FOMC Rate Decision',           impact:'H', cat:'FED',      note:'Federal Reserve interest rate announcement' },
+        { date:'2026-12-17', label:'FOMC Rate Decision',           impact:'H', cat:'FED',      note:'Federal Reserve interest rate announcement' },
+        // ── US CPI ──
+        { date:'2026-03-12', label:'US CPI Inflation Report',      impact:'H', cat:'MACRO',   note:'Consumer Price Index — major crypto/equity mover' },
+        { date:'2026-04-14', label:'US CPI Inflation Report',      impact:'H', cat:'MACRO',   note:'Consumer Price Index — major crypto/equity mover' },
+        { date:'2026-05-13', label:'US CPI Inflation Report',      impact:'H', cat:'MACRO',   note:'Consumer Price Index — major crypto/equity mover' },
+        { date:'2026-06-11', label:'US CPI Inflation Report',      impact:'H', cat:'MACRO',   note:'Consumer Price Index — major crypto/equity mover' },
+        { date:'2026-07-15', label:'US CPI Inflation Report',      impact:'H', cat:'MACRO',   note:'Consumer Price Index — major crypto/equity mover' },
+        { date:'2026-08-13', label:'US CPI Inflation Report',      impact:'H', cat:'MACRO',   note:'Consumer Price Index — major crypto/equity mover' },
+        // ── NFP ──
+        { date:'2026-04-03', label:'US Non-Farm Payrolls',         impact:'M', cat:'MACRO',   note:'Employment data — affects risk appetite globally' },
+        { date:'2026-05-01', label:'US Non-Farm Payrolls',         impact:'M', cat:'MACRO',   note:'Employment data — affects risk appetite globally' },
+        { date:'2026-06-05', label:'US Non-Farm Payrolls',         impact:'M', cat:'MACRO',   note:'Employment data — affects risk appetite globally' },
+        { date:'2026-07-02', label:'US Non-Farm Payrolls',         impact:'M', cat:'MACRO',   note:'Employment data — affects risk appetite globally' },
+        // ── GDP ──
+        { date:'2026-04-29', label:'US GDP Q1 2026 Advance',       impact:'M', cat:'MACRO',   note:'Q1 GDP — signals broader economic health' },
+        { date:'2026-07-29', label:'US GDP Q2 2026 Advance',       impact:'M', cat:'MACRO',   note:'Q2 GDP — signals broader economic health' },
+        // ── CME Crypto Expiry ──
+        { date:'2026-03-27', label:'CME BTC/ETH Futures Expiry',   impact:'M', cat:'CRYPTO',  note:'Monthly futures expiry — expect volatility spike' },
+        { date:'2026-04-24', label:'CME BTC/ETH Futures Expiry',   impact:'M', cat:'CRYPTO',  note:'Monthly futures expiry — expect volatility spike' },
+        { date:'2026-05-29', label:'CME BTC/ETH Futures Expiry',   impact:'M', cat:'CRYPTO',  note:'Monthly futures expiry — expect volatility spike' },
+        { date:'2026-06-26', label:'CME BTC Quarterly Expiry',     impact:'H', cat:'CRYPTO',  note:'Quarterly expiry — historically major price event' },
+        { date:'2026-09-25', label:'CME BTC Quarterly Expiry',     impact:'H', cat:'CRYPTO',  note:'Quarterly expiry — historically major price event' },
+        { date:'2026-12-25', label:'CME BTC Quarterly Expiry',     impact:'H', cat:'CRYPTO',  note:'Quarterly expiry — historically major price event' },
+        { date:'2028-04-17', label:'BTC Halving (estimated)',       impact:'H', cat:'CRYPTO',  note:'Next Bitcoin block reward halving ~2028' },
+        // ── US Stock Earnings (Q1 2026 season — reports in Apr/May) ──
+        { date:'2026-04-23', label:'TSLA Earnings Q1 2026',        impact:'H', cat:'EARNINGS', note:'Tesla — high retail sentiment, moves crypto indirectly', ticker:'TSLA' },
+        { date:'2026-04-29', label:'META Earnings Q1 2026',        impact:'M', cat:'EARNINGS', note:'Meta Platforms — AI/tech bellwether', ticker:'META' },
+        { date:'2026-04-30', label:'MSFT Earnings Q1 2026',        impact:'H', cat:'EARNINGS', note:'Microsoft — AI & cloud signal, moves Nasdaq broadly', ticker:'MSFT' },
+        { date:'2026-04-30', label:'AAPL Earnings Q2 FY2026',      impact:'H', cat:'EARNINGS', note:'Apple — largest market cap, risk-on/off signal', ticker:'AAPL' },
+        { date:'2026-05-01', label:'AMZN Earnings Q1 2026',        impact:'H', cat:'EARNINGS', note:'Amazon — cloud & consumer, broad market signal', ticker:'AMZN' },
+        { date:'2026-05-06', label:'GOOG Earnings Q1 2026',        impact:'M', cat:'EARNINGS', note:'Alphabet — ad market & AI proxy', ticker:'GOOG' },
+        { date:'2026-05-28', label:'NVDA Earnings Q1 FY2027',      impact:'H', cat:'EARNINGS', note:'Nvidia — AI GPU demand, huge mover for Nasdaq & crypto sentiment', ticker:'NVDA' },
+        // ── Q2 2026 season (Jul/Aug) ──
+        { date:'2026-07-21', label:'TSLA Earnings Q2 2026',        impact:'H', cat:'EARNINGS', note:'Tesla quarterly results', ticker:'TSLA' },
+        { date:'2026-07-23', label:'GOOG Earnings Q2 2026',        impact:'M', cat:'EARNINGS', note:'Alphabet quarterly results', ticker:'GOOG' },
+        { date:'2026-07-28', label:'META Earnings Q2 2026',        impact:'M', cat:'EARNINGS', note:'Meta Platforms quarterly results', ticker:'META' },
+        { date:'2026-07-29', label:'MSFT Earnings Q4 FY2026',      impact:'H', cat:'EARNINGS', note:'Microsoft quarterly results', ticker:'MSFT' },
+        { date:'2026-07-30', label:'AAPL Earnings Q3 FY2026',      impact:'H', cat:'EARNINGS', note:'Apple quarterly results', ticker:'AAPL' },
+        { date:'2026-07-30', label:'AMZN Earnings Q2 2026',        impact:'H', cat:'EARNINGS', note:'Amazon quarterly results', ticker:'AMZN' },
+        { date:'2026-08-27', label:'NVDA Earnings Q2 FY2027',      impact:'H', cat:'EARNINGS', note:'Nvidia quarterly results — key AI sentiment read', ticker:'NVDA' },
+        // ── US Quarterly Options Expiry (Triple Witching) ──
+        { date:'2026-03-20', label:'Triple Witching (Options Expiry)', impact:'M', cat:'STOCKS', note:'US equity quarterly options + futures expiry — elevated vol' },
+        { date:'2026-06-19', label:'Triple Witching (Options Expiry)', impact:'M', cat:'STOCKS', note:'US equity quarterly options + futures expiry — elevated vol' },
+        { date:'2026-09-18', label:'Triple Witching (Options Expiry)', impact:'M', cat:'STOCKS', note:'US equity quarterly options + futures expiry — elevated vol' },
+        { date:'2026-12-18', label:'Triple Witching (Options Expiry)', impact:'M', cat:'STOCKS', note:'US equity quarterly options + futures expiry — elevated vol' },
+        // ── Key Dividends (ex-dividend dates approx) ──
+        { date:'2026-05-09', label:'AAPL Ex-Dividend Date',         impact:'L', cat:'DIV',     note:'Apple quarterly dividend ~$0.25/share', ticker:'AAPL' },
+        { date:'2026-08-08', label:'AAPL Ex-Dividend Date',         impact:'L', cat:'DIV',     note:'Apple quarterly dividend ~$0.25/share', ticker:'AAPL' },
+        { date:'2026-05-15', label:'MSFT Ex-Dividend Date',         impact:'L', cat:'DIV',     note:'Microsoft quarterly dividend ~$0.83/share', ticker:'MSFT' },
+        { date:'2026-08-20', label:'MSFT Ex-Dividend Date',         impact:'L', cat:'DIV',     note:'Microsoft quarterly dividend ~$0.83/share', ticker:'MSFT' },
+        { date:'2026-04-03', label:'NVDA Ex-Dividend Date',         impact:'L', cat:'DIV',     note:'Nvidia quarterly dividend ~$0.01/share', ticker:'NVDA' },
+        { date:'2026-07-03', label:'NVDA Ex-Dividend Date',         impact:'L', cat:'DIV',     note:'Nvidia quarterly dividend ~$0.01/share', ticker:'NVDA' },
+        // ── Indonesia / IDR-relevant ──
+        { date:'2026-04-16', label:'BI Rate Decision (Bank Indonesia)', impact:'M', cat:'IDR', note:'Bank Indonesia interest rate — affects USD/IDR' },
+        { date:'2026-07-16', label:'BI Rate Decision (Bank Indonesia)', impact:'M', cat:'IDR', note:'Bank Indonesia interest rate — affects USD/IDR' },
+        { date:'2026-10-15', label:'BI Rate Decision (Bank Indonesia)', impact:'M', cat:'IDR', note:'Bank Indonesia interest rate — affects USD/IDR' },
       ];
 
-      // Filter to next 90 days, sort by date
-      const cutoff = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+      // ── Render with category filter tabs ──
+      const cutoff = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000); // show 120 days
       const upcoming = events
         .map(function(e) { return Object.assign({}, e, { d: new Date(e.date) }); })
-        .filter(function(e) { return e.d >= now && e.d <= cutoff; })
+        .filter(function(e) { return e.d >= new Date(now.getTime() - 86400000) && e.d <= cutoff; })
         .sort(function(a,b) { return a.d - b.d; });
 
-      const catColor = { FED:'#ff8c00', MACRO:'var(--accent)', CRYPTO:'var(--green)' };
-      const impColor = { H:'var(--red)', M:'var(--warn)' };
+      const catColor = { FED:'#ff8c00', MACRO:'var(--accent)', CRYPTO:'var(--green)', EARNINGS:'#c084fc', STOCKS:'#60a5fa', DIV:'#34d399', IDR:'#fbbf24' };
+      const impColor = { H:'var(--red)', M:'var(--warn)', L:'var(--muted)' };
+      const catLabel = { FED:'FED', MACRO:'MACRO', CRYPTO:'CRYPTO', EARNINGS:'EARNINGS', STOCKS:'STOCKS', DIV:'DIVIDENDS', IDR:'IDR/BI' };
 
-      const rendered = upcoming.map(function(e) {
-        const daysLeft = Math.ceil((e.d - now) / (24*60*60*1000));
-        const isToday  = daysLeft <= 1;
-        const isSoon   = daysLeft <= 7;
-        const cc = catColor[e.cat] || 'var(--muted)';
-        const ic = impColor[e.impact] || 'var(--muted)';
-        const dateStr = e.d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
-        const daysStr = isToday ? '⚡ TODAY' : isSoon ? daysLeft+'d' : daysLeft+'d';
-        return '<div class="liq-row" style="'+(isToday?'background:rgba(255,45,85,.08);border-radius:4px;padding:4px 6px;':isSoon?'background:rgba(255,140,0,.05);border-radius:4px;padding:2px 6px;':'')+'align-items:flex-start">'+
-          '<div style="flex:1;min-width:0">'+
-            '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
-              '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:'+cc+'">['+e.cat+']</span>'+
-              '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text)">'+e.label+'</span>'+
-              '<span style="font-family:Share Tech Mono,monospace;font-size:.5rem;padding:1px 5px;border-radius:3px;background:'+ic+'22;color:'+ic+';border:1px solid '+ic+'44;margin-left:auto">'+e.impact+' IMPACT</span>'+
+      function renderCalEvents(filterCat) {
+        const filtered = filterCat === 'ALL' ? upcoming : upcoming.filter(function(e){ return e.cat === filterCat; });
+        if(!filtered.length) return '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted);padding:8px 0">No events in this category for the next 120 days</div>';
+        return filtered.map(function(e) {
+          const daysLeft = Math.ceil((e.d - now) / (24*60*60*1000));
+          const isToday  = daysLeft <= 1;
+          const isSoon   = daysLeft <= 7;
+          const cc = catColor[e.cat] || 'var(--muted)';
+          const ic = impColor[e.impact] || 'var(--muted)';
+          const dateStr = e.d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+          const daysStr = isToday ? '⚡ TODAY' : daysLeft+'d';
+          const tickerBadge = e.ticker ? '<span style="font-family:Orbitron,monospace;font-size:.5rem;padding:1px 5px;border-radius:3px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);margin-left:4px">'+e.ticker+'</span>' : '';
+          return '<div class="liq-row" style="'+(isToday?'background:rgba(255,45,85,.08);border-radius:4px;padding:4px 6px;':isSoon?'background:rgba(255,140,0,.05);border-radius:4px;padding:2px 6px;':'')+'align-items:flex-start">'+
+            '<div style="flex:1;min-width:0">'+
+              '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">'+
+                '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:'+cc+'">['+catLabel[e.cat]+']</span>'+
+                '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text)">'+e.label+'</span>'+
+                tickerBadge+
+                '<span style="font-family:Share Tech Mono,monospace;font-size:.5rem;padding:1px 5px;border-radius:3px;background:'+ic+'22;color:'+ic+';border:1px solid '+ic+'44;margin-left:auto">'+e.impact+' IMPACT</span>'+
+              '</div>'+
+              '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+                '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted)">'+dateStr+'</span>'+
+                '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:'+(isSoon?ic:'var(--muted)')+'">'+daysStr+' away</span>'+
+                '<span style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);flex:1">'+e.note+'</span>'+
+              '</div>'+
             '</div>'+
-            '<div style="display:flex;gap:10px">'+
-              '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted)">'+dateStr+'</span>'+
-              '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:'+(isSoon?ic:'var(--muted)')+'">'+daysStr+' away</span>'+
-              '<span style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);flex:1">'+e.note+'</span>'+
-            '</div>'+
-          '</div>'+
-        '</div>';
-      }).join('');
+          '</div>';
+        }).join('');
+      }
 
-      panel.innerHTML = rendered || '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No events in next 90 days</div>';
-      _mktSet('econCal', rendered);
+      // Build filter tabs + content
+      const cats = ['ALL','FED','MACRO','EARNINGS','CRYPTO','STOCKS','DIV','IDR'];
+      const tabsHtml = cats.map(function(c, i) {
+          const count = c === 'ALL' ? upcoming.length : upcoming.filter(function(e){ return e.cat === c; }).length;
+          if(count === 0 && c !== 'ALL') return '';
+          return '<button class="ind-tab'+(i===0?' active':'')+'" id="cal-tab-'+c+'" onclick="switchCalTab(\''+c+'\')">'+
+            (c === 'ALL' ? 'All ('+count+')' : (catLabel[c]||c)+' ('+count+')')+
+          '</button>';
+        }).join('');
+
+      // Tabs go in the fixed row above the scroll area; events go inside scroll panel
+      const tabsRow = document.getElementById('cal-tabs-row');
+      if(tabsRow) tabsRow.innerHTML = tabsHtml;
+
+      panel.innerHTML = '<div id="calEventsList">'+renderCalEvents('ALL')+'</div>';
+
+      // Store events for tab switching (must stay in memory)
+      window._calEvents = upcoming;
+      window._calCatColor = catColor;
+      window._calCatLabel = catLabel;
+      window._calImpColor = impColor;
+
     } catch(e) {
       if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Calendar unavailable</div>';
     }
+  }
+
+  function switchCalTab(cat) {
+    document.querySelectorAll('[id^="cal-tab-"]').forEach(function(b){ b.classList.remove('active'); });
+    const btn = document.getElementById('cal-tab-'+cat);
+    if(btn) btn.classList.add('active');
+
+    const now = new Date();
+    const events = window._calEvents || [];
+    const catColor = window._calCatColor || {};
+    const catLabel = window._calCatLabel || {};
+    const impColor = window._calImpColor || {};
+    const filtered = cat === 'ALL' ? events : events.filter(function(e){ return e.cat === cat; });
+    const list = document.getElementById('calEventsList');
+    if(!list) return;
+
+    if(!filtered.length) {
+      list.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted);padding:8px 0">No events in this category</div>';
+      return;
+    }
+    list.innerHTML = filtered.map(function(e) {
+      const daysLeft = Math.ceil((e.d - now) / (24*60*60*1000));
+      const isToday  = daysLeft <= 1;
+      const isSoon   = daysLeft <= 7;
+      const cc = catColor[e.cat] || 'var(--muted)';
+      const ic = impColor[e.impact] || 'var(--muted)';
+      const dateStr = e.d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+      const daysStr = isToday ? '⚡ TODAY' : daysLeft+'d';
+      const tickerBadge = e.ticker ? '<span style="font-family:Orbitron,monospace;font-size:.5rem;padding:1px 5px;border-radius:3px;background:rgba(192,132,252,.15);color:#c084fc;border:1px solid rgba(192,132,252,.3);margin-left:4px">'+e.ticker+'</span>' : '';
+      return '<div class="liq-row" style="'+(isToday?'background:rgba(255,45,85,.08);border-radius:4px;padding:4px 6px;':isSoon?'background:rgba(255,140,0,.05);border-radius:4px;padding:2px 6px;':'')+'align-items:flex-start">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap">'+
+            '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:'+cc+'">['+( catLabel[e.cat]||e.cat)+']</span>'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text)">'+e.label+'</span>'+
+            tickerBadge+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.5rem;padding:1px 5px;border-radius:3px;background:'+ic+'22;color:'+ic+';border:1px solid '+ic+'44;margin-left:auto">'+e.impact+' IMPACT</span>'+
+          '</div>'+
+          '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted)">'+dateStr+'</span>'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:'+(isSoon?ic:'var(--muted)')+'">'+daysStr+' away</span>'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);flex:1">'+e.note+'</span>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
   }
 
   // ─── EXCHANGE VOLUME SPLIT ────────────────────────────────────────────────
@@ -7162,6 +7661,102 @@ self.onmessage=function(e){
     }).join('');
   }
 
+
+  // ══════════════════════════════════════════════════════
+  //  POSITION SIZE CALCULATOR
+  // ══════════════════════════════════════════════════════
+  function calcPosSize() {
+    const account = parseFloat(document.getElementById('ps-account')?.value) || 0;
+    const riskPct = parseFloat(document.getElementById('ps-risk')?.value) || 1;
+    const entry   = parseFloat(document.getElementById('ps-entry')?.value) || 0;
+    const sl      = parseFloat(document.getElementById('ps-sl')?.value)    || 0;
+    const tp      = parseFloat(document.getElementById('ps-tp')?.value)    || 0;
+    const lev     = Math.max(1, parseFloat(document.getElementById('ps-lev')?.value) || 1);
+    const FEE     = 0.001; // 0.1% taker fee (Binance standard)
+
+    function setResult(id, val, color) {
+      const card = document.getElementById(id);
+      if(!card) return;
+      const valEl = card.querySelector('.ps-result-val');
+      if(valEl) { valEl.textContent = val; if(color) valEl.style.color = color; else valEl.style.color = 'var(--accent)'; }
+    }
+
+    if(!account || !entry || !sl || entry <= 0 || sl <= 0) {
+      ['psr-possize','psr-coins','psr-risk','psr-rr','psr-slpct','psr-tppct','psr-break','psr-margin'].forEach(function(id){ setResult(id,'—'); });
+      const sig = document.getElementById('posSizeSignal');
+      if(sig) sig.innerHTML = '<span style="color:var(--muted)">Enter Account Size, Entry Price, and Stop Loss to calculate.</span>';
+      return;
+    }
+
+    const isLong    = entry > sl;
+    const slDist    = Math.abs(entry - sl);
+    const slPct     = slDist / entry * 100;
+    const riskUSD   = account * (riskPct / 100);
+    const posUSD    = (riskUSD / slPct * 100) * lev;   // position size in USD (leveraged)
+    const coins     = posUSD / entry;
+    const margin    = posUSD / lev;                     // collateral required
+    const breakeven = isLong ? entry * (1 + FEE * 2) : entry * (1 - FEE * 2);
+
+    let rrVal = null, tpPct = 0;
+    if(tp && tp > 0 && ((isLong && tp > entry) || (!isLong && tp < entry))) {
+      const tpDist = Math.abs(tp - entry);
+      tpPct = tpDist / entry * 100;
+      rrVal = tpDist / slDist;
+    }
+
+    const maxLoss   = riskUSD;
+    const liqBuffer = 1 / lev * 100; // rough liquidation distance %
+
+    // Colors
+    const riskColor  = riskPct > 3 ? 'var(--red)' : riskPct > 2 ? 'var(--warn)' : 'var(--green)';
+    const rrColor    = rrVal == null ? 'var(--muted)' : rrVal >= 3 ? 'var(--green)' : rrVal >= 2 ? 'var(--accent)' : rrVal >= 1 ? 'var(--warn)' : 'var(--red)';
+
+    function fmtUSD(n) { return n >= 1e6 ? '$'+(n/1e6).toFixed(2)+'M' : n >= 1e3 ? '$'+(n/1e3).toFixed(2)+'K' : '$'+n.toFixed(2); }
+    function fmtCoins(n) { return n >= 1000 ? n.toFixed(1) : n >= 1 ? n.toFixed(3) : n.toFixed(6); }
+
+    setResult('psr-possize', fmtUSD(posUSD), posUSD > account ? 'var(--warn)' : 'var(--accent)');
+    setResult('psr-coins',   fmtCoins(coins));
+    setResult('psr-risk',    fmtUSD(maxLoss), riskColor);
+    setResult('psr-rr',      rrVal != null ? '1 : '+rrVal.toFixed(2) : 'No TP set', rrColor);
+    setResult('psr-slpct',   slPct.toFixed(2)+'%', slPct > 10 ? 'var(--red)' : slPct > 5 ? 'var(--warn)' : 'var(--green)');
+    setResult('psr-tppct',   tpPct > 0 ? '+'+tpPct.toFixed(2)+'%' : 'No TP set', tpPct > 0 ? 'var(--green)' : 'var(--muted)');
+    setResult('psr-break',   isLong ? '$'+(breakeven).toFixed(entry<1?6:2) : '$'+(breakeven).toFixed(entry<1?6:2));
+    setResult('psr-margin',  fmtUSD(margin), margin > account * 0.5 ? 'var(--red)' : 'var(--accent)');
+
+    // Signal / advice text
+    const sigEl = document.getElementById('posSizeSignal');
+    if(sigEl) {
+      const warnings = [];
+      const advice   = [];
+      if(riskPct > 3) warnings.push('⚠️ Risk '+riskPct+'% is high — recommended max 1–2% per trade');
+      if(posUSD > account * 0.9 && lev === 1) warnings.push('⚠️ Position uses >90% of account (spot) — consider sizing down');
+      if(lev > 1 && liqBuffer < slPct * 1.5) warnings.push('⚠️ Liquidation distance (~'+liqBuffer.toFixed(1)+'%) is close to your SL — add margin buffer');
+      if(rrVal != null && rrVal < 1.5) warnings.push('⚠️ R:R below 1.5 — risk outweighs reward at this TP level');
+      if(rrVal != null && rrVal >= 3) advice.push('✅ Excellent R:R ratio of 1:'+rrVal.toFixed(2));
+      if(riskPct <= 1) advice.push('✅ Conservative risk sizing — good for capital preservation');
+      if(slPct < 2 && slPct > 0) advice.push('✅ Tight stop — allows larger position size at same risk');
+      const dir  = isLong ? '🟢 LONG' : '🔴 SHORT';
+      const summ = dir+' · Entry '+('$'+entry.toFixed(entry<1?6:2))+' → SL '+('$'+sl.toFixed(sl<1?6:2))+
+        (tp ? ' → TP $'+tp.toFixed(tp<1?6:2) : '')+' · '+lev+'× leverage';
+      sigEl.innerHTML =
+        '<div style="color:var(--text);margin-bottom:4px">'+summ+'</div>'+
+        (warnings.length ? warnings.map(function(w){ return '<div style="color:var(--warn)">'+w+'</div>'; }).join('') : '')+
+        (advice.length ? advice.map(function(a){ return '<div style="color:var(--green)">'+a+'</div>'; }).join('') : '');
+    }
+  }
+
+  function psFillFromChart() {
+    // Auto-fill entry from current chart price
+    const price = window._lastAnalysisPrice || parseFloat(document.getElementById('pcPrice')?.textContent?.replace(/[^0-9.]/g,'')) || 0;
+    const entryEl = document.getElementById('ps-entry');
+    if(entryEl && price) {
+      entryEl.value = price;
+      calcPosSize();
+    }
+  }
+
+  // Auto-fill entry when a new symbol is analysed
+  const _origUpdatePriceCard = window._origUpdatePriceCard;
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
