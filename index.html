@@ -6741,10 +6741,10 @@ self.onmessage=function(e){
 
     let rows = _scanResults.slice();
 
-    // Filter
-    if(_scanFilter === 'buy')  rows = rows.filter(function(r){ return r.sig.includes('BUY'); });
-    if(_scanFilter === 'sell') rows = rows.filter(function(r){ return r.sig.includes('SELL'); });
-    if(_scanFilter === 'neut') rows = rows.filter(function(r){ return r.sig.includes('NEUTRAL'); });
+    // Filter (also handle '—' for insufficient data)
+    if(_scanFilter === 'buy')  rows = rows.filter(function(r){ return r.sig && r.sig.includes('BUY'); });
+    if(_scanFilter === 'sell') rows = rows.filter(function(r){ return r.sig && r.sig.includes('SELL'); });
+    if(_scanFilter === 'neut') rows = rows.filter(function(r){ return r.sig && (r.sig.includes('NEUTRAL') || r.sig === '—'); });
 
     // Sort
     rows.sort(function(a, b) {
@@ -6777,8 +6777,10 @@ self.onmessage=function(e){
                                 : (r.price != null ? fmtP(r.price) : '—');
       const pctColor = r.pct > 0 ? 'var(--green)' : r.pct < 0 ? 'var(--red)' : 'var(--muted)';
       const pctStr   = r.pct != null ? (r.pct > 0 ? '+' : '') + r.pct.toFixed(2) + '%' : '—';
-      const scoreW   = r.score != null ? Math.max(r.score, r.sig.includes('BUY')?15:r.sig.includes('SELL')?5:10) : 0;
-      const scoreColor = scoreW >= 70 ? 'var(--green)' : scoreW <= 30 ? 'var(--red)' : 'var(--warn)';
+      const scoreRaw   = r.score != null ? r.score : 50;
+      const scoreW     = scoreRaw; // 0=strong sell bar empty, 100=full buy bar
+      const scoreBarW  = scoreRaw <= 50 ? (50 - scoreRaw) * 2 : scoreRaw; // bar shows strength either way
+      const scoreColor = scoreRaw >= 65 ? 'var(--green)' : scoreRaw <= 35 ? 'var(--red)' : 'var(--warn)';
       const rsiColor = r.rsi == null ? 'var(--muted)' : r.rsi >= 70 ? 'var(--red)' : r.rsi <= 30 ? 'var(--green)' : 'var(--accent)';
       const trendColor = r.trend && r.trend.startsWith('↑') ? 'var(--green)' : r.trend && r.trend.startsWith('↓') ? 'var(--red)' : 'var(--muted)';
 
@@ -6792,8 +6794,8 @@ self.onmessage=function(e){
         '<td>'+priceStr+'</td>'+
         '<td style="color:'+pctColor+'">'+pctStr+'</td>'+
         '<td>'+
-          '<span style="color:'+scoreColor+';font-weight:700">'+( r.score != null ? r.score : '—')+'</span>'+
-          '<span class="scan-bar-wrap"><span class="scan-bar" style="width:'+scoreW+'%;background:'+scoreColor+'"></span></span>'+
+          '<span style="color:'+scoreColor+';font-weight:700;min-width:28px">'+( r.score != null ? r.score : '—')+'</span>'+
+          '<span class="scan-bar-wrap"><span class="scan-bar" style="width:'+scoreBarW+'%;background:'+scoreColor+'"></span></span>'+
         '</td>'+
         '<td><span class="scan-badge" style="background:'+sigBg+';color:'+r.color+';border:1px solid '+sigBorder+'">'+r.sig+'</span></td>'+
         '<td style="color:'+rsiColor+'">'+( r.rsi != null ? r.rsi : '—')+'</td>'+
@@ -6907,20 +6909,23 @@ self.onmessage=function(e){
   async function fetchAltSeasonIndex(bust) {
     try {
       const TTL = 15 * 60 * 1000;
-      let coins = _mktGet('cgMarkets', TTL);
+      let coins = _mktGet('cgMarkets90d', TTL);
       if(!coins || bust) {
         coins = await smartFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false&price_change_percentage=90d');
-        _mktSet('cgMarkets', coins);
+        _mktSet('cgMarkets90d', coins);
       }
       if(!Array.isArray(coins)) throw new Error('bad data');
 
       // Altcoin season: % of top 50 altcoins (excl BTC) that outperformed BTC in 90d
       const btc   = coins.find(function(c){ return c.id === 'bitcoin'; });
       const btcChg = btc ? (btc.price_change_percentage_90d_in_currency || 0) : 0;
-      const alts   = coins.filter(function(c){ return c.id !== 'bitcoin'; }).slice(0, 50);
+      // Only include alts that have actual 90d data (null = new coin, skip)
+      const alts = coins.filter(function(c){
+        return c.id !== 'bitcoin' && c.price_change_percentage_90d_in_currency != null;
+      }).slice(0, 50);
+      if(alts.length < 10) throw new Error('Not enough 90d data from CoinGecko');
       const outperforming = alts.filter(function(c){
-        const chg = c.price_change_percentage_90d_in_currency || 0;
-        return chg > btcChg;
+        return c.price_change_percentage_90d_in_currency > btcChg;
       }).length;
       const idx = Math.round(outperforming / alts.length * 100);
 
@@ -6957,7 +6962,13 @@ self.onmessage=function(e){
           '<div style="color:var(--muted);margin-top:2px">Based on 90d perf · top 50 by market cap</div>';
       }
 
-    } catch(e) { console.warn('Alt season failed:', e.message); }
+    } catch(e) {
+      console.warn('Alt season failed:', e.message);
+      const lblEl = document.getElementById('altSeasonLabel');
+      if(lblEl) lblEl.textContent = 'Data unavailable';
+      const sigEl = document.getElementById('altSeasonSignal');
+      if(sigEl) sigEl.innerHTML = '<div style="color:var(--muted)">CoinGecko 90d data not available — try again in a moment</div>';
+    }
   }
 
   // ── Arc gauge canvas helper ───────────────────────────────────────────
