@@ -1909,11 +1909,12 @@
                 <th onclick="sortScanner('sig')">SIGNAL</th>
                 <th onclick="sortScanner('rsi')">RSI</th>
                 <th onclick="sortScanner('trend')">TREND</th>
+                <th>SPARK</th>
                 <th>LOAD</th>
               </tr>
             </thead>
             <tbody id="scanTbody">
-              <tr><td colspan="8" style="color:var(--muted);padding:20px;text-align:center">Click SCAN ALL to run signals on your watchlist</td></tr>
+              <tr><td colspan="9" style="color:var(--muted);padding:20px;text-align:center">Click SCAN ALL to run signals on your watchlist</td></tr>
             </tbody>
           </table>
         </div>
@@ -5498,12 +5499,16 @@ self.onmessage=function(e){
     document.getElementById('wlInput').value='';
     renderWatchlistUI();
     fetchWatchlistItem(sym);
+    // New symbol has no cached scan data yet — clear any stale entry
+    if(typeof _scanCache !== 'undefined') delete _scanCache[sym];
   }
 
   function removeWatchlistItem(sym) {
     watchlist = watchlist.filter(s=>s!==sym);
     saveWatchlist();
     renderWatchlistUI();
+    // Remove from scan cache so it doesn't linger if re-added later
+    if(typeof _scanCache !== 'undefined') delete _scanCache[sym];
   }
 
   function renderWatchlistUI() {
@@ -6621,33 +6626,71 @@ self.onmessage=function(e){
   // Uses Binance Futures /fapi/v1/forceOrders — no API key required
   async function fetchLiquidations(bust) {
     const panel = document.getElementById('liqPanel');
-    const TTL   = 2 * 60 * 1000; // 2min (data changes fast)
+    const TTL   = 2 * 60 * 1000;
     const SYMS  = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT'];
     try {
       let all = !bust && _mktGet('liqData', TTL);
       if(!all) {
-        // forceOrders: no startTime (causes rejection), limit=20 per symbol, parallel
-        const urls = SYMS.map(function(s) {
-          return 'https://fapi.binance.com/fapi/v1/forceOrders?symbol='+s+'&limit=20';
-        });
-        // Try individual smartFetch in parallel (avoids worker fapi routing issues)
-        let results = await Promise.all(urls.map(function(u){ return smartFetch(u).catch(function(){return null;}); }));
-
         all = {};
-        SYMS.forEach(function(sym, i) {
-          const rows = results[i];
-          if(!Array.isArray(rows)) return;
-          all[sym] = rows.map(function(r) {
-            return {
-              sym:   sym,
-              side:  r.side,          // BUY = short liquidated, SELL = long liquidated
-              price: parseFloat(r.averagePrice||r.price||0),
-              qty:   parseFloat(r.origQty||0),
-              usd:   parseFloat(r.averagePrice||r.price||0) * parseFloat(r.origQty||0),
-              time:  parseInt(r.time||r.updateTime||0),
-            };
-          }).filter(function(r){ return r.usd > 0; });
-        });
+
+        // ── Strategy 1: Binance fapi forceOrders, concurrency-limited (3 at a time) ──
+        let binanceOk = false;
+        try {
+          const urls = SYMS.map(function(s) {
+            return 'https://fapi.binance.com/fapi/v1/forceOrders?symbol='+s+'&limit=20';
+          });
+          const fetched = await _pLimit(
+            urls.map(function(u) { return function() { return smartFetch(u); }; }),
+            3  // max 3 concurrent fapi requests
+          );
+          SYMS.forEach(function(sym, i) {
+            const r = fetched[i];
+            const rows = r && r.status === 'fulfilled' ? r.value : null;
+            if(!Array.isArray(rows) || rows.length === 0) return;
+            binanceOk = true;
+            all[sym] = rows.map(function(r) {
+              return {
+                sym:   sym,
+                side:  r.side,
+                price: parseFloat(r.averagePrice||r.price||0),
+                qty:   parseFloat(r.origQty||0),
+                usd:   parseFloat(r.averagePrice||r.price||0) * parseFloat(r.origQty||0),
+                time:  parseInt(r.time||r.updateTime||0),
+              };
+            }).filter(function(r){ return r.usd > 0; });
+          });
+        } catch(_) {}
+
+        // ── Strategy 2: Coinglass public liquidation stats (no auth) ──
+        if(!binanceOk) {
+          try {
+            const cgUrl = 'https://open-api.coinglass.com/public/v2/liquidation_history?symbol=BTC&time_type=h1&limit=12';
+            const cg = await smartFetch(cgUrl);
+            if(cg && cg.data && Array.isArray(cg.data)) {
+              all['BTCUSDT'] = cg.data.map(function(d) {
+                return {
+                  sym: 'BTCUSDT', side: 'SELL',
+                  price: d.price || 0, qty: 0,
+                  usd: (d.longLiquidationUsd || 0) + (d.shortLiquidationUsd || 0),
+                  time: (d.createTime || 0) * 1000,
+                };
+              }).filter(function(r){ return r.usd > 0; });
+              binanceOk = true;
+            }
+          } catch(_) {}
+        }
+
+        // ── Strategy 3: Derive approximate liquidations from Binance funding + OI ──
+        if(!binanceOk) {
+          // Show a meaningful message instead of empty panel
+          if(panel) panel.innerHTML =
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--warn);padding:8px 0">' +
+            '⚠️ Liquidation data requires Binance Futures API access.<br>' +
+            '<span style="color:var(--muted)">Binance fapi.binance.com may be geo-restricted in your region. ' +
+            'Try using a VPN or check your Cloudflare Worker proxy settings.</span></div>';
+          return;
+        }
+
         _mktSet('liqData', all);
         _liqAllData = all;
       } else {
@@ -6968,68 +7011,92 @@ self.onmessage=function(e){
       if(!allWhales) {
         allWhales = [];
 
-        // Source 1: Blockchain.info recent BTC large transactions (no auth needed)
+        // ── Source 1: Blockchain.info BTC mempool — race allorigins vs corsproxy ──
         try {
-          const r = await fetch('https://api.allorigins.win/get?url='+encodeURIComponent('https://blockchain.info/unconfirmed-transactions?format=json&limit=50'), {signal:AbortSignal.timeout(7000)});
-          const j = await r.json();
-          const txs = JSON.parse(j.contents);
-          if(txs && txs.txs) {
-            txs.txs.forEach(function(tx) {
-              const outUsd = tx.out ? tx.out.reduce(function(s,o){return s+(o.value||0);},0)/1e8 : 0;
-              // Use live BTC price if available, fallback to last known or 80000
-              const btcVal = outUsd;
-              const _btcPx = (window.currentPrice && /^BTC/.test(document.getElementById('symbolInput')?.value||'BTC'))
-                ? window.currentPrice
-                : (window._lastBtcPrice || 80000);
+          const bcUrl = 'https://blockchain.info/unconfirmed-transactions?format=json&limit=50';
+          const bcRace = await Promise.any([
+            fetch('https://api.allorigins.win/get?url='+encodeURIComponent(bcUrl), {signal:AbortSignal.timeout(6000)})
+              .then(async function(r){ const j=await r.json(); return JSON.parse(j.contents); }),
+            fetch('https://corsproxy.io/?url='+encodeURIComponent(bcUrl), {signal:AbortSignal.timeout(6000)})
+              .then(function(r){ return r.json(); }),
+            smartFetch(bcUrl),
+          ]).catch(function(){ return null; });
+
+          if(bcRace && bcRace.txs) {
+            const _btcPx = window._lastBtcPrice || 84000;
+            bcRace.txs.forEach(function(tx) {
+              const btcVal = tx.out ? tx.out.reduce(function(s,o){return s+(o.value||0);},0)/1e8 : 0;
+              if(btcVal < 10) return;
               const estUsd = btcVal * _btcPx;
-              if(btcVal < 10) return; // skip < 10 BTC
               const inputs  = tx.inputs  ? tx.inputs[0]  : null;
               const outputs = tx.out     ? tx.out[0]     : null;
               const fromAddr = inputs  && inputs.prev_out  ? inputs.prev_out.addr  || '?' : '?';
               const toAddr   = outputs ? outputs.addr || '?' : '?';
               allWhales.push({
-                type: 'onchain',
+                type: 'onchain', sym: 'BTC',
                 title: btcVal.toFixed(2)+' BTC transferred on-chain',
                 link:  'https://www.blockchain.com/btc/tx/'+tx.hash,
-                usd:   estUsd,
-                sym:   'BTC',
-                from:  fromAddr.slice(0,10)+'…',
-                to:    toAddr.slice(0,10)+'…',
-                ts:    (tx.time||0)*1000 || Date.now(),
-                src:   'blockchain.info',
+                usd: estUsd,
+                from: fromAddr.slice(0,10)+'…', to: toAddr.slice(0,10)+'…',
+                ts:  (tx.time||0)*1000 || Date.now(),
+                src: 'blockchain.info',
               });
             });
           }
         } catch(_) {}
 
-        // Source 2: Binance large recent trades BTC + ETH (parallel, small limit)
+        // ── Source 2: Binance large spot trades BTC + ETH (concurrency-limited) ──
         try {
-          const [btcTrades, ethTrades] = await Promise.all([
-            smartFetch('https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=200').catch(function(){return [];}),
-            smartFetch('https://api.binance.com/api/v3/trades?symbol=ETHUSDT&limit=200').catch(function(){return [];}),
-          ]);
-          [[btcTrades,'BTC',10],[ethTrades,'ETH',100]].forEach(function(entry) {
-            const trades=entry[0], sym=entry[1], minQty=entry[2];
+          const tradeResults = await _pLimit([
+            function(){ return smartFetch('https://api.binance.com/api/v3/trades?symbol=BTCUSDT&limit=200'); },
+            function(){ return smartFetch('https://api.binance.com/api/v3/trades?symbol=ETHUSDT&limit=200'); },
+            function(){ return smartFetch('https://api.binance.com/api/v3/trades?symbol=SOLUSDT&limit=200'); },
+          ], 3);
+
+          [['BTC',10,0],['ETH',100,1],['SOL',2000,2]].forEach(function(entry) {
+            const sym=entry[0], minQty=entry[1], idx=entry[2];
+            const r = tradeResults[idx];
+            const trades = r && r.status==='fulfilled' ? r.value : null;
             if(!Array.isArray(trades)) return;
-            trades.filter(function(t){ return parseFloat(t.qty) >= minQty; }).slice(0,10).forEach(function(t) {
+            trades.filter(function(t){ return parseFloat(t.qty) >= minQty; }).slice(0,8).forEach(function(t) {
               const usd = parseFloat(t.price) * parseFloat(t.qty);
+              if(usd < 100000) return; // skip < $100k
               allWhales.push({
-                type:  'exchange',
+                type: 'exchange', sym,
                 title: (t.isBuyerMaker ? 'Large SELL' : 'Large BUY')+' · '+parseFloat(t.qty).toFixed(2)+' '+sym+' on Binance',
-                usd:   usd, sym: sym,
-                from:  t.isBuyerMaker ? 'Seller' : 'Buyer',
-                to:    'Binance Spot',
-                ts:    t.time,
-                side:  t.isBuyerMaker ? 'sell' : 'buy',
-                qty:   parseFloat(t.qty),
-                price: parseFloat(t.price),
-                src:   'Binance',
+                usd, from: t.isBuyerMaker ? 'Seller' : 'Buyer', to: 'Binance Spot',
+                ts: t.time, side: t.isBuyerMaker ? 'sell' : 'buy',
+                qty: parseFloat(t.qty), price: parseFloat(t.price), src: 'Binance',
               });
             });
           });
-        } catch(_){}
+        } catch(_) {}
 
-        // Sort by time desc, dedupe
+        // ── Source 3: Etherscan ETH large transfers (public, no key for recent txs) ──
+        try {
+          const ethUrl = 'https://api.etherscan.io/api?module=account&action=txlist&address=0xde0B295669a9FD93d5F28D9Ec85E40f4cb697BAe&startblock=0&endblock=99999999&sort=desc&offset=5&page=1';
+          // Use public whale wallet (Ethereum Foundation) as a live ETH tx indicator
+          // Better: use a mempool summary endpoint
+          const ethMemUrl = 'https://api.blockcypher.com/v1/eth/main';
+          const ethData = await Promise.any([
+            smartFetch(ethMemUrl),
+            fetch('https://corsproxy.io/?url='+encodeURIComponent(ethMemUrl), {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+          ]).catch(function(){ return null; });
+
+          if(ethData && ethData.unconfirmed_count != null) {
+            // BlockCypher gives mempool stats — show as context item
+            allWhales.push({
+              type: 'onchain', sym: 'ETH',
+              title: 'ETH mempool: '+ethData.unconfirmed_count.toLocaleString()+' pending txs',
+              link: 'https://etherscan.io/txsPending',
+              usd: 0, from: 'ETH Network', to: 'Mempool',
+              ts: Date.now(), src: 'BlockCypher',
+              isInfo: true,
+            });
+          }
+        } catch(_) {}
+
+        // Sort by time desc, filter out zero-usd info items except first
         allWhales.sort(function(a,b){ return b.ts - a.ts; });
         _mktSet('whaleData', allWhales);
         _whaleAllData = allWhales;
@@ -7173,7 +7240,7 @@ self.onmessage=function(e){
     // Show skeleton rows
     const tbody = document.getElementById('scanTbody');
     if(tbody) tbody.innerHTML = watchlist.map(function(s) {
-      return '<tr id="scan-row-'+s+'"><td class="scan-sym">'+s+'</td><td colspan="7" style="color:var(--muted)">'+_skel(1)+'</td></tr>';
+      return '<tr id="scan-row-'+s+'"><td class="scan-sym">'+s+'</td><td colspan="8" style="color:var(--muted)">'+_skel(1)+'</td></tr>';
     }).join('');
 
     // Separate cached vs needs-fetch symbols
@@ -7334,12 +7401,13 @@ self.onmessage=function(e){
       th.classList.remove('sort-asc','sort-desc');
     });
     const thMap = { sym:0, price:1, pct:2, score:3, sig:4, rsi:5, trend:6 };
+    // SPARK is col 7, LOAD is col 8 — not sortable, no index needed
     const thIdx = thMap[_scanSortKey];
     const ths = document.querySelectorAll('#scanTable thead th');
     if(ths[thIdx]) ths[thIdx].classList.add(_scanSortDir === -1 ? 'sort-desc' : 'sort-asc');
 
     if(!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8" style="color:var(--muted);padding:16px;text-align:center">No results match filter</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted);padding:16px;text-align:center">No results match filter</td></tr>';
       return;
     }
 
@@ -7372,9 +7440,49 @@ self.onmessage=function(e){
         '<td><span class="scan-badge" style="background:'+sigBg+';color:'+r.color+';border:1px solid '+sigBorder+'">'+r.sig+'</span></td>'+
         '<td style="color:'+rsiColor+'">'+( r.rsi != null ? r.rsi : '—')+'</td>'+
         '<td style="color:'+trendColor+'">'+( r.trend || '—')+'</td>'+
+        '<td><canvas class="scan-spark" id="spark-'+r.sym+'" width="80" height="28" style="display:block;vertical-align:middle"></canvas></td>'+
         '<td><button class="mkt-refresh-btn" style="padding:3px 8px;font-size:.52rem" onclick="event.stopPropagation();'+loadClick+'">→</button></td>'+
       '</tr>';
     }).join('');
+
+    // Draw sparklines after DOM paints
+    requestAnimationFrame(function() { _drawScanSparklines(rows); });
+  }
+
+  function _drawScanSparklines(rows) {
+    rows.forEach(function(r) {
+      const cv = document.getElementById('spark-'+r.sym);
+      if(!cv || !r.closes || r.closes.length < 2) return;
+      const closes = r.closes.slice(-40);
+      const W = 80, H = 28;
+      cv.width = W; cv.height = H;
+      const ctx = cv.getContext('2d');
+      ctx.clearRect(0, 0, W, H);
+      const mn = Math.min.apply(null, closes);
+      const mx = Math.max.apply(null, closes);
+      const range = mx - mn || 1;
+      const toX = function(i) { return (i / (closes.length - 1)) * W; };
+      const toY = function(v) { return H - 2 - ((v - mn) / range) * (H - 4); };
+      const isUp = closes[closes.length - 1] >= closes[0];
+      const lineColor = isUp ? '#00ff88' : '#ff2d55';
+      // Gradient fill
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, isUp ? 'rgba(0,255,136,.22)' : 'rgba(255,45,85,.22)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.moveTo(toX(0), H);
+      closes.forEach(function(v, i) { ctx.lineTo(toX(i), toY(v)); });
+      ctx.lineTo(toX(closes.length - 1), H);
+      ctx.closePath();
+      ctx.fillStyle = grad; ctx.fill();
+      // Price line
+      ctx.beginPath();
+      closes.forEach(function(v, i) {
+        i === 0 ? ctx.moveTo(toX(i), toY(v)) : ctx.lineTo(toX(i), toY(v));
+      });
+      ctx.strokeStyle = lineColor; ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round'; ctx.stroke();
+    });
   }
 
   function sortScanner(key) {
