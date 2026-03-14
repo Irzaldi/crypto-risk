@@ -7410,7 +7410,7 @@ self.onmessage=function(e){
         const ratio = parseFloat(d.longShortRatio);
         const longPct  = parseFloat(d.longAccount) * 100;
         const shortPct = parseFloat(d.shortAccount) * 100;
-        const barW = Math.round(longPct);
+        const barW = Math.min(100, Math.max(0, Math.round(isNaN(longPct) ? 50 : longPct)));
         const lColor = longPct > 60 ? 'var(--green)' : longPct < 40 ? 'var(--red)' : 'var(--warn)';
         const signal = longPct > 65 ? '⚠️ Crowded Long' : longPct > 55 ? '↑ Long Bias' : longPct < 35 ? '⚠️ Crowded Short' : longPct < 45 ? '↓ Short Bias' : '⟺ Balanced';
         const base = sym.replace('USDT','');
@@ -7799,6 +7799,7 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     const st  = document.getElementById('scanStatus');
     if(btn) { btn.disabled = true; btn.textContent = '⟳ SCANNING...'; }
     if(st)  st.textContent = 'Fetching candle data for watchlist...';
+    try {
 
     // Show skeleton rows
     const tbody = document.getElementById('scanTbody');
@@ -7840,7 +7841,6 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     });
 
     // Merge: keep watchlist order — cached symbols slot in by their original position
-    let cachedIdx = 0;
     _scanResults = watchlist.map(function(sym) {
       const hit = !bust && _scanCacheGet(sym);
       if(hit) return hit; // already cached (including ones we just set)
@@ -7861,7 +7861,12 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     const upd = document.getElementById('scanLastUpdate');
     if(upd) upd.textContent = 'Updated: ' + new Date().toLocaleTimeString();
     if(st)  st.textContent = '✓ Scanned ' + _scanResults.length + ' symbols';
-    if(btn) { btn.disabled = false; btn.textContent = '⟳ SCAN ALL'; }
+
+    } catch(e) {
+      if(st) st.textContent = '⚠️ Scan error: ' + e.message;
+    } finally {
+      if(btn) { btn.disabled = false; btn.textContent = '⟳ SCAN ALL'; }
+    }
   }
 
   // ── Fetch one symbol for scanner ─────────────────────────────────────
@@ -7911,7 +7916,7 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
 
     // ── RSI divergence detection (last 14 candles) ──
     let divergence = null;
-    if(rsi !== null && closes.length >= 20) {
+    if(rsi !== null && closes.length >= 30) {
       const n = 14;
       const recentCloses = closes.slice(-n);
       const recentRSIs   = _scanCalcRSIArray(closes, n);
@@ -8401,8 +8406,7 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     const panel = document.getElementById('macroPulsePanel');
     if(!panel) return;
     panel.innerHTML = _skel(5);
-
-    const TTL = 15 * 60 * 1000;
+    try {
     const ASSETS = [
       { id: 'DXY',   yahoo: 'DX-Y.NYB', label: 'US Dollar (DXY)',   flip: true,  note: 'Strong USD = bearish crypto/EM' },
       { id: 'GOLD',  yahoo: 'GC=F',     label: 'Gold (XAU/USD)',    flip: false, note: 'Risk-off hedge, positive for BTC' },
@@ -8461,9 +8465,10 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
         '<span class="macro-impact">'+r.note+trendStr+rsiStr+'</span>'+
       '</div>';
     }).join('');
+  } catch(e) {
+    if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Macro pulse unavailable</div>';
   }
-
-
+  }
   // ══════════════════════════════════════════════════════
   //  POSITION SIZE CALCULATOR
   // ══════════════════════════════════════════════════════
