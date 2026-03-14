@@ -785,8 +785,9 @@
   /* Dashboard grid */
   .mkt-grid-top { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
   .mkt-grid-mid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
-  @media(max-width:900px){ .mkt-grid-top { grid-template-columns:1fr 1fr; } }
-  @media(max-width:700px){ .mkt-grid-top,.mkt-grid-mid { grid-template-columns:1fr; } }
+  .oc-grid-3    { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+  @media(max-width:900px){ .mkt-grid-top { grid-template-columns:1fr 1fr; } .oc-grid-3 { grid-template-columns:1fr 1fr; } }
+  @media(max-width:700px){ .mkt-grid-top,.mkt-grid-mid,.oc-grid-3 { grid-template-columns:1fr; } }
 
   /* Funding rate rows */
   .fr-row { display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.04); }
@@ -1919,7 +1920,7 @@
     </div>
 
     <!-- Row 3: BTC Mempool | ETH Gas | Long/Short Ratio -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="oc-grid-3">
 
       <!-- BTC Mempool -->
       <div class="panel">
@@ -6692,6 +6693,30 @@ self.onmessage=function(e){
   let _liqAllData  = {};   // keyed by symbol
   let _whaleAllData = [];  // all whale rows
 
+  async function _pLimit(tasks, limit, onProgress) {
+    const results = new Array(tasks.length).fill(null);
+    let idx = 0, done = 0;
+    await new Promise(function(resolve) {
+      function next() {
+        if(idx >= tasks.length) return;
+        const i = idx++;
+        tasks[i]().then(function(v) {
+          results[i] = { status: 'fulfilled', value: v };
+        }).catch(function(e) {
+          results[i] = { status: 'rejected', reason: e };
+        }).finally(function() {
+          done++;
+          if(onProgress) onProgress(done, tasks.length);
+          if(done === tasks.length) resolve();
+          else next();
+        });
+      }
+      // Launch initial batch
+      for(let i = 0; i < Math.min(limit, tasks.length); i++) next();
+    });
+    return results;
+  }
+
   async function fetchOnChainDashboard(bust) {
     const btn    = document.getElementById('onchainRefreshBtn');
     const status = document.getElementById('onchainStatus');
@@ -7301,23 +7326,41 @@ self.onmessage=function(e){
     try {
       let data = !bust && _mktGet('ethGas', TTL);
       if(!data) {
-        // Race Etherscan (free, no key for gasoracle) vs owlracle
-        data = await Promise.any([
+        // Try Etherscan first (free, no key needed for gasoracle)
+        // Fallback: owlracle (needs correct format handling)
+        const rawData = await Promise.any([
           smartFetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle'),
-          fetch('https://owlracle.info/eth/gas?apikey=&blocks=10', {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+          fetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle', {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+          // owlracle: returns {speeds:[{maxFeePerGas,minFeePerGas,estimatedFee},...]}
+          fetch('https://owlracle.info/eth/gas?apikey=&blocks=10&percentile=35,60,90', {signal:AbortSignal.timeout(5000)})
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+              // Normalise owlracle to Etherscan-like shape
+              if(d && d.speeds && d.speeds.length >= 3) {
+                return { result: {
+                  SafeGasPrice:   String(Math.round(d.speeds[0].maxFeePerGas || 0)),
+                  ProposeGasPrice:String(Math.round(d.speeds[1].maxFeePerGas || 0)),
+                  FastGasPrice:   String(Math.round(d.speeds[2].maxFeePerGas || 0)),
+                }};
+              }
+              return null;
+            }),
         ]).catch(function(){ return null; });
-        if(data) _mktSet('ethGas', data);
+        if(rawData) { data = rawData; _mktSet('ethGas', data); }
       }
       if(!data) throw new Error('no data');
 
-      // Handle Etherscan format
-      const res = data.result || data;
-      const slow   = parseFloat(res.SafeGasPrice   || res.slow   || 0);
-      const normal = parseFloat(res.ProposeGasPrice || res.standard || res.average || 0);
-      const fast   = parseFloat(res.FastGasPrice    || res.fast   || 0);
-      if(!fast) throw new Error('bad format');
+      const res    = data.result || data;
+      const slow   = parseFloat(res.SafeGasPrice   || 0);
+      const normal = parseFloat(res.ProposeGasPrice || 0);
+      const fast   = parseFloat(res.FastGasPrice    || 0);
+      if(!fast) throw new Error('bad gas data');
 
-      const ethPx = window._lastBtcPrice ? window._lastBtcPrice * 0.05 : 3200; // rough ETH/BTC
+      // Use ETH price from DOM (already fetched by market dashboard) or estimate
+      const ethPriceEl = document.getElementById('mkt-ETH-price');
+      const ethPxStr   = ethPriceEl ? ethPriceEl.textContent.replace(/[^0-9.]/g,'') : '';
+      const ethPx      = parseFloat(ethPxStr) || (window._lastBtcPrice ? window._lastBtcPrice * 0.055 : 3000);
+
       const tiers = [
         { label:'🐌 Slow',    gwei: slow,   time:'~2min',  color:'var(--muted)' },
         { label:'🚗 Normal',  gwei: normal, time:'~30s',   color:'var(--accent)' },
@@ -7750,30 +7793,6 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
   }
 
   // ── Concurrency-limited parallel fetch (max N at a time) ─────────────
-  async function _pLimit(tasks, limit, onProgress) {
-    const results = new Array(tasks.length).fill(null);
-    let idx = 0, done = 0;
-    await new Promise(function(resolve) {
-      function next() {
-        if(idx >= tasks.length) return;
-        const i = idx++;
-        tasks[i]().then(function(v) {
-          results[i] = { status: 'fulfilled', value: v };
-        }).catch(function(e) {
-          results[i] = { status: 'rejected', reason: e };
-        }).finally(function() {
-          done++;
-          if(onProgress) onProgress(done, tasks.length);
-          if(done === tasks.length) resolve();
-          else next();
-        });
-      }
-      // Launch initial batch
-      for(let i = 0; i < Math.min(limit, tasks.length); i++) next();
-    });
-    return results;
-  }
-
   // ── Main scan orchestrator ────────────────────────────────────────────
   async function runScanner(bust) {
     const btn = document.getElementById('scanRefreshBtn');
