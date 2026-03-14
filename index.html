@@ -1223,6 +1223,62 @@
         </div>
       </div>
     </div>
+
+    <!-- ── Custom Indicator Plugin System ── -->
+    <div class="panel" style="border-color:rgba(192,132,252,.25)">
+      <div class="ptitle" style="color:#c084fc">🧩 Custom Indicators <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">formula or JS code · runs on current OHLCV</span></div>
+
+      <!-- Mode toggle -->
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <button class="ind-tab active" id="ci-mode-formula" onclick="ciSetMode('formula')">📝 Formula</button>
+        <button class="ind-tab" id="ci-mode-code" onclick="ciSetMode('code')">💻 JS Code</button>
+        <button class="ind-tab" id="ci-mode-examples" onclick="ciSetMode('examples')">📚 Examples</button>
+        <span id="ci-status" style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--muted);margin-left:auto;display:flex;align-items:center"></span>
+      </div>
+
+      <!-- Formula mode -->
+      <div id="ci-panel-formula">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--muted);margin-bottom:6px">
+          Use: <code style="color:var(--accent)">EMA(n)</code> <code style="color:var(--accent)">RSI(n)</code> <code style="color:var(--accent)">ATR(n)</code> <code style="color:var(--accent)">CLOSE</code> <code style="color:var(--accent)">PRICE</code> <code style="color:var(--accent)">VOLUME</code> — returns BUY/SELL/NEUTRAL
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:6px;margin-bottom:8px">
+          <input id="ci-formula-input" type="text" class="alert-input" style="width:100%;font-family:'Share Tech Mono',monospace;font-size:.65rem"
+            placeholder="e.g. EMA(8) > EMA(21) AND RSI(14) < 70" value="">
+          <button class="mkt-refresh-btn" onclick="ciRunFormula()" style="white-space:nowrap">▶ RUN</button>
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:6px">
+          Name: <input id="ci-formula-name" type="text" class="alert-input" style="width:140px;font-size:.6rem;display:inline-block;margin-left:4px" placeholder="My Indicator">
+          &nbsp;
+          <button class="alert-add-btn" onclick="ciSaveFormula()" style="display:inline-block">💾 Save</button>
+        </div>
+      </div>
+
+      <!-- Code mode -->
+      <div id="ci-panel-code" style="display:none">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--muted);margin-bottom:6px">
+          Function receives: <code style="color:var(--accent)">closes, opens, highs, lows, volumes, price, indicators</code> (rsi, ema8/13/21/55/200, atr, adx…)<br>
+          Must return: <code style="color:var(--accent)">{value, signal:'bull'|'bear'|'neut', label, description}</code>
+        </div>
+        <textarea id="ci-code-input" spellcheck="false" style="width:100%;height:120px;background:#050a12;border:1px solid rgba(192,132,252,.3);color:#e2e8f0;font-family:'Share Tech Mono',monospace;font-size:.62rem;padding:8px;border-radius:6px;resize:vertical;outline:none;box-sizing:border-box;tab-size:2"></textarea>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+          <input id="ci-code-name" type="text" class="alert-input" placeholder="Indicator name" style="width:150px;font-size:.6rem">
+          <button class="mkt-refresh-btn" onclick="ciRunCode()">▶ TEST</button>
+          <button class="alert-add-btn" onclick="ciSaveCode()">💾 Save</button>
+          <button class="alert-add-btn" style="border-color:var(--red);color:var(--red)" onclick="ciClearEditor()">✕ Clear</button>
+        </div>
+      </div>
+
+      <!-- Examples mode -->
+      <div id="ci-panel-examples" style="display:none">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--muted);margin-bottom:8px">Click any example to load it into the editor:</div>
+        <div id="ci-examples-list" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
+      <!-- Results: saved custom indicators rendered here -->
+      <div id="ci-saved-list" style="margin-top:10px"></div>
+      <div id="ci-results" style="margin-top:8px"></div>
+    </div>
+
     <div class="panel">
       <div class="ptitle">⚙️ Risk Management</div>
       <div class="rm-grid">
@@ -1652,6 +1708,7 @@
       <div class="mkt-card"><div class="mkt-card-label">ETH Dominance</div><div class="mkt-card-value" id="mkt-ethdom">—</div><div class="mkt-card-sub" id="mkt-ethdom-sub">of total market</div></div>
       <div class="mkt-card"><div class="mkt-card-label">24h Volume</div><div class="mkt-card-value" id="mkt-vol24">—</div><div class="mkt-card-sub" id="mkt-vol24-sub">—</div></div>
       <div class="mkt-card"><div class="mkt-card-label">Active Cryptos</div><div class="mkt-card-value" id="mkt-active">—</div><div class="mkt-card-sub" id="mkt-active-sub">—</div></div>
+      <div class="mkt-card"><div class="mkt-card-label">Stablecoin Dom</div><div class="mkt-card-value" id="mkt-stabledom">—</div><div class="mkt-card-sub" id="mkt-stabledom-sub">USDT + USDC</div></div>
       <!-- Fear & Greed Index card -->
       <div class="mkt-card" id="mkt-fng-card" style="position:relative;overflow:hidden">
         <div class="mkt-card-label">Fear &amp; Greed Index</div>
@@ -1855,6 +1912,35 @@
         <!-- Whale stats summary -->
         <div id="whaleSummary" style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap"></div>
         <div id="whalePanel" class="news-scroll" style="max-height:340px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Row 3: BTC Mempool | ETH Gas | Long/Short Ratio -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px">
+
+      <!-- BTC Mempool -->
+      <div class="panel">
+        <div class="ptitle">⛓️ BTC Mempool <span style="font-size:.5rem;color:var(--muted);margin-left:6px">mempool.space · sat/vB</span></div>
+        <div id="mempoolPanel">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+      <!-- ETH Gas -->
+      <div class="panel">
+        <div class="ptitle">⛽ ETH Gas <span style="font-size:.5rem;color:var(--muted);margin-left:6px">Etherscan oracle · Gwei</span></div>
+        <div id="gasPanel">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
+        </div>
+      </div>
+
+      <!-- BTC/ETH Long/Short Ratio -->
+      <div class="panel">
+        <div class="ptitle">⚖️ Long/Short Ratio <span style="font-size:.5rem;color:var(--muted);margin-left:6px">Binance futures · 1h</span></div>
+        <div id="lsRatioPanel">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
         </div>
       </div>
@@ -3964,6 +4050,8 @@ self.onmessage=function(e){
     if(atr) window._lastATR = atr;
     // Auto-fill entry price if field is empty
     psAutoFill();
+    // Run custom indicator plugins with current data + computed indicators
+    _runCustomIndicators({ closes, opens, highs, lows, volumes, price, ind });
 
     // ── Indicator bars ──────────────────────────────────────────────────────
     if(rsi!==null){const c=rsi<30?'var(--green)':rsi>70?'var(--red)':'var(--warn)';setInd('rsiBar','rsiVal','rsiBadge',rsi,c,rsi.toFixed(1),rsi<30?'bull':rsi>70?'bear':'neut',rsi<30?'OVERSOLD':rsi>70?'OVERBOUGHT':rsi>=50?'BULLISH':'BEARISH');}
@@ -6096,6 +6184,12 @@ self.onmessage=function(e){
       set('mkt-active', active ? active.toLocaleString() : '—');
       set('mkt-active-sub', 'tracked by CoinGecko');
       set('mkt-btcdom-sub', btcDom > 55 ? '⚠️ Alt season unlikely' : btcDom < 45 ? '🔥 Alt season possible' : 'Moderate BTC control');
+      // Stablecoin dominance (USDT + USDC)
+      const mcp = d.market_cap_percentage || {};
+      const stableDom = (mcp.usdt || 0) + (mcp.usdc || 0);
+      set('mkt-stabledom', stableDom ? stableDom.toFixed(1)+'%' : '—',
+          stableDom > 10 ? 'var(--warn)' : 'var(--accent)');
+      set('mkt-stabledom-sub', stableDom > 10 ? '⚠️ Risk-off: high stable' : stableDom > 7 ? 'Elevated stable dom' : '✅ Risk-on signal');
     } catch(e) { console.warn('Global metrics failed:', e.message); }
   }
 
@@ -6604,8 +6698,8 @@ self.onmessage=function(e){
     if(btn)    { btn.disabled = true; btn.textContent = '⟳ LOADING...'; }
     if(status) status.textContent = 'Fetching on-chain data...';
 
-    ['liqPanel','exchPanel','whalePanel'].forEach(function(id) {
-      const el = document.getElementById(id); if(el) el.innerHTML = _skel(6);
+    ['liqPanel','exchPanel','whalePanel','mempoolPanel','gasPanel','lsRatioPanel'].forEach(function(id) {
+      const el = document.getElementById(id); if(el) el.innerHTML = _skel(3);
     });
 
     await Promise.allSettled([
@@ -6613,6 +6707,9 @@ self.onmessage=function(e){
       fetchEconomicCalendar(bust),
       fetchExchangeVolumes(bust),
       fetchWhaleAlerts(bust),
+      fetchMempoolFees(bust),
+      fetchEthGas(bust),
+      fetchLongShortRatio(bust),
     ]);
 
     window._onchainLoaded = true;
@@ -7157,10 +7254,457 @@ self.onmessage=function(e){
     }).join('');
   }
 
-  // ══════════════════════════════════════════════════════════════════════
-  //  SCANNER & MACRO TAB
-  //  4 panels: Signal Scanner · BTC Dominance · Alt Season · Corr Matrix · Macro Pulse
-  // ══════════════════════════════════════════════════════════════════════
+  // ══ BTC MEMPOOL FEE TRACKER ══════════════════════════════════════════
+  async function fetchMempoolFees(bust) {
+    const panel = document.getElementById('mempoolPanel');
+    if(!panel) return;
+    const TTL = 3 * 60 * 1000;
+    try {
+      let data = !bust && _mktGet('mempoolFees', TTL);
+      if(!data) {
+        data = await Promise.any([
+          fetch('https://mempool.space/api/v1/fees/recommended', {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+          smartFetch('https://mempool.space/api/v1/fees/recommended'),
+        ]).catch(function(){ return null; });
+        if(data) _mktSet('mempoolFees', data);
+      }
+      if(!data || !data.fastestFee) throw new Error('no data');
+
+      const tiers = [
+        { label:'🐌 No Rush',   fee: data.minimumFee||data.hourFee,   time:'1–2h',  color:'var(--muted)' },
+        { label:'🚶 Economy',   fee: data.hourFee,                     time:'~1h',   color:'var(--accent)' },
+        { label:'🚗 Normal',    fee: data.halfHourFee,                 time:'~30m',  color:'var(--warn)' },
+        { label:'✈️ Priority',  fee: data.fastestFee,                  time:'~10m',  color:'var(--green)' },
+      ];
+      // Estimate USD cost for typical tx (250 vBytes)
+      const btcPx = window._lastBtcPrice || 84000;
+      panel.innerHTML = tiers.map(function(t) {
+        const sats = t.fee * 250;
+        const usd  = (sats / 1e8) * btcPx;
+        return '<div class="liq-row" style="justify-content:space-between">'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:'+t.color+'">'+t.label+'</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text)">'+t.fee+' sat/vB</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--muted)">~$'+usd.toFixed(2)+' · '+t.time+'</span>'+
+        '</div>';
+      }).join('') +
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:4px">for 250 vByte tx · mempool.space</div>';
+    } catch(e) {
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Mempool data unavailable</div>';
+    }
+  }
+
+  // ══ ETH GAS TRACKER ═══════════════════════════════════════════════════
+  async function fetchEthGas(bust) {
+    const panel = document.getElementById('gasPanel');
+    if(!panel) return;
+    const TTL = 2 * 60 * 1000;
+    try {
+      let data = !bust && _mktGet('ethGas', TTL);
+      if(!data) {
+        // Race Etherscan (free, no key for gasoracle) vs owlracle
+        data = await Promise.any([
+          smartFetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle'),
+          fetch('https://owlracle.info/eth/gas?apikey=&blocks=10', {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+        ]).catch(function(){ return null; });
+        if(data) _mktSet('ethGas', data);
+      }
+      if(!data) throw new Error('no data');
+
+      // Handle Etherscan format
+      const res = data.result || data;
+      const slow   = parseFloat(res.SafeGasPrice   || res.slow   || 0);
+      const normal = parseFloat(res.ProposeGasPrice || res.standard || res.average || 0);
+      const fast   = parseFloat(res.FastGasPrice    || res.fast   || 0);
+      if(!fast) throw new Error('bad format');
+
+      const ethPx = window._lastBtcPrice ? window._lastBtcPrice * 0.05 : 3200; // rough ETH/BTC
+      const tiers = [
+        { label:'🐌 Slow',    gwei: slow,   time:'~2min',  color:'var(--muted)' },
+        { label:'🚗 Normal',  gwei: normal, time:'~30s',   color:'var(--accent)' },
+        { label:'✈️ Fast',    gwei: fast,   time:'~15s',   color:'var(--green)' },
+      ];
+      panel.innerHTML = tiers.map(function(t) {
+        const usd = (t.gwei * 21000 * 1e-9) * ethPx;
+        return '<div class="liq-row" style="justify-content:space-between">'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:'+t.color+'">'+t.label+'</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text)">'+t.gwei.toFixed(1)+' Gwei</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--muted)">~$'+usd.toFixed(3)+' ETH tx · '+t.time+'</span>'+
+        '</div>';
+      }).join('') +
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:4px">for 21000 gas (ETH transfer) · Etherscan</div>';
+    } catch(e) {
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Gas data unavailable</div>';
+    }
+  }
+
+  // ══ LONG/SHORT RATIO ══════════════════════════════════════════════════
+  async function fetchLongShortRatio(bust) {
+    const panel = document.getElementById('lsRatioPanel');
+    if(!panel) return;
+    const TTL  = 5 * 60 * 1000;
+    const SYMS = ['BTCUSDT','ETHUSDT','SOLUSDT'];
+    try {
+      let data = !bust && _mktGet('lsRatio', TTL);
+      if(!data) {
+        const results = await _pLimit(
+          SYMS.map(function(s) {
+            return function() {
+              return smartFetch('https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol='+s+'&period=1h&limit=1');
+            };
+          }), 3
+        );
+        data = {};
+        SYMS.forEach(function(sym, i) {
+          const r = results[i];
+          const arr = r && r.status === 'fulfilled' ? r.value : null;
+          if(Array.isArray(arr) && arr.length) data[sym] = arr[0];
+        });
+        _mktSet('lsRatio', data);
+      }
+      const rows = SYMS.map(function(sym) {
+        const d = data[sym];
+        if(!d) return '';
+        const ratio = parseFloat(d.longShortRatio);
+        const longPct  = parseFloat(d.longAccount) * 100;
+        const shortPct = parseFloat(d.shortAccount) * 100;
+        const barW = Math.round(longPct);
+        const lColor = longPct > 60 ? 'var(--green)' : longPct < 40 ? 'var(--red)' : 'var(--warn)';
+        const signal = longPct > 65 ? '⚠️ Crowded Long' : longPct > 55 ? '↑ Long Bias' : longPct < 35 ? '⚠️ Crowded Short' : longPct < 45 ? '↓ Short Bias' : '⟺ Balanced';
+        const base = sym.replace('USDT','');
+        return '<div style="margin-bottom:10px">'+
+          '<div style="display:flex;justify-content:space-between;margin-bottom:3px">'+
+            '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:var(--accent)">'+base+'</span>'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--muted)">'+signal+'</span>'+
+          '</div>'+
+          '<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:3px">'+
+            '<div style="width:'+barW+'%;background:var(--green);transition:width .5s"></div>'+
+            '<div style="flex:1;background:var(--red)"></div>'+
+          '</div>'+
+          '<div style="display:flex;justify-content:space-between">'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--green)">Long '+longPct.toFixed(1)+'%</span>'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--muted)">ratio '+ratio.toFixed(2)+'</span>'+
+            '<span style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--red)">Short '+shortPct.toFixed(1)+'%</span>'+
+          '</div>'+
+        '</div>';
+      }).join('');
+      panel.innerHTML = rows || '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No data</div>';
+    } catch(e) {
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">L/S ratio unavailable — needs Binance Futures access</div>';
+    }
+  }
+
+  // ══ CUSTOM INDICATOR PLUGIN SYSTEM ════════════════════════════════════
+
+  // Saved indicators in localStorage
+  let _ciIndicators = (function() {
+    try { return JSON.parse(localStorage.getItem('tl_custom_indicators') || '[]'); } catch(e) { return []; }
+  })();
+  function _ciSave() { try { localStorage.setItem('tl_custom_indicators', JSON.stringify(_ciIndicators)); } catch(e) {} }
+
+  // Last live indicator data for re-running
+  window._ciLastData = null;
+
+  // Built-in example indicators
+  const CI_EXAMPLES = [
+    {
+      name: 'EMA Cross Signal',
+      mode: 'formula',
+      code: 'EMA(8) > EMA(21) AND RSI(14) < 70',
+      desc: 'Buy when EMA8 above EMA21 and RSI not overbought',
+    },
+    {
+      name: 'RSI Momentum',
+      mode: 'formula',
+      code: 'RSI(14) > 50 AND RSI(14) < 70',
+      desc: 'Bullish RSI in momentum zone',
+    },
+    {
+      name: 'Volume Surge',
+      mode: 'formula',
+      code: 'VOLUME > AVG_VOLUME(20) * 1.5 AND CLOSE > EMA(20)',
+      desc: 'Price above EMA20 with volume surge',
+    },
+    {
+      name: 'Price vs VWAP Ratio',
+      mode: 'code',
+      code: `// Price deviation from VWAP as a percentage
+function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
+  if(!ind.vwap || ind.vwap === 0) return null;
+  const dev = ((price - ind.vwap) / ind.vwap) * 100;
+  return {
+    value: Math.abs(dev),
+    signal: dev > 2 ? 'bear' : dev < -2 ? 'bull' : 'neut',
+    label: 'VWAP Dev',
+    description: dev >= 0 ? '+'+dev.toFixed(2)+'% ABOVE VWAP' : dev.toFixed(2)+'% BELOW VWAP'
+  };
+}`,
+      desc: 'Measures how far price is from VWAP',
+    },
+    {
+      name: 'ATR Volatility Meter',
+      mode: 'code',
+      code: `// ATR as % of price — measures current volatility
+function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
+  if(!ind.atr || price === 0) return null;
+  const atrPct = (ind.atr / price) * 100;
+  return {
+    value: atrPct,
+    signal: atrPct > 3 ? 'bear' : atrPct < 1 ? 'neut' : 'bull',
+    label: 'ATR%',
+    description: atrPct.toFixed(2)+'% '+(atrPct > 3 ? 'HIGH VOLATILITY' : atrPct > 1.5 ? 'MODERATE' : 'LOW VOLATILITY')
+  };
+}`,
+      desc: 'ATR as percentage of price',
+    },
+    {
+      name: 'Squeeze Momentum',
+      mode: 'code',
+      code: `// Simplified Squeeze: closes inside Bollinger but outside Keltner
+function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
+  if(!ind.bbP || !ind.kelt) return null;
+  const inSqueeze = ind.bbP > 0.15 && ind.bbP < 0.85 && ind.kelt.pct > 20 && ind.kelt.pct < 80;
+  const momentum  = closes[closes.length-1] - closes[closes.length-5];
+  return {
+    value: Math.abs(momentum / price * 100),
+    signal: inSqueeze ? 'neut' : momentum > 0 ? 'bull' : 'bear',
+    label: 'Squeeze',
+    description: inSqueeze ? '🔥 IN SQUEEZE' : momentum > 0 ? 'FIRED UP ↑' : 'FIRED DOWN ↓'
+  };
+}`,
+      desc: 'Detects Bollinger Band squeeze setups',
+    },
+  ];
+
+  // ── UI functions ─────────────────────────────────────────────────────
+
+  function ciSetMode(mode) {
+    ['formula','code','examples'].forEach(function(m) {
+      const btn = document.getElementById('ci-mode-'+m);
+      const panel = document.getElementById('ci-panel-'+m);
+      if(btn) btn.classList.toggle('active', m === mode);
+      if(panel) panel.style.display = m === mode ? 'block' : 'none';
+    });
+    if(mode === 'examples') _ciRenderExamples();
+  }
+
+  function _ciRenderExamples() {
+    const list = document.getElementById('ci-examples-list');
+    if(!list) return;
+    list.innerHTML = CI_EXAMPLES.map(function(ex, i) {
+      return '<div style="background:rgba(192,132,252,.06);border:1px solid rgba(192,132,252,.2);border-radius:6px;padding:8px 10px;cursor:pointer" onclick="_ciLoadExample('+i+')">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">' +
+          '<span style="font-family:Orbitron,monospace;font-size:.6rem;color:#c084fc">'+ex.name+'</span>' +
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);background:rgba(192,132,252,.1);padding:2px 6px;border-radius:3px">'+ex.mode+'</span>' +
+        '</div>' +
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--muted)">'+ex.desc+'</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function _ciLoadExample(i) {
+    const ex = CI_EXAMPLES[i];
+    ciSetMode(ex.mode);
+    if(ex.mode === 'formula') {
+      const inp = document.getElementById('ci-formula-input');
+      const nm  = document.getElementById('ci-formula-name');
+      if(inp) inp.value = ex.code;
+      if(nm)  nm.value  = ex.name;
+    } else {
+      const inp = document.getElementById('ci-code-input');
+      const nm  = document.getElementById('ci-code-name');
+      if(inp) inp.value = ex.code;
+      if(nm)  nm.value  = ex.name;
+    }
+    _ciSetStatus('Loaded: '+ex.name, 'var(--accent)');
+  }
+
+  function _ciSetStatus(msg, color) {
+    const el = document.getElementById('ci-status');
+    if(el) { el.textContent = msg; el.style.color = color || 'var(--muted)'; }
+  }
+
+  // ── Formula parser & evaluator ────────────────────────────────────────
+  function _ciEvalFormula(formula, data) {
+    const { closes, opens, highs, lows, volumes, price, ind } = data;
+    if(!closes || !closes.length) return null;
+
+    // Build EMA helper
+    function _ema(n) {
+      let e = closes[0], k = 2/(n+1);
+      for(let i=1;i<closes.length;i++) e = closes[i]*k + e*(1-k);
+      return e;
+    }
+    function _rsi(n) {
+      n = n || 14;
+      if(closes.length < n+1) return 50;
+      let g=0,l=0;
+      for(let i=closes.length-n;i<closes.length;i++){
+        const d=closes[i]-closes[i-1]; if(d>0)g+=d; else l-=d;
+      }
+      if(l===0) return 100;
+      return 100 - 100/(1+(g/n)/(l/n));
+    }
+    function _atr(n) {
+      n = n || 14; if(highs.length < n+1) return price*0.02;
+      let trs=[]; for(let i=1;i<highs.length;i++) trs.push(Math.max(highs[i]-lows[i],Math.abs(highs[i]-closes[i-1]),Math.abs(lows[i]-closes[i-1])));
+      let a=trs.slice(0,n).reduce(function(s,v){return s+v;},0)/n;
+      for(let i=n;i<trs.length;i++) a=(a*(n-1)+trs[i])/n;
+      return a;
+    }
+    function _avgVol(n) {
+      n = n || 20; if(volumes.length < n) return volumes[volumes.length-1];
+      return volumes.slice(-n).reduce(function(s,v){return s+v;},0)/n;
+    }
+
+    // Replace function calls with values
+    let expr = formula
+      .replace(/EMA\((\d+)\)/gi, function(_,n){ return _ema(+n).toFixed(8); })
+      .replace(/RSI\((\d+)\)/gi, function(_,n){ return _rsi(+n).toFixed(8); })
+      .replace(/ATR\((\d+)\)/gi, function(_,n){ return _atr(+n).toFixed(8); })
+      .replace(/AVG_VOLUME\((\d+)\)/gi, function(_,n){ return _avgVol(+n).toFixed(8); })
+      .replace(/\bCLOSE\b/gi, price.toFixed(8))
+      .replace(/\bPRICE\b/gi, price.toFixed(8))
+      .replace(/\bVOLUME\b/gi, (volumes[volumes.length-1]||0).toFixed(8))
+      .replace(/\bAND\b/gi, '&&')
+      .replace(/\bOR\b/gi, '||')
+      .replace(/\bNOT\b/gi, '!');
+
+    const result = new Function('return !!('+expr+')')();
+    return result;
+  }
+
+  function ciRunFormula() {
+    const formula = document.getElementById('ci-formula-input')?.value?.trim();
+    if(!formula) { _ciSetStatus('Enter a formula first', 'var(--warn)'); return; }
+    if(!window._ciLastData) { _ciSetStatus('Load a symbol first', 'var(--warn)'); return; }
+    try {
+      const result = _ciEvalFormula(formula, window._ciLastData);
+      const sig = result ? 'BUY ✅' : 'NO SIGNAL ❌';
+      const color = result ? 'var(--green)' : 'var(--red)';
+      const resEl = document.getElementById('ci-results');
+      if(resEl) resEl.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.65rem;color:'+color+';padding:6px 0">Formula result: <strong>'+sig+'</strong></div>';
+      _ciSetStatus('Evaluated ✓', 'var(--green)');
+    } catch(e) {
+      _ciSetStatus('Error: '+e.message, 'var(--red)');
+    }
+  }
+
+  function ciSaveFormula() {
+    const formula = document.getElementById('ci-formula-input')?.value?.trim();
+    const name    = document.getElementById('ci-formula-name')?.value?.trim() || 'Custom Formula';
+    if(!formula) { _ciSetStatus('Enter a formula first', 'var(--warn)'); return; }
+    if(_ciIndicators.length >= 8) { _ciSetStatus('Max 8 indicators', 'var(--warn)'); return; }
+    _ciIndicators.push({ id: Date.now(), name, mode: 'formula', code: formula });
+    _ciSave();
+    _ciRenderSaved();
+    _ciSetStatus('Saved: '+name, 'var(--green)');
+    if(window._ciLastData) _runCustomIndicators(window._ciLastData);
+  }
+
+  // ── Code mode ────────────────────────────────────────────────────────
+  function ciRunCode() {
+    const code = document.getElementById('ci-code-input')?.value?.trim();
+    if(!code) { _ciSetStatus('Enter code first', 'var(--warn)'); return; }
+    if(!window._ciLastData) { _ciSetStatus('Load a symbol first', 'var(--warn)'); return; }
+    try {
+      const result = _ciRunCodeFn(code, window._ciLastData);
+      if(!result) { _ciSetStatus('Returned null', 'var(--muted)'); return; }
+      const color = result.signal === 'bull' ? 'var(--green)' : result.signal === 'bear' ? 'var(--red)' : 'var(--warn)';
+      const resEl = document.getElementById('ci-results');
+      if(resEl) resEl.innerHTML =
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;padding:6px 0">'+
+          '<span style="color:var(--accent)">'+result.label+'</span> '+
+          '<span style="color:'+color+'">'+result.description+'</span> '+
+          '<span style="color:var(--muted)">(value: '+Number(result.value).toFixed(4)+')</span>'+
+        '</div>';
+      _ciSetStatus('Test OK ✓', 'var(--green)');
+    } catch(e) {
+      _ciSetStatus('Error: '+e.message, 'var(--red)');
+    }
+  }
+
+  function _ciRunCodeFn(code, data) {
+    const fn = new Function(
+      'closes','opens','highs','lows','volumes','price','indicators',
+      code + '\nreturn (typeof myIndicator === "function") ? myIndicator(closes,opens,highs,lows,volumes,price,indicators) : null;'
+    );
+    return fn(data.closes, data.opens, data.highs, data.lows, data.volumes, data.price, data.ind);
+  }
+
+  function ciSaveCode() {
+    const code = document.getElementById('ci-code-input')?.value?.trim();
+    const name = document.getElementById('ci-code-name')?.value?.trim() || 'Custom Code';
+    if(!code) { _ciSetStatus('Enter code first', 'var(--warn)'); return; }
+    if(_ciIndicators.length >= 8) { _ciSetStatus('Max 8 indicators', 'var(--warn)'); return; }
+    _ciIndicators.push({ id: Date.now(), name, mode: 'code', code });
+    _ciSave();
+    _ciRenderSaved();
+    _ciSetStatus('Saved: '+name, 'var(--green)');
+    if(window._ciLastData) _runCustomIndicators(window._ciLastData);
+  }
+
+  function ciClearEditor() {
+    const inp = document.getElementById('ci-code-input');
+    const nm  = document.getElementById('ci-code-name');
+    if(inp) inp.value = '';
+    if(nm)  nm.value  = '';
+    const res = document.getElementById('ci-results');
+    if(res) res.innerHTML = '';
+    _ciSetStatus('', '');
+  }
+
+  function ciDeleteIndicator(id) {
+    _ciIndicators = _ciIndicators.filter(function(i){ return i.id !== id; });
+    _ciSave();
+    _ciRenderSaved();
+    if(window._ciLastData) _runCustomIndicators(window._ciLastData);
+  }
+
+  function _ciRenderSaved() {
+    const list = document.getElementById('ci-saved-list');
+    if(!list) return;
+    if(!_ciIndicators.length) { list.innerHTML = ''; return; }
+    list.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.55rem;color:var(--muted);margin-bottom:6px;border-top:1px solid var(--border);padding-top:8px">Saved indicators (run on every symbol load):</div>' +
+      _ciIndicators.map(function(ci) {
+        const color = ci._lastSignal === 'bull' ? 'var(--green)' : ci._lastSignal === 'bear' ? 'var(--red)' : 'var(--muted)';
+        return '<div id="ci-saved-'+ci.id+'" class="ind-row" style="justify-content:space-between">'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text)">'+ci.name+'</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;padding:2px 6px;background:rgba(192,132,252,.08);border-radius:3px;color:var(--muted)">'+ci.mode+'</span>'+
+          '<span id="ci-res-'+ci.id+'" style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:'+color+'">'+(ci._lastDesc || '—')+'</span>'+
+          '<span onclick="ciDeleteIndicator('+ci.id+')" style="color:var(--red);cursor:pointer;font-size:.7rem;padding:0 4px">✕</span>'+
+        '</div>';
+      }).join('');
+  }
+
+  // ── Run all saved indicators against current data ─────────────────────
+  function _runCustomIndicators(data) {
+    window._ciLastData = data;
+    if(!_ciIndicators.length) return;
+    _ciIndicators.forEach(function(ci) {
+      try {
+        let result;
+        if(ci.mode === 'formula') {
+          const bool = _ciEvalFormula(ci.code, data);
+          result = { value: bool?1:0, signal: bool?'bull':'neut', label: ci.name, description: bool?'SIGNAL ✅':'NO SIGNAL' };
+        } else {
+          result = _ciRunCodeFn(ci.code, data);
+        }
+        if(result) {
+          ci._lastSignal = result.signal;
+          ci._lastDesc   = result.description;
+        }
+      } catch(e) {
+        ci._lastSignal = 'neut';
+        ci._lastDesc   = 'Error';
+      }
+    });
+    _ciRenderSaved();
+  }
+
+  // Initialise saved list on page load
+  _ciRenderSaved();
+
+  // ══ SCANNER TAB ════════════════════════════════════════════════════════════════════════
   window._scanLoaded    = false;
   let _scanResults      = [];   // [{sym, price, pct, score, sig, color, rsi, trend, closes}]
   let _scanSortKey      = 'score';
@@ -7340,8 +7884,36 @@ self.onmessage=function(e){
     const rsi  = closes.length >= 14 ? _scanCalcRSI(closes) : null;
     const trend = _scanTrend(closes);
 
+    // ── Volume spike detection ──
+    const volAvg20 = volumes.length >= 20
+      ? volumes.slice(-21,-1).reduce(function(a,b){return a+b;},0) / 20 : null;
+    const volLast  = volumes[volumes.length-1];
+    const volSpike = volAvg20 && volLast > 0 ? Math.round(volLast / volAvg20 * 100) : null;
+
+    // ── RSI divergence detection (last 14 candles) ──
+    let divergence = null;
+    if(rsi !== null && closes.length >= 20) {
+      const n = 14;
+      const recentCloses = closes.slice(-n);
+      const recentRSIs   = _scanCalcRSIArray(closes, n);
+      if(recentRSIs && recentRSIs.length >= n) {
+        const cLow1  = Math.min.apply(null, recentCloses.slice(0, Math.floor(n/2)));
+        const cLow2  = Math.min.apply(null, recentCloses.slice(Math.floor(n/2)));
+        const rLow1  = Math.min.apply(null, recentRSIs.slice(0, Math.floor(n/2)));
+        const rLow2  = Math.min.apply(null, recentRSIs.slice(Math.floor(n/2)));
+        const cHigh1 = Math.max.apply(null, recentCloses.slice(0, Math.floor(n/2)));
+        const cHigh2 = Math.max.apply(null, recentCloses.slice(Math.floor(n/2)));
+        const rHigh1 = Math.max.apply(null, recentRSIs.slice(0, Math.floor(n/2)));
+        const rHigh2 = Math.max.apply(null, recentRSIs.slice(Math.floor(n/2)));
+        // Bullish divergence: price lower low, RSI higher low
+        if(cLow2 < cLow1 * 0.998 && rLow2 > rLow1 * 1.01) divergence = 'bull';
+        // Bearish divergence: price higher high, RSI lower high
+        else if(cHigh2 > cHigh1 * 1.002 && rHigh2 < rHigh1 * 0.99) divergence = 'bear';
+      }
+    }
+
     return { sym, price, pct, score: mtf.score, sig: mtf.sig, color: mtf.color,
-             rsi, trend, closes, highs, lows, volumes };
+             rsi, trend, closes, highs, lows, volumes, volSpike, divergence };
   }
 
   // ── RSI for scanner (simple, standalone) ─────────────────────────────
@@ -7357,6 +7929,25 @@ self.onmessage=function(e){
     if(losses === 0) return 100;
     const rs = (gains / period) / (losses / period);
     return Math.round(100 - 100 / (1 + rs));
+  }
+
+  // Returns array of last `count` RSI values for divergence detection
+  function _scanCalcRSIArray(closes, count, period) {
+    period = period || 14;
+    const results = [];
+    if(closes.length < period + count) return null;
+    for(let k = count; k >= 1; k--) {
+      const slice = closes.slice(-(period + k), closes.length - k + 1);
+      if(slice.length < period + 1) { results.push(50); continue; }
+      let g = 0, l = 0;
+      for(let i = 1; i < slice.length; i++) {
+        const d = slice[i] - slice[i-1];
+        if(d > 0) g += d; else l -= d;
+      }
+      if(l === 0) { results.push(100); continue; }
+      results.push(100 - 100 / (1 + (g/period)/(l/period)));
+    }
+    return results;
   }
 
   // ── Trend summary from EMAs ───────────────────────────────────────────
@@ -7424,6 +8015,17 @@ self.onmessage=function(e){
       const rsiColor = r.rsi == null ? 'var(--muted)' : r.rsi >= 70 ? 'var(--red)' : r.rsi <= 30 ? 'var(--green)' : 'var(--accent)';
       const trendColor = r.trend && r.trend.startsWith('↑') ? 'var(--green)' : r.trend && r.trend.startsWith('↓') ? 'var(--red)' : 'var(--muted)';
 
+      // Vol spike badge
+      const volBadge = r.volSpike && r.volSpike >= 200
+        ? '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 4px;border-radius:3px;background:rgba(255,184,0,.15);color:var(--warn);border:1px solid rgba(255,184,0,.3);margin-left:4px" title="Volume '+r.volSpike+'% of 20-bar avg">🔊'+r.volSpike+'%</span>'
+        : '';
+      // Divergence badge
+      const divBadge = r.divergence === 'bull'
+        ? '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 4px;border-radius:3px;background:rgba(0,255,136,.12);color:var(--green);border:1px solid rgba(0,255,136,.3);margin-left:4px" title="Bullish RSI divergence">⚡DIV↑</span>'
+        : r.divergence === 'bear'
+        ? '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 4px;border-radius:3px;background:rgba(255,45,85,.12);color:var(--red);border:1px solid rgba(255,45,85,.3);margin-left:4px" title="Bearish RSI divergence">⚡DIV↓</span>'
+        : '';
+
       const sigBg = r.sig.includes('BUY') ? 'rgba(0,255,136,.15)' : r.sig.includes('SELL') ? 'rgba(255,45,85,.15)' : 'rgba(255,184,0,.1)';
       const sigBorder = r.sig.includes('BUY') ? 'rgba(0,255,136,.4)' : r.sig.includes('SELL') ? 'rgba(255,45,85,.4)' : 'rgba(255,184,0,.3)';
 
@@ -7439,7 +8041,7 @@ self.onmessage=function(e){
         '</td>'+
         '<td><span class="scan-badge" style="background:'+sigBg+';color:'+r.color+';border:1px solid '+sigBorder+'">'+r.sig+'</span></td>'+
         '<td style="color:'+rsiColor+'">'+( r.rsi != null ? r.rsi : '—')+'</td>'+
-        '<td style="color:'+trendColor+'">'+( r.trend || '—')+'</td>'+
+        '<td style="color:'+trendColor+'">'+( r.trend || '—')+divBadge+volBadge+'</td>'+
         '<td><canvas class="scan-spark" id="spark-'+r.sym+'" width="80" height="28" style="display:block;vertical-align:middle"></canvas></td>'+
         '<td><button class="mkt-refresh-btn" style="padding:3px 8px;font-size:.52rem" onclick="event.stopPropagation();'+loadClick+'">→</button></td>'+
       '</tr>';
