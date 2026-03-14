@@ -1932,7 +1932,7 @@
 
       <!-- ETH Gas -->
       <div class="panel">
-        <div class="ptitle">⛽ ETH Gas <span style="font-size:.5rem;color:var(--muted);margin-left:6px">Etherscan oracle · Gwei</span></div>
+        <div class="ptitle">⛽ Gas Fees <span style="font-size:.5rem;color:var(--muted);margin-left:6px">ETH · SOL · Gwei / µlamports</span></div>
         <div id="gasPanel">
           <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Loading...</div>
         </div>
@@ -8407,6 +8407,7 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     if(!panel) return;
     panel.innerHTML = _skel(5);
     try {
+    const TTL = 15 * 60 * 1000;
     const ASSETS = [
       { id: 'DXY',   yahoo: 'DX-Y.NYB', label: 'US Dollar (DXY)',   flip: true,  note: 'Strong USD = bearish crypto/EM' },
       { id: 'GOLD',  yahoo: 'GC=F',     label: 'Gold (XAU/USD)',    flip: false, note: 'Risk-off hedge, positive for BTC' },
