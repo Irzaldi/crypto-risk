@@ -2098,7 +2098,9 @@
         <button class="ind-tab"        id="fxg-idr"    onclick="fxSetGroup('idr')">🇮🇩 IDR</button>
         <button class="ind-tab"        id="fxg-asia"   onclick="fxSetGroup('asia')">Asia</button>
         <button class="ind-tab"        id="fxg-comm"   onclick="fxSetGroup('comm')">Commodities</button>
-        <button class="ind-tab"        id="fxg-stocks" onclick="fxSetGroup('stocks')">🇮🇩 IDX Stocks</button>
+        <button class="ind-tab"        id="fxg-stocks" onclick="fxSetGroup('stocks')">All Stocks</button>
+        <button class="ind-tab"        id="fxg-china"  onclick="fxSetGroup('china')">🇨🇳 China</button>
+        <button class="ind-tab"        id="fxg-custom" onclick="fxSetGroup('custom')">⭐ My Custom</button>
       </div>
 
       <div id="fxs-rates-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
@@ -2159,18 +2161,69 @@
 
     </div>
 
-    <!-- ── Row 3: IDX Indonesia Stocks ── -->
+    <!-- ── Row 3: IDX + US + China Stocks ── -->
     <div class="panel" style="margin-bottom:14px">
-      <div class="ptitle">🇮🇩 IDX Indonesia Stocks <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">click to load in Analysis · Yahoo Finance</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px" id="fxs-idx-grid">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div class="ptitle" style="margin-bottom:0">📈 Stock Markets</div>
+        <div style="display:flex;gap:6px">
+          <button class="ind-tab active" id="stk-tab-idx" onclick="stkSetTab('idx')">🇮🇩 IDX</button>
+          <button class="ind-tab"        id="stk-tab-us"  onclick="stkSetTab('us')">🇺🇸 US</button>
+          <button class="ind-tab"        id="stk-tab-cn"  onclick="stkSetTab('cn')">🇨🇳 China</button>
+        </div>
+      </div>
+      <div id="fxs-stocks-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">
         <!-- Populated by JS -->
       </div>
     </div>
 
-    <!-- ── Row 4: US Stocks Quick Access ── -->
-    <div class="panel">
-      <div class="ptitle">🇺🇸 US Stocks <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">click to load in Analysis · Yahoo Finance</span></div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px" id="fxs-us-grid">
+    <!-- ── Row 4: Dividends Calendar ── -->
+    <div class="panel" style="margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div class="ptitle" style="margin-bottom:0">💰 Upcoming Dividends <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">ex-dividend dates · click to load stock</span></div>
+        <div style="display:flex;gap:6px">
+          <button class="ind-tab active" id="div-tab-all" onclick="divSetTab('all')">All</button>
+          <button class="ind-tab"        id="div-tab-idx" onclick="divSetTab('idx')">🇮🇩 IDX</button>
+          <button class="ind-tab"        id="div-tab-us"  onclick="divSetTab('us')">🇺🇸 US</button>
+        </div>
+      </div>
+      <div id="fxs-div-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- ── Row 5: Add Custom Pair / Stock / Forex ── -->
+    <div class="panel" style="border-color:rgba(0,229,255,.2)">
+      <div class="ptitle" style="color:var(--accent)">➕ Add Custom Pair <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">stock · forex · commodity · crypto — persisted across sessions</span></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:10px">
+        <div>
+          <label class="rm-label">Type</label>
+          <select id="fxs-add-type" class="alert-input" style="width:100%;font-size:.6rem" onchange="fxsUpdateHint()">
+            <option value="stock">📈 Stock (Yahoo ticker)</option>
+            <option value="forex">💱 Forex (6-letter pair)</option>
+            <option value="commodity">🛢️ Commodity (Yahoo ticker)</option>
+            <option value="crypto">🪙 Crypto (Binance symbol)</option>
+          </select>
+        </div>
+        <div>
+          <label class="rm-label">Symbol</label>
+          <input id="fxs-add-sym" type="text" class="alert-input" style="width:100%;font-size:.65rem;text-transform:uppercase"
+            placeholder="e.g. 600519.SS" maxlength="20" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <div>
+          <label class="rm-label">Display Name (optional)</label>
+          <input id="fxs-add-label" type="text" class="alert-input" style="width:100%;font-size:.65rem" placeholder="e.g. Kweichow Moutai">
+        </div>
+        <button class="mkt-refresh-btn" onclick="fxsAddCustom()" style="white-space:nowrap;height:32px">＋ ADD</button>
+      </div>
+
+      <div id="fxs-add-hint" style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--muted);margin-bottom:10px">
+        Yahoo Finance ticker for stocks/commodities (e.g. 600519.SS, GC=F, AAPL). Stooq fallback for IDX (.JK) stocks.
+      </div>
+      <div id="fxs-add-error" style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--red);display:none;margin-bottom:8px"></div>
+
+      <!-- Custom pairs grid -->
+      <div id="fxs-custom-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">
         <!-- Populated by JS -->
       </div>
     </div>
@@ -8063,8 +8116,10 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
       { sym:'COPPER', label:'Copper',     flag:'🔩', yahooTicker:'HG=F', isCommodity:true },
     ],
     stocks: [
-      // IDX presets shown in stocks group
+      // All stocks shown via stkSetTab — this group is populated dynamically
     ],
+    china: [],   // populated from CN_STOCKS in IIFE
+    custom: [],  // populated from customPairs localStorage
   };
 
   // IDX Indonesia preset stocks
@@ -8085,14 +8140,32 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
 
   // US Stocks presets
   const US_STOCKS = [
-    { sym:'AAPL',  label:'Apple',     sector:'Tech',      flag:'🍎' },
-    { sym:'MSFT',  label:'Microsoft', sector:'Tech',      flag:'🪟' },
-    { sym:'NVDA',  label:'Nvidia',    sector:'AI/GPU',    flag:'🟢' },
-    { sym:'TSLA',  label:'Tesla',     sector:'EV/Auto',   flag:'⚡' },
-    { sym:'AMZN',  label:'Amazon',    sector:'E-Commerce',flag:'📦' },
-    { sym:'META',  label:'Meta',      sector:'Social',    flag:'👁️' },
-    { sym:'GOOGL', label:'Alphabet',  sector:'Tech',      flag:'🔵' },
-    { sym:'BRK-B', label:'Berkshire', sector:'Finance',   flag:'💰' },
+    { sym:'AAPL',  label:'Apple',     sector:'Tech',      flag:'🍎', divYield:'0.5%' },
+    { sym:'MSFT',  label:'Microsoft', sector:'Tech',      flag:'🪟', divYield:'0.7%' },
+    { sym:'NVDA',  label:'Nvidia',    sector:'AI/GPU',    flag:'🟢', divYield:'0.03%' },
+    { sym:'TSLA',  label:'Tesla',     sector:'EV/Auto',   flag:'⚡', divYield:null },
+    { sym:'AMZN',  label:'Amazon',    sector:'E-Commerce',flag:'📦', divYield:null },
+    { sym:'META',  label:'Meta',      sector:'Social',    flag:'👁️', divYield:'0.4%' },
+    { sym:'GOOGL', label:'Alphabet',  sector:'Tech',      flag:'🔵', divYield:'0.5%' },
+    { sym:'BRK-B', label:'Berkshire', sector:'Finance',   flag:'💰', divYield:null },
+    { sym:'JPM',   label:'JPMorgan',  sector:'Finance',   flag:'🏦', divYield:'2.2%' },
+    { sym:'KO',    label:'Coca-Cola', sector:'Consumer',  flag:'🥤', divYield:'3.1%' },
+  ];
+
+  // China A-shares + HK stocks
+  const CN_STOCKS = [
+    { sym:'600519.SS', label:'Kweichow Moutai', sector:'Consumer', flag:'🍶' },
+    { sym:'601398.SS', label:'ICBC',             sector:'Finance',  flag:'🏦' },
+    { sym:'600036.SS', label:'China Merchants Bank',sector:'Finance',flag:'🏦' },
+    { sym:'601318.SS', label:'Ping An Insurance',sector:'Finance',  flag:'🛡️' },
+    { sym:'600276.SS', label:'Hengrui Medicine', sector:'Pharma',   flag:'💊' },
+    { sym:'000858.SZ', label:'Wuliangye Yibin',  sector:'Consumer', flag:'🍶' },
+    { sym:'000333.SZ', label:'Midea Group',       sector:'Appliances',flag:'🌀' },
+    { sym:'002594.SZ', label:'BYD Company',       sector:'EV/Auto',  flag:'🚗' },
+    { sym:'9988.HK',   label:'Alibaba (HK)',      sector:'Tech',     flag:'🟠' },
+    { sym:'0700.HK',   label:'Tencent',           sector:'Tech',     flag:'💚' },
+    { sym:'3690.HK',   label:'Meituan',           sector:'Tech',     flag:'🟡' },
+    { sym:'9999.HK',   label:'NetEase',           sector:'Gaming',   flag:'🎮' },
   ];
 
   let _fxGroup = 'major';
@@ -8116,7 +8189,6 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     });
     // Register IDX stocks
     IDX_STOCKS.forEach(function(s) {
-      const key = s.sym.replace('.JK','');
       if(!window._customStocks) window._customStocks = {};
       window._customStocks[s.sym] = { yahoo:s.sym, display:s.label };
       SPECIAL_PAIRS[s.sym] = { display:s.label+' (IDX)', isStock:true };
@@ -8127,11 +8199,18 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
       window._customStocks[s.sym] = { yahoo:s.sym, display:s.label };
       SPECIAL_PAIRS[s.sym] = { display:s.label, isStock:true };
     });
+    // Register China stocks
+    CN_STOCKS.forEach(function(s) {
+      if(!window._customStocks) window._customStocks = {};
+      window._customStocks[s.sym] = { yahoo:s.sym, display:s.label };
+      SPECIAL_PAIRS[s.sym] = { display:s.label+' (CN)', isStock:true };
+    });
   })();
 
   // ── Market Session Clock ──────────────────────────────────────────────
-  // Sessions in UTC: Tokyo 0-9, London 8-17, New York 13-22
+  // Sessions in UTC: Tokyo 0-9, London 8-17, New York 13-22, Shanghai 1-7
   const FX_SESSIONS = [
+    { name:'Shanghai', open:1,  close:7,  color:'#ff4444', pairs:'CNY, A-shares, HSI' },
     { name:'Tokyo',    open:0,  close:9,  color:'#ff8c00', pairs:'JPY, AUD, NZD, SGD' },
     { name:'London',   open:8,  close:17, color:'#00e5ff', pairs:'EUR, GBP, CHF' },
     { name:'New York', open:13, close:22, color:'var(--green)', pairs:'USD, CAD, MXN' },
@@ -8244,6 +8323,8 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
       }
     } catch(e) {}
     _fxRenderGroup(_fxGroup);
+    // Refresh bottom custom grid so forex rates show up
+    if(typeof _fxRenderBottomCustomGrid === 'function') _fxRenderBottomCustomGrid();
   }
 
   function _fxGetRate(sym) {
@@ -8261,7 +8342,7 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
 
   function fxSetGroup(grp) {
     _fxGroup = grp;
-    ['major','idr','asia','comm','stocks'].forEach(function(g) {
+    ['major','idr','asia','comm','stocks','china','custom'].forEach(function(g) {
       const b = document.getElementById('fxg-'+g);
       if(b) b.classList.toggle('active', g === grp);
     });
@@ -8273,7 +8354,15 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     if(!grid) return;
 
     if(grp === 'stocks') {
-      _fxRenderStockCards(grid);
+      _fxRenderStockCards(grid, IDX_STOCKS.concat(US_STOCKS));
+      return;
+    }
+    if(grp === 'china') {
+      _fxRenderStockCards(grid, CN_STOCKS);
+      return;
+    }
+    if(grp === 'custom') {
+      _fxRenderCustomGroup(grid);
       return;
     }
 
@@ -8306,21 +8395,316 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     _fxFetchDailyChanges(pairs);
   }
 
-  function _fxRenderStockCards(grid) {
-    const allStocks = IDX_STOCKS.concat(US_STOCKS);
-    grid.innerHTML = allStocks.map(function(s) {
+  function _fxRenderStockCards(grid, stocks) {
+    if(!stocks || !stocks.length) {
+      grid.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No stocks in this group</div>';
+      return;
+    }
+    grid.innerHTML = stocks.map(function(s) {
       return '<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .2s" '+
         'onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'" '+
         'onclick="_fxLoadStock(\''+s.sym+'\')" title="Click to load '+s.label+'">'+
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
-          '<span style="font-size:.85rem">'+s.flag+'</span>'+
-          '<span style="font-family:Orbitron,monospace;font-size:.62rem;font-weight:700;color:var(--accent)">'+s.sym+'</span>'+
-          '<span style="font-family:Share Tech Mono,monospace;font-size:.5rem;padding:1px 5px;border-radius:3px;background:rgba(255,255,255,.05);color:var(--muted);margin-left:auto">'+s.sector+'</span>'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
+          '<span style="font-size:.8rem">'+(s.flag||'📈')+'</span>'+
+          '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:var(--accent)">'+s.sym+'</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 4px;background:rgba(255,255,255,.05);border-radius:3px;color:var(--muted);margin-left:auto">'+(s.sector||'')+'</span>'+
         '</div>'+
-        '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">'+s.label+'</div>'+
-        '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);margin-top:3px">→ analyse + fundamentals</div>'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted)">'+s.label+'</div>'+
+        (s.divYield ? '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:#34d399;margin-top:2px">💰 Div: '+s.divYield+'</div>' : '')+
       '</div>';
     }).join('');
+  }
+
+  // Custom group in rates grid
+  function _fxRenderCustomGroup(grid) {
+    const custom = _fxGetCustomPairs();
+    if(!custom.length) {
+      grid.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No custom pairs yet — add them below ↓</div>';
+      return;
+    }
+    grid.innerHTML = custom.map(function(p) {
+      const isStock = p.type === 'stock';
+      const isForex = p.type === 'forex';
+      const rate = isForex ? _fxGetRate(p.sym) : null;
+      const rateStr = rate ? rate.toFixed(4) : '—';
+      return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(0,229,255,.2);border-radius:8px;padding:10px 12px;cursor:pointer;position:relative;transition:border-color .2s" '+
+        'onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'rgba(0,229,255,.2)\'" '+
+        'onclick="'+(isStock?"_fxLoadStock('"+p.sym+"')":"_fxLoadPair('"+p.sym+"')")+'" title="Click to load">'+
+        '<div style="position:absolute;top:6px;right:6px;cursor:pointer;color:var(--red);font-size:.7rem;padding:0 4px" '+
+          'onclick="event.stopPropagation();fxsRemoveCustom(\''+p.sym+'\')" title="Remove">✕</div>'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 5px;border-radius:3px;background:rgba(0,229,255,.08);color:var(--accent)">'+p.type.toUpperCase()+'</span>'+
+          '<span style="font-family:Orbitron,monospace;font-size:.62rem;font-weight:700;color:var(--accent)">'+p.sym+'</span>'+
+        '</div>'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted)">'+p.label+'</div>'+
+        (isForex && rate ? '<div style="font-family:Share Tech Mono,monospace;font-size:.65rem;color:var(--text);font-weight:700;margin-top:3px">'+rateStr+'</div>' : '')+
+      '</div>';
+    }).join('');
+  }
+
+  // ── Stock market tabs (IDX / US / China) ──────────────────────────────
+  let _stkTab = 'idx';
+  function stkSetTab(tab) {
+    _stkTab = tab;
+    ['idx','us','cn'].forEach(function(t) {
+      const b = document.getElementById('stk-tab-'+t);
+      if(b) b.classList.toggle('active', t === tab);
+    });
+    _fxRenderStockGrids();
+  }
+
+  function _fxRenderStockGrids() {
+    const grid = document.getElementById('fxs-stocks-grid');
+    if(!grid) return;
+    const stocks = _stkTab === 'idx' ? IDX_STOCKS :
+                   _stkTab === 'us'  ? US_STOCKS  : CN_STOCKS;
+    _fxRenderStockCards(grid, stocks);
+  }
+
+  // ── Dividends Calendar ────────────────────────────────────────────────
+  const DIVIDENDS = [
+    { sym:'BBCA.JK', label:'Bank BCA',       flag:'🏦', market:'idx', exDiv:'2026-04-15', yield:'3.2%', amount:'IDR 340/share',  freq:'Annual' },
+    { sym:'BMRI.JK', label:'Bank Mandiri',   flag:'🏦', market:'idx', exDiv:'2026-04-20', yield:'5.8%', amount:'IDR 420/share',  freq:'Annual' },
+    { sym:'BBRI.JK', label:'Bank BRI',       flag:'🏦', market:'idx', exDiv:'2026-04-22', yield:'6.1%', amount:'IDR 215/share',  freq:'Annual' },
+    { sym:'TLKM.JK', label:'Telkom',         flag:'📡', market:'idx', exDiv:'2026-05-10', yield:'5.5%', amount:'IDR 185/share',  freq:'Interim' },
+    { sym:'UNVR.JK', label:'Unilever IDX',   flag:'🛒', market:'idx', exDiv:'2026-04-08', yield:'4.8%', amount:'IDR 378/share',  freq:'Annual' },
+    { sym:'ASII.JK', label:'Astra Intl',     flag:'🚗', market:'idx', exDiv:'2026-05-05', yield:'4.2%', amount:'IDR 215/share',  freq:'Annual' },
+    { sym:'PGAS.JK', label:'Perusahaan Gas', flag:'⛽', market:'idx', exDiv:'2026-06-01', yield:'7.1%', amount:'IDR 135/share',  freq:'Annual' },
+    { sym:'ICBP.JK', label:'Indofood CBP',   flag:'🍜', market:'idx', exDiv:'2026-05-20', yield:'3.5%', amount:'IDR 260/share',  freq:'Annual' },
+    { sym:'AAPL',    label:'Apple',          flag:'🍎', market:'us',  exDiv:'2026-05-09', yield:'0.5%', amount:'$0.25/share',    freq:'Quarterly' },
+    { sym:'MSFT',    label:'Microsoft',      flag:'🪟', market:'us',  exDiv:'2026-05-15', yield:'0.7%', amount:'$0.83/share',    freq:'Quarterly' },
+    { sym:'META',    label:'Meta',           flag:'👁️', market:'us',  exDiv:'2026-06-01', yield:'0.4%', amount:'$0.525/share',  freq:'Quarterly' },
+    { sym:'GOOGL',   label:'Alphabet',       flag:'🔵', market:'us',  exDiv:'2026-06-10', yield:'0.5%', amount:'$0.20/share',   freq:'Quarterly' },
+    { sym:'JPM',     label:'JPMorgan',       flag:'🏦', market:'us',  exDiv:'2026-04-04', yield:'2.2%', amount:'$1.40/share',   freq:'Quarterly' },
+    { sym:'KO',      label:'Coca-Cola',      flag:'🥤', market:'us',  exDiv:'2026-06-13', yield:'3.1%', amount:'$0.51/share',   freq:'Quarterly' },
+    { sym:'NVDA',    label:'Nvidia',         flag:'🟢', market:'us',  exDiv:'2026-06-04', yield:'0.03%',amount:'$0.01/share',   freq:'Quarterly' },
+  ];
+
+  let _divTab = 'all';
+  function divSetTab(tab) {
+    _divTab = tab;
+    ['all','idx','us'].forEach(function(t) {
+      const b = document.getElementById('div-tab-'+t);
+      if(b) b.classList.toggle('active', t === tab);
+    });
+    _fxRenderDividends();
+  }
+
+  function _fxRenderDividends() {
+    const grid = document.getElementById('fxs-div-grid');
+    if(!grid) return;
+    const now = new Date();
+    const filtered = DIVIDENDS
+      .filter(function(d) {
+        if(_divTab !== 'all' && d.market !== _divTab) return false;
+        return new Date(d.exDiv) >= new Date(now.getTime() - 7*86400000);
+      })
+      .sort(function(a,b){ return new Date(a.exDiv) - new Date(b.exDiv); });
+
+    if(!filtered.length) {
+      grid.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No upcoming dividends in this category</div>';
+      return;
+    }
+    grid.innerHTML = filtered.map(function(d) {
+      const exDate  = new Date(d.exDiv);
+      const daysLeft= Math.ceil((exDate - now) / 86400000);
+      const isPast  = daysLeft < 0;
+      const isSoon  = daysLeft >= 0 && daysLeft <= 7;
+      const dateStr = exDate.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+      const daysStr = isPast ? Math.abs(daysLeft)+'d ago' : daysLeft === 0 ? '⚡ TODAY' : daysLeft+'d';
+      const border  = isPast ? 'var(--border)' : isSoon ? 'rgba(52,211,153,.4)' : 'rgba(52,211,153,.15)';
+      const dColor  = isPast ? 'var(--muted)' : isSoon ? '#34d399' : 'var(--accent)';
+      return '<div style="background:rgba(52,211,153,.03);border:1px solid '+border+';border-radius:8px;padding:10px 12px;cursor:pointer;opacity:'+(isPast?'0.6':'1')+'" '+
+        'onclick="_fxLoadStock(\''+d.sym+'\')" title="Click to load '+d.label+'">'+
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
+          '<span style="font-size:.8rem">'+d.flag+'</span>'+
+          '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:var(--accent)">'+d.sym+'</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 4px;border-radius:3px;background:rgba(52,211,153,.1);color:#34d399;margin-left:auto">'+d.freq+'</span>'+
+        '</div>'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted);margin-bottom:6px">'+d.label+'</div>'+
+        '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px">'+
+          '<div><div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted)">Ex-Dividend</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:'+dColor+';font-weight:700">'+dateStr+'</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:'+dColor+'">'+daysStr+'</div></div>'+
+          '<div style="text-align:right"><div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted)">Amount · Yield</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:#34d399;font-weight:700">'+d.amount+'</div>'+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:#34d399">'+d.yield+' yield</div></div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }
+
+  // ── Custom Pairs Add/Remove ────────────────────────────────────────────
+  function _fxGetCustomPairs() {
+    try { return JSON.parse(localStorage.getItem('tl_fxs_custom') || '[]'); } catch(e){ return []; }
+  }
+  function _fxSaveCustomPairs(arr) {
+    try { localStorage.setItem('tl_fxs_custom', JSON.stringify(arr)); } catch(e){}
+  }
+
+  function fxsUpdateHint() {
+    const type = document.getElementById('fxs-add-type')?.value;
+    const hints = {
+      stock:    'Yahoo Finance ticker. IDX: BBCA.JK · HK: 0700.HK · Shanghai: 600519.SS · US: AAPL',
+      forex:    '6-letter pair: GBPUSD, USDCAD, USDZAR, EURGBP. Uses ECB + ER-API + fawazahmed0.',
+      commodity:'Yahoo futures: GC=F (Gold), NG=F (Natural Gas), ZC=F (Corn), HG=F (Copper)',
+      crypto:   'Binance symbol without USDT: BTC, ETH, SOL, RENDER, WLD',
+    };
+    const el = document.getElementById('fxs-add-hint');
+    if(el) el.textContent = hints[type] || '';
+  }
+
+  function fxsAddCustom() {
+    const sym   = (document.getElementById('fxs-add-sym')?.value  || '').trim().toUpperCase().replace(/[^A-Z0-9.=\-]/g,'');
+    const label = (document.getElementById('fxs-add-label')?.value || '').trim() || sym;
+    const type  = document.getElementById('fxs-add-type')?.value || 'stock';
+    const errEl = document.getElementById('fxs-add-error');
+    if(errEl) { errEl.style.display='none'; errEl.textContent=''; }
+    if(!sym) { if(errEl){ errEl.textContent='Symbol is required'; errEl.style.display='block'; } return; }
+
+    const custom = _fxGetCustomPairs();
+    if(custom.find(function(p){ return p.sym === sym; })) {
+      if(errEl){ errEl.textContent=sym+' already in your custom list'; errEl.style.display='block'; } return;
+    }
+    if(type === 'forex' && sym.length !== 6) {
+      if(errEl){ errEl.textContent='Forex pair must be exactly 6 letters (e.g. GBPUSD)'; errEl.style.display='block'; } return;
+    }
+
+    // Register into runtime maps
+    if(type === 'forex') {
+      FOREX_PAIRS[sym]  = FOREX_PAIRS[sym]  || { base:sym.slice(0,3), quote:sym.slice(3), display:label, isFiat:true };
+      SPECIAL_PAIRS[sym]= SPECIAL_PAIRS[sym] || { display:label, isFiat:true };
+    } else if(type === 'commodity') {
+      COMMODITY_PAIRS[sym]= COMMODITY_PAIRS[sym] || { yahoo:sym, display:label, unit:'USD', isCommodity:true };
+      SPECIAL_PAIRS[sym]  = SPECIAL_PAIRS[sym]   || { display:label, isCommodity:true };
+    } else if(type === 'stock') {
+      window._customStocks = window._customStocks || {};
+      window._customStocks[sym] = window._customStocks[sym] || { yahoo:sym, display:label };
+      SPECIAL_PAIRS[sym] = SPECIAL_PAIRS[sym] || { display:label, isStock:true };
+    }
+    // Also mirror into Analysis pair buttons
+    if(!customPairs.find(function(p){ return p.sym === sym; })) {
+      customPairs.push({ sym, label, type });
+      saveCustomPairs();
+      renderCustomPairBtns();
+    }
+
+    custom.push({ sym, label, type });
+    _fxSaveCustomPairs(custom);
+
+    const symEl = document.getElementById('fxs-add-sym');
+    const lblEl = document.getElementById('fxs-add-label');
+    if(symEl) symEl.value = '';
+    if(lblEl) lblEl.value = '';
+
+    // Update pip dropdown if forex pair added
+    if(type === 'forex') {
+      const pipSel = document.getElementById('pip-pair');
+      if(pipSel) {
+        const opt = document.createElement('option');
+        opt.value = sym; opt.textContent = label || sym;
+        pipSel.appendChild(opt);
+      }
+    }
+
+    // Refresh bottom custom grid
+    _fxRenderBottomCustomGrid();
+
+    // Switch rates grid to custom tab and load
+    fxSetGroup('custom');
+    if(type === 'forex') { _fxLoadPair(sym); }
+    else { _fxLoadStock(sym); }
+  }
+
+  function fxsRemoveCustom(sym) {
+    const updated = _fxGetCustomPairs().filter(function(p){ return p.sym !== sym; });
+    _fxSaveCustomPairs(updated);
+    _fxRenderCustomGroup(document.getElementById('fxs-rates-grid'));
+    _fxRenderBottomCustomGrid();
+  }
+
+  // Render saved custom pairs into the always-visible bottom grid
+  function _fxRenderBottomCustomGrid() {
+    const grid = document.getElementById('fxs-custom-grid');
+    if(!grid) return;
+    const custom = _fxGetCustomPairs();
+    if(!custom.length) {
+      grid.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No custom pairs yet — use the form above to add any stock, forex pair, commodity or crypto.</div>';
+      return;
+    }
+    const typeIcon = { stock:'📈', forex:'💱', commodity:'🛢️', crypto:'🪙' };
+    grid.innerHTML = custom.map(function(p) {
+      const isForex = p.type === 'forex';
+      const rate = isForex ? _fxGetRate(p.sym) : null;
+      const loadFn = isForex ? "_fxLoadPair('"+p.sym+"')" : "_fxLoadStock('"+p.sym+"')";
+      return '<div style="background:rgba(255,255,255,.03);border:1px solid rgba(0,229,255,.2);border-radius:8px;padding:10px 12px;cursor:pointer;position:relative" '+
+        'onclick="'+loadFn+'" title="Load '+p.label+'">'+
+        '<div style="position:absolute;top:6px;right:6px;cursor:pointer;color:var(--red);font-size:.7rem;padding:0 4px" '+
+          'onclick="event.stopPropagation();fxsRemoveCustom(\''+p.sym+'\')" title="Remove">✕</div>'+
+        '<div style="display:flex;align-items:center;gap:5px;margin-bottom:2px">'+
+          '<span>'+(typeIcon[p.type]||'📌')+'</span>'+
+          '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:var(--accent)">'+p.sym+'</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 4px;background:rgba(0,229,255,.08);color:var(--accent);border-radius:3px;margin-left:auto">'+p.type+'</span>'+
+        '</div>'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.57rem;color:var(--muted)">'+p.label+'</div>'+
+        (rate ? '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;color:var(--text);font-weight:700;margin-top:2px">'+rate.toFixed(4)+'</div>' : '')+
+      '</div>';
+    }).join('');
+  }
+
+  // Restore custom pairs from fxs storage on load + sync from Analysis custom pairs
+  (function() {
+    // First restore FX-tab-specific custom pairs
+    _fxGetCustomPairs().forEach(function(p) {
+      if(p.type === 'forex') {
+        FOREX_PAIRS[p.sym]  = FOREX_PAIRS[p.sym]  || { base:p.sym.slice(0,3), quote:p.sym.slice(3), display:p.label, isFiat:true };
+        SPECIAL_PAIRS[p.sym]= SPECIAL_PAIRS[p.sym] || { display:p.label, isFiat:true };
+      } else if(p.type === 'commodity') {
+        COMMODITY_PAIRS[p.sym]= COMMODITY_PAIRS[p.sym] || { yahoo:p.sym, display:p.label, unit:'USD', isCommodity:true };
+      } else if(p.type === 'stock') {
+        window._customStocks = window._customStocks || {};
+        window._customStocks[p.sym] = window._customStocks[p.sym] || { yahoo:p.sym, display:p.label };
+        SPECIAL_PAIRS[p.sym] = SPECIAL_PAIRS[p.sym] || { display:p.label, isStock:true };
+      }
+    });
+
+    // Sync any pairs from Analysis (tl_custom_pairs) that aren't in FX list yet
+    const fxCustom = _fxGetCustomPairs();
+    const fxSyms = new Set(fxCustom.map(function(p){ return p.sym; }));
+    let changed = false;
+    customPairs.forEach(function(p) {
+      if(!fxSyms.has(p.sym)) {
+        fxCustom.push(p);
+        fxSyms.add(p.sym);
+        changed = true;
+      }
+    });
+    if(changed) _fxSaveCustomPairs(fxCustom);
+  })();
+
+  // ── Initialise Forex & Stocks tab ─────────────────────────────────────
+  function _initFxStocks() {
+    // Start session clock if not already running
+    _fxDrawSessions();
+    if(!_fxClockTimer) {
+      _fxClockTimer = setInterval(_fxDrawSessions, 30000);
+    }
+
+    if(window._fxsLoaded) {
+      _fxRenderGroup(_fxGroup);
+      _fxRenderStockGrids();
+      _fxRenderDividends();
+      _fxRenderBottomCustomGrid();
+      return;
+    }
+    window._fxsLoaded = true;
+
+    _fxRenderStockGrids();
+    _fxRenderDividends();
+    _fxRenderBottomCustomGrid();
+    fetchFxRates(false);
+    calcPip();
+    fxsUpdateHint();
   }
 
   async function _fxFetchDailyChanges(pairs) {
@@ -8513,49 +8897,6 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     } catch(e) {
       if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Fundamentals unavailable for '+sym+'</div>';
     }
-  }
-
-  // ── Render IDX and US stock grids ────────────────────────────────────
-  function _fxRenderStockGrids() {
-    const idxGrid = document.getElementById('fxs-idx-grid');
-    const usGrid  = document.getElementById('fxs-us-grid');
-
-    function stockCard(s) {
-      return '<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .2s" '+
-        'onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'" '+
-        'onclick="_fxLoadStock(\''+s.sym+'\')" title="'+s.label+'">'+
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">'+
-          '<span style="font-size:.8rem">'+s.flag+'</span>'+
-          '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:var(--accent)">'+s.sym+'</span>'+
-          '<span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 4px;background:rgba(255,255,255,.05);border-radius:3px;color:var(--muted);margin-left:auto">'+s.sector+'</span>'+
-        '</div>'+
-        '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted)">'+s.label+'</div>'+
-      '</div>';
-    }
-
-    if(idxGrid) idxGrid.innerHTML = IDX_STOCKS.map(stockCard).join('');
-    if(usGrid)  usGrid.innerHTML  = US_STOCKS.map(stockCard).join('');
-  }
-
-  // ── Initialise Forex & Stocks tab ─────────────────────────────────────
-  function _initFxStocks() {
-    // Start session clock if not already running
-    _fxDrawSessions();
-    if(!_fxClockTimer) {
-      _fxClockTimer = setInterval(_fxDrawSessions, 30000);
-    }
-
-    if(window._fxsLoaded) {
-      // Re-render group to refresh rates display on return
-      _fxRenderGroup(_fxGroup);
-      return;
-    }
-    window._fxsLoaded = true;
-
-    // First load: render stock grids and fetch rates
-    _fxRenderStockGrids();
-    fetchFxRates(false);
-    calcPip();
   }
 
   // ══ SCANNER TAB ════════════════════════════════════════════════════════════════════════
