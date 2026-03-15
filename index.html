@@ -3382,7 +3382,6 @@ self.onmessage=function(e){
     const startDate = new Date(Date.now() - days*86400000).toISOString().slice(0,10);
 
     // Helper: parse Frankfurter history response
-    // Returns sorted array of {date, rate}
     function parseFrankfurter(d, base, quote) {
       if(!d?.rates) throw new Error('No rates');
       return Object.entries(d.rates)
@@ -3392,7 +3391,6 @@ self.onmessage=function(e){
     }
 
     // Helper: turn daily rate array into OHLCV (synthetic candles)
-    // Synthesizes proxy volume from price volatility (|change| * scale)
     function ratesToOHLCV(rates) {
       const closes  = rates.map(r => r.rate);
       const opens   = [closes[0], ...closes.slice(0,-1)];
@@ -3404,33 +3402,34 @@ self.onmessage=function(e){
         const prev = opens[i];
         return Math.min(c, prev) * (1 - 0.0008);
       });
-      // Proxy volume: proportional to daily price change magnitude (so OBV/CMF work directionally)
       const avgPrice = closes.reduce((a,b)=>a+b,0)/closes.length;
       const volumes = closes.map((c,i) => {
-        const chg = Math.abs(c - opens[i]) / avgPrice; // fractional move
-        return Math.round(1000000 * (0.5 + chg * 50)); // synthetic tick volume
+        const chg = Math.abs(c - opens[i]) / avgPrice;
+        return Math.round(1000000 * (0.5 + chg * 50));
       });
       return { opens, closes, highs, lows, volumes };
     }
 
-    let rates = null, sourceLabel = '';
+    // ── Race all sources simultaneously ────────────────────────────────
+    // Build fetch promises for every available source
+    const sources = [];
 
-    // Source 1: Frankfurter (EUR base — works for EURUSD, EURIDR)
+    // Source A: Frankfurter direct (EUR base only)
     if(fp.base === 'EUR') {
-      try {
-        const url = `https://api.frankfurter.app/${startDate}..${endDate}?from=${fp.base}&to=${fp.quote}`;
-        const d = await smartFetch(url);
-        rates = parseFrankfurter(d, fp.base, fp.quote);
-        sourceLabel = 'Frankfurter (ECB)';
-      } catch(e) {}
+      const urlF = `https://api.frankfurter.app/${startDate}..${endDate}?from=${fp.base}&to=${fp.quote}`;
+      sources.push(
+        // via proxy
+        smartFetch(urlF).then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter (ECB)' })),
+        // direct (CORS open)
+        fetch(urlF, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+          .then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter direct' }))
+      );
     }
 
-    // Source 2: For USD base (USDIDR, USDJPY) — use Frankfurter from EUR, then cross
-    // USD/IDR = EUR/IDR ÷ EUR/USD
-    if(!rates && fp.base === 'USD') {
-      try {
-        const url = `https://api.frankfurter.app/${startDate}..${endDate}?from=EUR&to=${fp.quote},USD`;
-        const d = await smartFetch(url);
+    // Source B: Frankfurter EUR cross (USD base)
+    if(fp.base === 'USD') {
+      const urlC = `https://api.frankfurter.app/${startDate}..${endDate}?from=EUR&to=${fp.quote},USD`;
+      const parseCross = (d) => {
         if(!d?.rates) throw new Error('No rates');
         const entries = Object.entries(d.rates)
           .map(([date, r]) => ({
@@ -3439,32 +3438,34 @@ self.onmessage=function(e){
           }))
           .filter(r => r.rate != null)
           .sort((a,b) => a.date.localeCompare(b.date));
-        if(entries.length > 5) { rates = entries; sourceLabel = 'Frankfurter (ECB cross)'; }
-      } catch(e) {}
+        if(entries.length < 5) throw new Error('too few');
+        return entries;
+      };
+      sources.push(
+        smartFetch(urlC).then(d => ({ rates: parseCross(d), label: 'Frankfurter cross' })),
+        fetch(urlC, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+          .then(d => ({ rates: parseCross(d), label: 'Frankfurter cross direct' }))
+      );
     }
 
-    // Source 3: ExchangeRate.host fallback
-    if(!rates) {
-      try {
-        const url = `https://api.exchangerate.host/timeseries?start_date=${startDate}&end_date=${endDate}&base=${fp.base}&symbols=${fp.quote}`;
-        const d = await smartFetch(url);
-        if(!d?.rates) throw new Error('No rates');
-        rates = Object.entries(d.rates)
-          .map(([date, r]) => ({ date, rate: r[fp.quote] }))
-          .filter(r => r.rate != null)
-          .sort((a,b) => a.date.localeCompare(b.date));
-        sourceLabel = 'ExchangeRate.host';
-      } catch(e) {}
+    // Source C: Frankfurter general (any base supported by ECB) — catches GBP, AUD, etc.
+    {
+      const urlG = `https://api.frankfurter.app/${startDate}..${endDate}?from=${fp.base}&to=${fp.quote}`;
+      if(fp.base !== 'EUR' && fp.base !== 'USD') {  // EUR/USD already covered above
+        sources.push(
+          smartFetch(urlG).then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter (ECB)' })),
+          fetch(urlG, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+            .then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter direct' }))
+        );
+      }
     }
 
-    // Source 4: open.er-api.com (just current rate, synthesize history)
-    if(!rates || rates.length < 5) {
-      try {
-        const url = `https://open.er-api.com/v6/latest/${fp.base}`;
-        const d = await smartFetch(url);
+    // Source D: open.er-api.com current rate (any pair) — synthesises history if needed
+    {
+      const urlER = `https://open.er-api.com/v6/latest/${fp.base}`;
+      const parseER = async (d) => {
         if(!d?.rates?.[fp.quote]) throw new Error('No rate');
         const price = d.rates[fp.quote];
-        // Synthesize 200 daily candles with small random walk around current price
         const synth = [];
         let r = price * 0.95;
         for(let i=200; i>=0; i--) {
@@ -3472,15 +3473,53 @@ self.onmessage=function(e){
           r = r * (1 + (Math.random()-0.5)*0.004);
           synth.push({ date, rate: r });
         }
-        synth[synth.length-1].rate = price; // pin last to real price
-        rates = synth;
-        sourceLabel = 'ER-API (live rate)';
-      } catch(e) {}
+        synth[synth.length-1].rate = price;
+        return synth;
+      };
+      sources.push(
+        smartFetch(urlER).then(async d => ({ rates: await parseER(d), label: 'ER-API' })),
+        fetch(urlER, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+          .then(async d => ({ rates: await parseER(d), label: 'ER-API direct' }))
+      );
     }
 
-    if(!rates || rates.length < 5) throw new Error(`${sym}: all forex sources failed`);
+    // Source E: fawazahmed0 currency API (free, no key, CORS open — great fallback)
+    {
+      const today = new Date().toISOString().slice(0,10);
+      const baseLower = fp.base.toLowerCase();
+      const quoteLower = fp.quote.toLowerCase();
+      const urlFawaz = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseLower}.json`;
+      sources.push(
+        fetch(urlFawaz, {signal:AbortSignal.timeout(7000)}).then(r=>r.json()).then(d => {
+          const rate = d[baseLower]?.[quoteLower];
+          if(!rate) throw new Error('no rate');
+          // Build synthetic history around current rate
+          const synth = [];
+          let r = rate * 0.95;
+          for(let i=200; i>=0; i--) {
+            const date = new Date(Date.now() - i*86400000).toISOString().slice(0,10);
+            r = r * (1 + (Math.random()-0.5)*0.004);
+            synth.push({ date, rate: r });
+          }
+          synth[synth.length-1].rate = rate;
+          return { rates: synth, label: 'fawazahmed0 CDN' };
+        })
+      );
+    }
 
-    const { opens, closes, highs, lows, volumes } = ratesToOHLCV(rates);
+    // Fire all sources simultaneously — first valid result wins
+    if(!sources.length) throw new Error('No sources for '+sym);
+
+    const result = await Promise.any(
+      sources.map(p => p.then(res => {
+        if(!res.rates || res.rates.length < 5) throw new Error('too few rates');
+        return res;
+      }).catch(e => Promise.reject(e)))
+    ).catch(() => null);
+
+    if(!result || result.rates.length < 5) throw new Error(`${sym}: all forex sources failed`);
+
+    const { opens, closes, highs, lows, volumes } = ratesToOHLCV(result.rates);
     const price = closes[closes.length-1];
 
     // Warn user if they selected a sub-daily TF — forex only has daily candles
@@ -3522,14 +3561,21 @@ self.onmessage=function(e){
 
   // Race query1 + query2 simultaneously — take whichever responds first
   async function _yahooRace(ticker, interval, range) {
-    const urls = [
-      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`,
-      `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`,
-    ];
-    // Fire both at once, return first success
-    return Promise.any(urls.map(url =>
-      smartFetch(url).then(d => { const o = _parseYahooChart(d); if(!o) throw new Error('empty'); return { ohlcv:o, url }; })
-    ));
+    const mkUrl = (host) =>
+      `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`;
+    const parseUrl = (url) =>
+      smartFetch(url).then(d => { const o = _parseYahooChart(d); if(!o) throw new Error('empty'); return { ohlcv:o, url }; });
+    const directUrl = (url) =>
+      fetch(url, {signal: AbortSignal.timeout(8000)})
+        .then(r => r.json())
+        .then(d => { const o = _parseYahooChart(d); if(!o) throw new Error('empty'); return { ohlcv:o, url }; });
+    // Race proxy + direct fetch on both query1 and query2 simultaneously
+    return Promise.any([
+      parseUrl(mkUrl('query1.finance.yahoo.com')),
+      parseUrl(mkUrl('query2.finance.yahoo.com')),
+      directUrl(mkUrl('query1.finance.yahoo.com')),
+      directUrl(mkUrl('query2.finance.yahoo.com')),
+    ]);
   }
 
   // 5-minute candle cache for stocks/commodities (keyed by ticker+interval+range)
@@ -3554,10 +3600,47 @@ self.onmessage=function(e){
     const cached = _yahooCached(ticker, interval, range);
     if(cached) return { ...cached, source:`Yahoo (cached · ${interval})` };
 
-    const { ohlcv } = await _yahooRace(ticker, interval, range)
+    // Build race sources: proxy + direct fetch on query1 + query2
+    const parseStock = (d) => {
+      const o = _parseYahooChart(d);
+      if(!o) throw new Error('empty');
+      return { ohlcv: o };
+    };
+    const mkUrl = (host) =>
+      `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`;
+
+    const raceSources = [
+      smartFetch(mkUrl('query1.finance.yahoo.com')).then(parseStock),
+      smartFetch(mkUrl('query2.finance.yahoo.com')).then(parseStock),
+      fetch(mkUrl('query1.finance.yahoo.com'), {signal:AbortSignal.timeout(8000)}).then(r=>r.json()).then(parseStock),
+      fetch(mkUrl('query2.finance.yahoo.com'), {signal:AbortSignal.timeout(8000)}).then(r=>r.json()).then(parseStock),
+    ];
+
+    // For IDX stocks (.JK) add Stooq as an additional fallback
+    if(ticker.endsWith('.JK')) {
+      const stooqSym = ticker.toLowerCase().replace('.jk', '.jk');
+      const stooqUrl = `https://stooq.com/q/d/l/?s=${stooqSym}&i=${interval === '1d' ? 'd' : 'w'}`;
+      raceSources.push(
+        fetch(stooqUrl, {signal:AbortSignal.timeout(8000)}).then(async r => {
+          const text = await r.text();
+          if(!text.includes('Date')) throw new Error('bad stooq');
+          const rows = text.trim().split('\n').slice(1).filter(l=>l.trim()).map(l=>l.split(','));
+          if(rows.length < 5) throw new Error('too few rows');
+          return { ohlcv: {
+            closes:  rows.map(r=>+r[4]),
+            opens:   rows.map(r=>+r[1]),
+            highs:   rows.map(r=>+r[2]),
+            lows:    rows.map(r=>+r[3]),
+            volumes: rows.map(r=>+(r[5]||0)),
+          }};
+        })
+      );
+    }
+
+    const result = await Promise.any(raceSources)
       .catch(() => { throw new Error(`Yahoo Finance unavailable for ${ticker}`); });
 
-    const { closes, opens, highs, lows, volumes } = ohlcv;
+    const { closes, opens, highs, lows, volumes } = result.ohlcv;
     const price = closes[closes.length-1];
 
     // Warn user if 4h was selected (not supported by Yahoo)
@@ -3568,7 +3651,7 @@ self.onmessage=function(e){
       }, 800);
     }
 
-    const result = {
+    const stockResult = {
       price,
       high24: Math.max(...highs.slice(-2)),
       low24:  Math.min(...lows.slice(-2)),
@@ -3578,8 +3661,8 @@ self.onmessage=function(e){
       source: `Yahoo Finance (${ticker} · ${interval})`,
       pair:   cs.display||ticker
     };
-    _yahooSetCache(ticker, interval, range, result);
-    return result;
+    _yahooSetCache(ticker, interval, range, stockResult);
+    return stockResult;
   }
 
   // ── Commodities: Silver & Oil via Yahoo Finance futures ──────────────────────
@@ -6195,9 +6278,10 @@ self.onmessage=function(e){
         const sec = parseInt(document.getElementById('mktAutoInterval').value) || 60;
         _startMktTimers(sec);
       }
-      // Pause onchain timer while away
-      if(_ocTimer)   { _clearOcTimers(); }
-      if(_scanTimer) { _clearScanTimers(); }
+      // Pause onchain/scan/fxclock timers while away
+      if(_ocTimer)     { _clearOcTimers(); }
+      if(_scanTimer)   { _clearScanTimers(); }
+      if(_fxClockTimer){ clearInterval(_fxClockTimer); _fxClockTimer = null; }
     } else if(name === 'onchain') {
       if(!window._onchainLoaded) fetchOnChainDashboard(false);
       // Resume oc auto-refresh if toggle is on
@@ -6206,9 +6290,10 @@ self.onmessage=function(e){
         const sec = parseInt(document.getElementById('ocAutoInterval').value) || 60;
         _startOcTimers(sec);
       }
-      // Pause market timer while away
-      if(_mktTimer)  { _clearMktTimers(); }
-      if(_scanTimer) { _clearScanTimers(); }
+      // Pause market/scan/fxclock timers while away
+      if(_mktTimer)    { _clearMktTimers(); }
+      if(_scanTimer)   { _clearScanTimers(); }
+      if(_fxClockTimer){ clearInterval(_fxClockTimer); _fxClockTimer = null; }
     } else if(name === 'scanner') {
       if(!window._scanLoaded) runScanner(false);
       const scOn = document.getElementById('scanAutoToggle');
@@ -6216,10 +6301,12 @@ self.onmessage=function(e){
         const sec = parseInt(document.getElementById('scanAutoInterval').value) || 60;
         _startScanTimers(sec);
       }
-      if(_mktTimer)  { _clearMktTimers(); }
-      if(_ocTimer)   { _clearOcTimers(); }
+      if(_mktTimer)    { _clearMktTimers(); }
+      if(_ocTimer)     { _clearOcTimers(); }
+      if(_fxClockTimer){ clearInterval(_fxClockTimer); _fxClockTimer = null; }
     } else if(name === 'fxstocks') {
       _initFxStocks();
+      // _initFxStocks starts the clock — just stop other timers
       if(_mktTimer)  { _clearMktTimers(); }
       if(_ocTimer)   { _clearOcTimers(); }
       if(_scanTimer) { _clearScanTimers(); }
@@ -6228,6 +6315,8 @@ self.onmessage=function(e){
       _clearMktTimers();
       _clearOcTimers();
       _clearScanTimers();
+      // Stop FX clock when not on that tab
+      if(_fxClockTimer) { clearInterval(_fxClockTimer); _fxClockTimer = null; }
     }
   }
 
@@ -7968,8 +8057,8 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     comm: [
       { sym:'XAGUSD', label:'Silver XAG', flag:'🥈', isCommodity:true },
       { sym:'USOIL',  label:'WTI Crude',  flag:'🛢️', isCommodity:true },
-      { sym:'XAUUSD', label:'Gold XAU',   flag:'🥇', isCrypto:true },   // uses Binance XAUT
-      { sym:'XPTUSD', label:'Platinum',   flag:'⚗️', base:'XPT', quote:'USD', yahooTicker:'PL=F' },
+      { sym:'XAUGC',  label:'Gold (GC=F)', flag:'🥇', yahooTicker:'GC=F', isCommodity:true },
+      { sym:'XPTUSD', label:'Platinum',   flag:'⚗️', yahooTicker:'PL=F', isCommodity:true },
       { sym:'NATGAS', label:'Natural Gas', flag:'🔥', yahooTicker:'NG=F', isCommodity:true },
       { sym:'COPPER', label:'Copper',     flag:'🔩', yahooTicker:'HG=F', isCommodity:true },
     ],
@@ -8008,7 +8097,6 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
 
   let _fxGroup = 'major';
   let _fxRateCache = {};
-  let _fxSessionTimer = null;
   let _fxClockTimer = null;
   window._fxsLoaded = false;
 
@@ -8368,9 +8456,11 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
         const url = 'https://query1.finance.yahoo.com/v10/finance/quoteSummary/'+sym+
           '?modules=price,summaryDetail,defaultKeyStatistics,financialData';
         const raw = await Promise.any([
-          _yahooRace(sym, '1d', '5d').then(function(){ return smartFetch(url); }),
           smartFetch(url),
           fetch(url, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
+          fetch('https://query2.finance.yahoo.com/v10/finance/quoteSummary/'+sym+
+            '?modules=price,summaryDetail,defaultKeyStatistics,financialData',
+            {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
         ]).catch(function(){ return null; });
         if(raw && raw.quoteSummary && raw.quoteSummary.result) {
           data = raw.quoteSummary.result[0];
@@ -8449,20 +8539,22 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
 
   // ── Initialise Forex & Stocks tab ─────────────────────────────────────
   function _initFxStocks() {
-    if(window._fxsLoaded) return;
+    // Start session clock if not already running
+    _fxDrawSessions();
+    if(!_fxClockTimer) {
+      _fxClockTimer = setInterval(_fxDrawSessions, 30000);
+    }
+
+    if(window._fxsLoaded) {
+      // Re-render group to refresh rates display on return
+      _fxRenderGroup(_fxGroup);
+      return;
+    }
     window._fxsLoaded = true;
 
-    // Start session clock (updates every 30s)
-    _fxDrawSessions();
-    _fxClockTimer = setInterval(_fxDrawSessions, 30000);
-
-    // Render stock grids
+    // First load: render stock grids and fetch rates
     _fxRenderStockGrids();
-
-    // Fetch rates
     fetchFxRates(false);
-
-    // Init pip calculator
     calcPip();
   }
 
