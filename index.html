@@ -686,6 +686,28 @@
       padding: 8px 0;
       margin-bottom: 6px;
     }
+
+    /* ── Prevent iOS zoom on input focus ── */
+    input, select, textarea { font-size: 16px !important; }
+
+    /* ── Fix bottom nav overlap ── */
+    .wrap { padding-bottom: 80px !important; }
+
+    /* ── Scroll isolation for nested panels ── */
+    .news-scroll, .ind-scroll, .hm-rows, .bt-trades-scroll {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* ── Minimum touch target size (WCAG AA) ── */
+    .pair-btn, .tf-btn, .ind-tab { min-height: 44px !important; }
+    .alert-del, .wl-del { min-height: 44px !important; min-width: 44px !important; }
+
+    /* ── Fix chart canvas on mobile ── */
+    .chart-wrap { touch-action: none; }
+
+    /* ── MTF grid 4 columns on mobile ── */
+    .mtf-grid { grid-template-columns: repeat(4, 1fr) !important; }
   }
 
   /* ══════════════════════════════════════════════
@@ -881,6 +903,8 @@
     <button class="page-tab" onclick="switchTab('onchain')" id="tab-onchain">🔎 On-Chain &amp; Macro</button>
     <button class="page-tab" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner &amp; Macro</button>
     <button class="page-tab" onclick="switchTab('fxstocks')" id="tab-fxstocks">💱 Forex &amp; Stocks</button>
+    <button class="page-tab" onclick="switchTab('ai')" id="tab-ai">🤖 AI Assistant</button>
+    <button class="page-tab" onclick="switchTab('portfolio')" id="tab-portfolio">💼 Portfolio</button>
   </div>
 
   <!-- ══ PAGE: Analysis ══ -->
@@ -1071,9 +1095,17 @@
 
   <!-- ── Mini Candlestick Chart ── -->
   <div class="panel" style="margin-bottom:14px">
-    <div class="ptitle" style="margin-bottom:10px">📈 Price Chart
+    <div class="ptitle" style="margin-bottom:10px;flex-wrap:wrap;gap:6px">📈 Price Chart
       <span style="margin-left:8px;font-size:.52rem;color:var(--muted)">EMA 8/21/55/200 overlay</span>
-      <span style="margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted)" id="chart-tf-label"></span>
+      <span style="margin-left:auto;display:flex;gap:4px;align-items:center">
+        <button class="tf-btn active" id="chart-type-candle" onclick="setChartType('candle',this)" style="min-height:28px;padding:2px 8px;font-size:.52rem">🕯️ Candle</button>
+        <button class="tf-btn" id="chart-type-line" onclick="setChartType('line',this)" style="min-height:28px;padding:2px 8px;font-size:.52rem">📉 Line</button>
+        <button class="tf-btn" id="chart-type-area" onclick="setChartType('area',this)" style="min-height:28px;padding:2px 8px;font-size:.52rem">📊 Area</button>
+      </span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted)" id="chart-tf-label"></span>
+      <a id="tv-link" href="https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT" target="_blank" rel="noopener"
+        style="font-family:'Share Tech Mono',monospace;font-size:.52rem;padding:2px 8px;border:1px solid rgba(0,229,255,.25);border-radius:4px;color:var(--accent);text-decoration:none;white-space:nowrap;background:rgba(0,229,255,.06);margin-left:4px"
+        title="Open full chart on TradingView">📺 TradingView</a>
     </div>
     <div class="chart-wrap"><canvas id="miniChart"></canvas></div>
     <div class="chart-legend">
@@ -2231,6 +2263,118 @@
   </div><!-- end .wrap -->
   </div><!-- end #page-fxstocks -->
 
+  <!-- ══ PAGE: AI Assistant ══ -->
+  <div class="page-content" id="page-ai">
+  <div class="wrap" style="padding-top:0">
+    <div class="panel" style="border-color:rgba(192,132,252,.3);margin-bottom:14px">
+      <div class="ptitle" style="color:#c084fc">🤖 AI Trading Assistant
+        <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">Powered by Claude · Uses your live indicator data as context</span>
+        <button onclick="clearAiChat()" class="theme-btn" style="margin-left:auto;font-size:.52rem;padding:3px 10px;border-color:rgba(192,132,252,.4);color:#c084fc">🗑 Clear</button>
+      </div>
+      <!-- Quick prompts -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="pair-btn" onclick="aiQuickPrompt('analyze')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📊 Analyze Current</button>
+        <button class="pair-btn" onclick="aiQuickPrompt('risk')"    style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">⚖️ Risk Check</button>
+        <button class="pair-btn" onclick="aiQuickPrompt('strategy')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">🎓 Strategy Tips</button>
+        <button class="pair-btn" onclick="aiQuickPrompt('sentiment')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">😱 Market Mood</button>
+        <button class="pair-btn" onclick="aiQuickPrompt('entry')"    style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📍 Entry/Exit Plan</button>
+      </div>
+      <!-- Chat messages -->
+      <div id="aiChatMessages" style="min-height:280px;max-height:480px;overflow-y:auto;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;font-family:'Rajdhani',sans-serif;font-size:.85rem;line-height:1.6;scroll-behavior:smooth">
+        <div style="color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:.6rem;text-align:center;padding:20px 0">
+          👋 Hello! I'm your AI trading assistant.<br>Ask me anything about your current setup, or click a quick prompt above.<br><br>
+          <span style="color:var(--accent)">Tip: Fetch a symbol first so I have live indicator context.</span>
+        </div>
+      </div>
+      <!-- Input -->
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <textarea id="aiChatInput" placeholder="Ask anything... e.g. 'Is this a good BTC entry?' or 'Explain the RSI divergence'"
+          style="flex:1;background:rgba(192,132,252,.06);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:10px 12px;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:.85rem;resize:none;outline:none;line-height:1.5;min-height:52px;max-height:120px;"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"
+          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+        <button onclick="sendAiMessage()" id="aiSendBtn"
+          style="padding:12px 20px;background:rgba(192,132,252,.2);border:1px solid rgba(192,132,252,.5);color:#c084fc;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.6rem;cursor:pointer;white-space:nowrap;letter-spacing:1px;align-self:flex-end">⚡ SEND</button>
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:6px">Shift+Enter for newline · Context: live indicators + price data injected automatically</div>
+    </div>
+  </div>
+  </div><!-- end #page-ai -->
+
+  <!-- ══ PAGE: Portfolio ══ -->
+  <div class="page-content" id="page-portfolio">
+  <div class="wrap" style="padding-top:0">
+    <div class="panel" style="border-color:rgba(0,255,136,0.2);margin-bottom:14px">
+      <div class="ptitle" style="color:var(--green)">💼 Portfolio Tracker
+        <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">live P&amp;L · persisted across sessions</span>
+        <button onclick="refreshPortfolio()" class="wl-add-btn" style="margin-left:auto;padding:4px 10px;font-size:.52rem">⟳ Refresh Prices</button>
+      </div>
+      <!-- Add form -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+        <div><label class="rm-label">Symbol</label>
+          <input type="text" id="port-sym" class="alert-input" style="width:100%;text-transform:uppercase" placeholder="BTC" maxlength="12"></div>
+        <div><label class="rm-label">Quantity</label>
+          <input type="number" id="port-qty" class="alert-input" style="width:100%" placeholder="0.5" step="any"></div>
+        <div><label class="rm-label">Avg Buy Price ($)</label>
+          <input type="number" id="port-buy" class="alert-input" style="width:100%" placeholder="84000" step="any"></div>
+        <div style="display:flex;align-items:flex-end">
+          <button onclick="addPortfolioPosition()" class="alert-add-btn" style="width:100%;background:rgba(0,255,136,.1);border-color:var(--green);color:var(--green)">+ ADD POSITION</button>
+        </div>
+      </div>
+      <!-- Summary bar -->
+      <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+        <div class="pnl-stat"><span class="pnl-stat-k">Total Value</span><span class="pnl-stat-v" id="port-total" style="color:var(--accent)">—</span></div>
+        <div class="pnl-stat"><span class="pnl-stat-k">Total Cost</span><span class="pnl-stat-v" id="port-cost" style="color:var(--muted)">—</span></div>
+        <div class="pnl-stat"><span class="pnl-stat-k">Unrealized P&amp;L</span><span class="pnl-stat-v" id="port-pnl">—</span></div>
+        <div class="pnl-stat"><span class="pnl-stat-k">P&amp;L %</span><span class="pnl-stat-v" id="port-pnlpct">—</span></div>
+        <div class="pnl-stat"><span class="pnl-stat-k">Positions</span><span class="pnl-stat-v" id="port-count" style="color:var(--accent)">0</span></div>
+      </div>
+      <!-- Table -->
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-family:'Share Tech Mono',monospace;font-size:.6rem">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);color:var(--muted)">
+              <th style="padding:6px 8px;text-align:left">SYMBOL</th>
+              <th style="padding:6px 8px;text-align:right">QTY</th>
+              <th style="padding:6px 8px;text-align:right">AVG BUY</th>
+              <th style="padding:6px 8px;text-align:right">CURRENT</th>
+              <th style="padding:6px 8px;text-align:right">VALUE</th>
+              <th style="padding:6px 8px;text-align:right">P&amp;L</th>
+              <th style="padding:6px 8px;text-align:right">P&amp;L %</th>
+              <th style="padding:6px 8px;text-align:right">ALLOC</th>
+              <th style="padding:6px 8px"></th>
+            </tr>
+          </thead>
+          <tbody id="portTbody">
+            <tr><td colspan="9" style="padding:16px 8px;color:var(--muted);text-align:center">No positions yet. Add above.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Social Sentiment panel -->
+    <div class="panel" style="margin-bottom:14px;border-color:rgba(248,113,113,.2)">
+      <div class="ptitle" style="color:#f87171">💬 Social Sentiment
+        <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">Momentum-based sentiment · click refresh</span>
+        <button onclick="fetchSocialSentiment()" class="mkt-refresh-btn" style="margin-left:auto">⟳ REFRESH</button>
+      </div>
+      <div id="socialSentimentPanel">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Click refresh to load sentiment data...</div>
+      </div>
+    </div>
+
+    <!-- DeFi Analytics panel -->
+    <div class="panel" style="border-color:rgba(99,179,237,.25)">
+      <div class="ptitle" style="color:#63b3ed">🏦 DeFi Analytics
+        <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">TVL · Protocol Rankings · DefiLlama</span>
+        <button onclick="fetchDefiData(true)" class="mkt-refresh-btn" style="margin-left:auto">⟳ REFRESH</button>
+      </div>
+      <div id="defiPanel">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Click refresh to load DeFi data...</div>
+      </div>
+    </div>
+  </div>
+  </div><!-- end #page-portfolio -->
+
 
   <!-- ══════════════════════════════════════════════════════
        🔮 PRICE PREDICTION PANEL
@@ -2756,6 +2900,17 @@ self.onmessage=function(e){
 <script>
   let currentPrice = null;
   let currentTF = '1h';
+  let currentChartType = 'candle'; // 'candle' | 'line' | 'area'
+
+  function setChartType(type, el) {
+    currentChartType = type;
+    document.querySelectorAll('[id^="chart-type-"]').forEach(b => b.classList.remove('active'));
+    if(el) el.classList.add('active');
+    if(window._lastChartData) {
+      const d = window._lastChartData;
+      drawMiniChart(d.opens, d.closes, d.highs, d.lows, d.e8, d.e21, d.e55, d.e200, d.sym, d.tf);
+    }
+  }
   let workingExchangeId = null;
   let autoTimer = null, cTimer = null, cSec = 30;
 
@@ -3421,6 +3576,9 @@ self.onmessage=function(e){
     'EURIDR': { base:'EUR', quote:'IDR', display:'EUR/IDR', isFiat:true  },
   };
 
+  // Last-known price cache for forex — shows stale data instead of hard-failing
+  const _fxLastKnown = {};
+
   // How many days of history to fetch per TF
   // Frankfurter only gives DAILY data — sub-daily TFs get remapped to daily with more history
   const FOREX_HISTORY_DAYS = { '15m':365,'30m':365,'1h':365,'4h':500,'1d':500,'1w':1500,'1M':3000 };
@@ -3560,6 +3718,32 @@ self.onmessage=function(e){
       );
     }
 
+    // Source F: Stooq forex CSV — fast, no CORS issues, great for USD/IDR, USD/JPY etc.
+    {
+      const stooqFxMap = {
+        'USDIDR':'usdidr','EURUSD':'eurusd','USDJPY':'usdjpy','EURIDR':'euridr',
+        'GBPUSD':'gbpusd','AUDUSD':'audusd','USDCAD':'usdcad','USDCHF':'usdchf',
+        'NZDUSD':'nzdusd','EURGBP':'eurgbp','USDSGD':'usdsgd','USDMYR':'usdmyr',
+        'USDCNY':'usdcny','USDKRW':'usdkrw','USDTHB':'usdthb',
+      };
+      const stooqFx = stooqFxMap[sym];
+      if(stooqFx) {
+        sources.unshift( // put stooq FIRST — it's fastest
+          fetch(`https://stooq.com/q/d/l/?s=${stooqFx}&i=d`, {signal:AbortSignal.timeout(4000)})
+            .then(async r => {
+              const text = await r.text();
+              if(!text.includes('Date')||text.includes('No data')) throw new Error('no stooq data');
+              const lines = text.trim().split('\n').slice(1).filter(l=>l.trim());
+              if(lines.length<5) throw new Error('too few');
+              const rows  = lines.map(l=>l.split(','));
+              const rates = rows.map(row=>({ date:row[0], rate:+row[4]||+row[1] })).filter(r=>r.rate>0);
+              if(rates.length<5) throw new Error('bad rates');
+              return { rates, label:'Stooq FX' };
+            })
+        );
+      }
+    }
+
     // Fire all sources simultaneously — first valid result wins
     if(!sources.length) throw new Error('No sources for '+sym);
 
@@ -3593,7 +3777,7 @@ self.onmessage=function(e){
       open24: opens[opens.length-1],
       vol24:  0,
       opens, closes, highs, lows, volumes,
-      source: sourceLabel, pair: fp.display
+      source: result.label || 'FX API', pair: fp.display
     };
   }
 
@@ -3727,34 +3911,36 @@ self.onmessage=function(e){
     const range    = TF.yahooRange[currentTF] || '2y';
 
     const cached = _yahooCached(cp.yahoo, interval, range);
-    if(cached) return { ...cached, pair:cp.display, source:`Yahoo (cached · ${interval})` };
+    if(cached) return { ...cached, pair:cp.display, source:'Cached' };
 
-    // Race Yahoo query1 + query2 + Stooq simultaneously
-    const stooqSym = sym==='XAGUSD' ? 'xag.f' : 'cl.f';
-    const stooqPromise = fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=d`, { signal: AbortSignal.timeout(6000) })
+    const stooqSym = cp.stooq || 'cl.f';
+
+    // Helper: parse stooq CSV into ohlcv
+    const fetchStooqCSV = (s) => fetch(`https://stooq.com/q/d/l/?s=${s}&i=d`, {signal:AbortSignal.timeout(5000)})
       .then(async r => {
         const text = await r.text();
-        if(!text.includes('Date')) throw new Error('bad response');
+        if(!text.includes('Date') || text.includes('No data')) throw new Error('no data');
         const lines = text.trim().split('\n').slice(1).filter(l=>l.trim());
         if(lines.length < 10) throw new Error('too few rows');
         const rows = lines.map(l=>l.split(','));
-        return { ohlcv:{
-          closes:  rows.map(r=>+r[4]),
-          opens:   rows.map(r=>+r[1]),
-          highs:   rows.map(r=>+r[2]),
-          lows:    rows.map(r=>+r[3]),
-          volumes: rows.map(r=>+(r[5]||0)),
-        }, url:'stooq' };
+        const closes  = rows.map(r=>+r[4]).filter(v=>v>0);
+        const opens   = rows.map(r=>+r[1]).filter(v=>v>0);
+        const highs   = rows.map(r=>+r[2]).filter(v=>v>0);
+        const lows    = rows.map(r=>+r[3]).filter(v=>v>0);
+        const volumes = rows.map(r=>+(r[5]||0));
+        return { ohlcv:{ closes, opens, highs, lows, volumes }, src:'Stooq' };
       });
 
-    const { ohlcv, url } = await Promise.any([
-      _yahooRace(cp.yahoo, interval, range),
-      stooqPromise,
-    ]).catch(() => { throw new Error(`${cp.display}: all sources failed`); });
+    // Race all sources: stooq (fastest) + Yahoo query1 + Yahoo query2 + proxy
+    const { ohlcv, src } = await Promise.any([
+      fetchStooqCSV(stooqSym),
+      _yahooRace(cp.yahoo, interval, range).then(d => ({ohlcv:d.ohlcv, src:'Yahoo Finance'})),
+      // Alternative stooq symbols for Silver/Oil in case primary fails
+      sym==='XAGUSD' ? fetchStooqCSV('xag') : sym==='XAUT' ? fetchStooqCSV('xau') : fetchStooqCSV(stooqSym+'.us'),
+    ]).catch(() => { throw new Error(`${cp.display}: Yahoo Finance and Stooq both failed`); });
 
     const { closes, opens, highs, lows, volumes } = ohlcv;
     const price = closes[closes.length-1];
-    const sourceName = url==='stooq' ? `Stooq (${stooqSym} · Daily)` : `Yahoo Finance (${cp.yahoo} · ${interval})`;
     const result = {
       price,
       high24: Math.max(...highs.slice(-2)),
@@ -3762,7 +3948,7 @@ self.onmessage=function(e){
       open24: opens[opens.length-1],
       vol24:  volumes[volumes.length-1]||0,
       opens, closes, highs, lows, volumes,
-      source: sourceName, pair: cp.display
+      source: `${src} (${cp.yahoo} · ${interval})`, pair: cp.display
     };
     _yahooSetCache(cp.yahoo, interval, range, result);
     return result;
@@ -3771,6 +3957,7 @@ self.onmessage=function(e){
   // ── SPECIAL_PAIRS: used for fmtP detection (forex + ANTAM + commodities) ────
   const SPECIAL_PAIRS = {
     'ANTAM':  { display:'ANTAM/IDR',  isStock:true },
+    'XAUT':   { display:'Gold (XAU/USD)',    isCommodity:true },
     'XAGUSD': { display:'Silver (XAG/USD)', isCommodity:true },
     'USOIL':  { display:'WTI Crude Oil',    isCommodity:true },
     // Keep for fmtP detection only:
@@ -3812,6 +3999,15 @@ self.onmessage=function(e){
     const { ohlcv, url } = await Promise.any([
       _yahooRace(ticker, interval, range),
       stooqPromise,
+      // Additional stooq direct attempt with ANTM ticker variant
+      fetch('https://stooq.com/q/d/l/?s=antm&i=d', {signal:AbortSignal.timeout(5000)}).then(async r=>{
+        const text = await r.text();
+        if(!text.includes('Date')||text.includes('No data')) throw new Error('bad');
+        const lines = text.trim().split('\n').slice(1).filter(l=>l.trim());
+        if(lines.length<5) throw new Error('few');
+        const rows=lines.map(l=>l.split(','));
+        return {ohlcv:{closes:rows.map(r=>+r[4]),opens:rows.map(r=>+r[1]),highs:rows.map(r=>+r[2]),lows:rows.map(r=>+r[3]),volumes:rows.map(r=>+(r[5]||0))},url:'stooq2'};
+      }),
     ]).catch(() => { throw new Error('ANTAM: all sources failed'); });
 
     const { closes, opens, highs, lows, volumes } = ohlcv;
@@ -3858,13 +4054,24 @@ self.onmessage=function(e){
       activeProgress('exchange');
       try {
         data = await tryForex(sym);
+        _fxLastKnown[sym] = { price: data.price, closes: data.closes, highs: data.highs, lows: data.lows, opens: data.opens, volumes: data.volumes, pair: data.pair, source: data.source, ts: Date.now() };
         workingExchangeId = 'forex';
         stepProgress('proxy','done');
         stepProgress('exchange','done');
       } catch(e) {
-        setStatus(`✗ ${sym} unavailable — ${e.message}`,'error');
-        document.getElementById('fetchBtn').disabled=false;
-        return;
+        // Fallback: use last known price if available (within 1 hour)
+        const cached = _fxLastKnown[sym];
+        if(cached && Date.now() - cached.ts < 60 * 60 * 1000) {
+          setStatus(`⚠️ ${sym}: live fetch failed — showing last known price (${Math.round((Date.now()-cached.ts)/60000)}m ago)`,'loading');
+          data = { price:cached.price, high24:cached.price*1.005, low24:cached.price*0.995, open24:cached.price, vol24:0, opens:cached.opens, closes:cached.closes, highs:cached.highs, lows:cached.lows, volumes:cached.volumes, source:cached.source+' (cached)', pair:cached.pair };
+          workingExchangeId = 'forex';
+          stepProgress('proxy','done');
+          stepProgress('exchange','done');
+        } else {
+          setStatus(`✗ ${sym} unavailable — ${e.message}`,'error');
+          document.getElementById('fetchBtn').disabled=false;
+          return;
+        }
       }
     }
 
@@ -3943,6 +4150,8 @@ self.onmessage=function(e){
       document.getElementById('sourceLabel').textContent='FAILED';
       document.getElementById('fetchBtn').disabled=false;
       PROGRESS_STEPS.forEach(s=>{ const el=document.getElementById('ps-'+s.id); if(el&&el.classList.contains('active'))el.className='progress-step fail'; });
+      // Show TradingView embed as fallback so user can still see chart
+      _showTradingViewFallback(sym);
       return;
     }
 
@@ -4051,6 +4260,19 @@ self.onmessage=function(e){
     document.getElementById('pcPrice').textContent=fmtP(price);
     window._lastAnalysisPrice = price;
     document.getElementById('pcPair').textContent=pair;
+    // Update TradingView link for current symbol
+    (function() {
+      const tvLinkEl = document.getElementById('tv-link');
+      if(!tvLinkEl) return;
+      const tvMap = {
+        'EURUSD':'FX:EURUSD','USDIDR':'FX:USDIDR','USDJPY':'FX:USDJPY','EURIDR':'FX:EURIDR',
+        'GBPUSD':'FX:GBPUSD','AUDUSD':'FX:AUDUSD','USDCAD':'FX:USDCAD','USDCHF':'FX:USDCHF',
+        'XAUT':'OANDA:XAUUSD','XAGUSD':'OANDA:XAGUSD','USOIL':'NYMEX:CL1!','ANTAM':'IDX:ANTM',
+      };
+      const tvSym = tvMap[sym] || (FOREX_PAIRS[sym] ? `FX:${sym}` : SPECIAL_PAIRS[sym]?.isStock ? `IDX:${sym.replace('.JK','')}` : `BINANCE:${sym}USDT`);
+      const tvInt = {'15m':'15','30m':'30','1h':'60','4h':'240','1d':'D','1w':'W','1M':'M'}[currentTF]||'60';
+      tvLinkEl.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSym)}&interval=${tvInt}`;
+    })();
     const ce=document.getElementById('pc24h');
     ce.textContent=(pct>=0?'+':'')+pct.toFixed(2)+'%';
     ce.style.color=pct>=0?'var(--green)':'var(--red)';
@@ -4498,7 +4720,7 @@ self.onmessage=function(e){
 
     // ── Chart ───────────────────────────────────────────────────────────────
     drawMiniChart(opens||closes,closes,highs,lows,chart.e8,chart.e21,chart.e55,chart.e200,sym,tf);
-    window._lastChartData={opens:opens||closes,closes,highs,lows,e8:chart.e8,e21:chart.e21,e55:chart.e55,e200:chart.e200,sym,tf};
+    window._lastChartData={opens:opens||closes,closes,highs,lows,volumes,e8:chart.e8,e21:chart.e21,e55:chart.e55,e200:chart.e200,sym,tf};
 
     // ── Backtest ─────────────────────────────────────────────────────────────
     const btEl=document.getElementById('btPanel');
@@ -5493,8 +5715,9 @@ self.onmessage=function(e){
 
   // Yahoo Finance tickers for commodities not on crypto exchanges
   const COMMODITY_PAIRS = {
-    'XAGUSD': { yahoo:'SI=F',  display:'Silver (XAG/USD)', unit:'USD/oz',  isCommodity:true },
-    'USOIL':  { yahoo:'CL=F',  display:'WTI Crude Oil',    unit:'USD/bbl', isCommodity:true },
+    'XAUT':   { yahoo:'GC=F',  stooq:'gc.f', display:'Gold (XAU/USD)',  unit:'USD/oz',  isCommodity:true },
+    'XAGUSD': { yahoo:'SI=F',  stooq:'xag.f',display:'Silver (XAG/USD)',unit:'USD/oz',  isCommodity:true },
+    'USOIL':  { yahoo:'CL=F',  stooq:'cl.f', display:'WTI Crude Oil',   unit:'USD/bbl', isCommodity:true },
   };
 
   const FOREX_NOTICE = {
@@ -5503,7 +5726,8 @@ self.onmessage=function(e){
     'EURUSD': 'EUR/USD — fetching live FX rate data',
     'EURIDR': 'EUR/IDR — fetching live FX rate data',
     'ANTAM': 'ANTAM (IDX) — fetching via Yahoo Finance',
-    'XAGUSD': 'Silver — fetching futures data (SI=F) via Yahoo Finance',
+    'XAUT':   'Gold (XAU/USD) — fetching futures data (GC=F) via Yahoo / Stooq',
+    'XAGUSD': 'Silver — fetching futures data (SI=F) via Yahoo / Stooq',
     'USOIL':  'WTI Crude Oil — fetching futures data (CL=F) via Yahoo Finance',
   };
 
@@ -5526,7 +5750,26 @@ self.onmessage=function(e){
       setStatus(`⚠️ ${sp.display}: ${tf} may have limited data — using 1D candles`,'warn');
     fetchData();
   }
-  function toggleAuto(){const on=document.getElementById('autoRefresh').checked;clearInterval(autoTimer);clearInterval(cTimer);document.getElementById('countdown').textContent='';if(on){cSec=30;document.getElementById('countdown').textContent='Refresh in '+cSec+'s';autoTimer=setInterval(()=>{fetchData();cSec=30;},30000);cTimer=setInterval(()=>{cSec--;if(cSec>0)document.getElementById('countdown').textContent='Refresh in '+cSec+'s';},1000);}}
+  function toggleAuto() {
+    const on = document.getElementById('autoRefresh').checked;
+    clearInterval(autoTimer); clearInterval(cTimer);
+    document.getElementById('countdown').textContent = '';
+    if(on) {
+      const intervalSec = CFG.refreshSec || 30;
+      cSec = intervalSec;
+      document.getElementById('countdown').textContent = 'Refresh in ' + cSec + 's';
+      // Visibility-aware: pauses when tab is hidden to avoid wasted requests
+      autoTimer = setInterval(function() {
+        if(document.visibilityState === 'visible') { fetchData(); cSec = intervalSec; }
+      }, intervalSec * 1000);
+      cTimer = setInterval(function() {
+        if(document.visibilityState === 'visible') {
+          cSec--;
+          if(cSec > 0) document.getElementById('countdown').textContent = 'Refresh in ' + cSec + 's';
+        }
+      }, 1000);
+    }
+  }
 
   const DEFAULTS = { defaultSym:'BTC', defaultTF:'1h', stPeriod:10, stMult:3, atrPeriod:14, rsiPeriod:14, refreshSec:30, chartCandles:60 };
   let CFG = JSON.parse(localStorage.getItem('tl_cfg') || 'null') || {...DEFAULTS};
@@ -5648,6 +5891,56 @@ self.onmessage=function(e){
       }
       ctx.stroke(); ctx.setLineDash([]);
     };
+
+    // ── Line / Area chart types (overdraws candles if selected) ──
+    if(currentChartType !== 'candle') {
+      ctx.clearRect(0, 0, W, H);
+      // Redraw grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)'; ctx.lineWidth = 1;
+      for(let i=0; i<4; i++) {
+        const y = pxY + (pxH/4)*i;
+        ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W,y); ctx.stroke();
+        const v = maxP - (maxP-minP)*(i/4);
+        ctx.fillStyle='rgba(100,160,180,0.5)';ctx.font='9px Share Tech Mono,monospace';ctx.textAlign='right';
+        ctx.fillText(v>1000?'$'+(v/1000).toFixed(1)+'k':v>1?'$'+v.toFixed(2):'$'+v.toFixed(5),36,y+4);
+      }
+      const isUp = sC[sC.length-1] >= sC[0];
+      const lineColor = isUp ? '#00ff88' : '#ff2d55';
+      if(currentChartType === 'area') {
+        const grad = ctx.createLinearGradient(0, pxY, 0, pxY + pxH);
+        grad.addColorStop(0, isUp ? 'rgba(0,255,136,.35)' : 'rgba(255,45,85,.35)');
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.moveTo(toX(0), pxY + pxH);
+        for(let i=0;i<n;i++) ctx.lineTo(toX(i), toY(sC[i]));
+        ctx.lineTo(toX(n-1), pxY + pxH);
+        ctx.closePath();
+        ctx.fillStyle = grad; ctx.fill();
+      }
+      ctx.beginPath();
+      for(let i=0;i<n;i++) i===0?ctx.moveTo(toX(i),toY(sC[i])):ctx.lineTo(toX(i),toY(sC[i]));
+      ctx.strokeStyle = lineColor; ctx.lineWidth = 2; ctx.lineJoin='round'; ctx.stroke();
+    }
+
+    // ── Volume histogram at bottom (all chart types) ──
+    {
+      const sV = (lows && lows.length ? Array.from({length:n}, (_,i) => { const src = closes.slice(-n); return src[i] ? Math.abs(src[i] - (opens.slice(-n)[i]||src[i])) * 1000 : 0; }) : []);
+      // use raw volumes if passed (stored in _lastChartData)
+      const rawVols = window._lastChartData && window._lastChartData.volumes ? window._lastChartData.volumes.slice(-n) : null;
+      const vArr = rawVols || sV;
+      const maxV = Math.max(...vArr, 1);
+      const volH = 28;
+      const volY = H - volH - 2;
+      ctx.save();
+      ctx.globalAlpha = 0.22;
+      for(let i=0;i<n;i++) {
+        const vh = (vArr[i]/maxV)*volH;
+        const bull = sC[i] >= (sC[i-1]||sC[i]);
+        ctx.fillStyle = bull ? '#00ff88' : '#ff2d55';
+        ctx.fillRect(toX(i)-barW/2, volY+(volH-vh), Math.max(1,barW), vh);
+      }
+      ctx.restore();
+    }
     drawLine(sE8,  '#00ff88', []);
     drawLine(sE21, '#00e5ff', []);
     drawLine(sE55, '#ffb800', [3,2]);
@@ -5969,7 +6262,32 @@ self.onmessage=function(e){
   updateSessionPnL();
 
   let _resizeTimer;
-  window.addEventListener('resize', ()=>{ clearTimeout(_resizeTimer); _resizeTimer=setTimeout(()=>{ if(window._lastChartData){ const d=window._lastChartData; drawMiniChart(d.opens,d.closes,d.highs,d.lows,d.e8,d.e21,d.e55,d.e200,d.sym,d.tf); } },200); });
+  let _chartObserver = null;
+  function _setupChartObserver() {
+    if(_chartObserver) return;
+    const chartWrap = document.querySelector('.chart-wrap');
+    if(!chartWrap) return;
+    _chartObserver = new ResizeObserver(function() {
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(function() {
+        if(window._lastChartData) {
+          const d = window._lastChartData;
+          drawMiniChart(d.opens, d.closes, d.highs, d.lows, d.e8, d.e21, d.e55, d.e200, d.sym, d.tf);
+        }
+      }, 100);
+    });
+    _chartObserver.observe(chartWrap);
+  }
+  window.addEventListener('load', _setupChartObserver);
+  window.addEventListener('resize', function() {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(function() {
+      if(window._lastChartData) {
+        const d = window._lastChartData;
+        drawMiniChart(d.opens, d.closes, d.highs, d.lows, d.e8, d.e21, d.e55, d.e200, d.sym, d.tf);
+      }
+    }, 200);
+  });
 
   const IS_MOBILE = () => window.innerWidth <= 480;
 
@@ -6335,6 +6653,10 @@ self.onmessage=function(e){
       if(_ocTimer)     { _clearOcTimers(); }
       if(_scanTimer)   { _clearScanTimers(); }
       if(_fxClockTimer){ clearInterval(_fxClockTimer); _fxClockTimer = null; }
+      // Re-render heatmap now that tab is visible (canvas width was 0 when hidden)
+      setTimeout(function() {
+        if(window._lastHeatmapData) _renderHeatmap(window._lastHeatmapData, document.getElementById('heatmapTooltip'));
+      }, 80);
     } else if(name === 'onchain') {
       if(!window._onchainLoaded) fetchOnChainDashboard(false);
       // Resume oc auto-refresh if toggle is on
@@ -6363,6 +6685,13 @@ self.onmessage=function(e){
       if(_mktTimer)  { _clearMktTimers(); }
       if(_ocTimer)   { _clearOcTimers(); }
       if(_scanTimer) { _clearScanTimers(); }
+    } else if(name === 'ai') {
+      _clearMktTimers(); _clearOcTimers(); _clearScanTimers();
+      if(_fxClockTimer) { clearInterval(_fxClockTimer); _fxClockTimer = null; }
+    } else if(name === 'portfolio') {
+      _clearMktTimers(); _clearOcTimers(); _clearScanTimers();
+      if(_fxClockTimer) { clearInterval(_fxClockTimer); _fxClockTimer = null; }
+      if(!window._portfolioLoaded) { window._portfolioLoaded = true; refreshPortfolio(); }
     } else {
       // Analysis tab — pause all dashboard timers
       _clearMktTimers();
@@ -6856,6 +7185,7 @@ self.onmessage=function(e){
     try {
       const data=await cgP;
       if(!Array.isArray(data))throw new Error('bad response');
+      window._lastHeatmapData = data; // store for tab-switch re-render
       _renderHeatmap(data, document.getElementById('heatmapTooltip'));
     }catch(e){
       const cv=document.getElementById('heatmapCanvas');
@@ -6866,15 +7196,10 @@ self.onmessage=function(e){
   function _renderHeatmap(data, tooltip) {
     const canvas=document.getElementById('heatmapCanvas');
     if(!canvas)return;
-    const W = canvas.offsetWidth
-          || (canvas.parentElement && canvas.parentElement.offsetWidth)
-          || 800; // fallback width so canvas always renders
-    // Only defer if truly 0 (hidden tab) — but cap at 30 attempts to avoid infinite loop
-    if(W < 10) {
-      if(!_renderHeatmap._tries) _renderHeatmap._tries = 0;
-      if(++_renderHeatmap._tries < 30) { requestAnimationFrame(function(){_renderHeatmap(data,tooltip);}); return; }
-      _renderHeatmap._tries = 0; // reset, render anyway with fallback
-    }
+    // Use stored width from last render, or parent width, or fixed fallback — never loop forever
+    const parentW = canvas.parentElement ? canvas.parentElement.getBoundingClientRect().width : 0;
+    const W = parentW > 10 ? parentW : (canvas._lastW || 800);
+    if(parentW > 10) canvas._lastW = parentW; // remember for when tab is hidden
     const DPR=window.devicePixelRatio||1,H=320;
     canvas.width=W*DPR;canvas.height=H*DPR;canvas.style.height=H+'px';
     const ctx=canvas.getContext('2d');ctx.scale(DPR,DPR);
@@ -7004,71 +7329,78 @@ self.onmessage=function(e){
   }
 
   // ─── LIQUIDATIONS ────────────────────────────────────────────────────────
-  // Uses Binance Futures /fapi/v1/forceOrders — no API key required
+  // Liquidations — multi-source: Coinglass free API → derived from Binance spot aggTrades
   async function fetchLiquidations(bust) {
     const panel = document.getElementById('liqPanel');
-    const TTL   = 2 * 60 * 1000;
-    const SYMS  = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','ADAUSDT','DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT'];
+    const TTL   = 3 * 60 * 1000;
+    const SYMS  = ['BTCUSDT','ETHUSDT','SOLUSDT','BNBUSDT','XRPUSDT','DOGEUSDT'];
+
     try {
       let all = !bust && _mktGet('liqData', TTL);
       if(!all) {
         all = {};
 
-        // ── Strategy 1: Binance fapi forceOrders, concurrency-limited (3 at a time) ──
-        let binanceOk = false;
+        // ── Source 1: Coinglass public chart API (no API key, CORS open) ──
+        let gotData = false;
         try {
-          const urls = SYMS.map(function(s) {
-            return 'https://fapi.binance.com/fapi/v1/forceOrders?symbol='+s+'&limit=20';
-          });
-          const fetched = await _pLimit(
-            urls.map(function(u) { return function() { return smartFetch(u); }; }),
-            3  // max 3 concurrent fapi requests
-          );
-          SYMS.forEach(function(sym, i) {
-            const r = fetched[i];
-            const rows = r && r.status === 'fulfilled' ? r.value : null;
-            if(!Array.isArray(rows) || rows.length === 0) return;
-            binanceOk = true;
-            all[sym] = rows.map(function(r) {
-              return {
-                sym:   sym,
-                side:  r.side,
-                price: parseFloat(r.averagePrice||r.price||0),
-                qty:   parseFloat(r.origQty||0),
-                usd:   parseFloat(r.averagePrice||r.price||0) * parseFloat(r.origQty||0),
-                time:  parseInt(r.time||r.updateTime||0),
-              };
-            }).filter(function(r){ return r.usd > 0; });
+          const cgSyms = ['BTC','ETH','SOL','BNB','XRP','DOGE'];
+          const cgResults = await Promise.allSettled(cgSyms.map(function(s) {
+            return Promise.any([
+              fetch('https://open-api.coinglass.com/public/v2/liquidation_chart?symbol='+s+'&time_type=h4', {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+              smartFetch('https://open-api.coinglass.com/public/v2/liquidation_chart?symbol='+s+'&time_type=h4'),
+            ]);
+          }));
+          cgSyms.forEach(function(s, i) {
+            const r = cgResults[i];
+            if(r.status !== 'fulfilled' || !r.value?.data) return;
+            const rows = r.value.data;
+            if(!Array.isArray(rows) || !rows.length) return;
+            gotData = true;
+            const sym = s + 'USDT';
+            all[sym] = rows.slice(-20).map(function(d) {
+              const longUsd  = d.longLiquidationUsd  || d.buyUsd  || 0;
+              const shortUsd = d.shortLiquidationUsd || d.sellUsd || 0;
+              const items = [];
+              if(longUsd > 10000)  items.push({ sym, side:'SELL', price:0, usd:longUsd,  time:(d.createTime||d.t||0)*1000 });
+              if(shortUsd > 10000) items.push({ sym, side:'BUY',  price:0, usd:shortUsd, time:(d.createTime||d.t||0)*1000 });
+              return items;
+            }).flat().filter(function(r){ return r.usd > 0; });
           });
         } catch(_) {}
 
-        // ── Strategy 2: Coinglass public liquidation stats (no auth) ──
-        if(!binanceOk) {
+        // ── Source 2: Binance spot aggTrades — derive large moves as "forced" proxies ──
+        if(!gotData) {
           try {
-            const cgUrl = 'https://open-api.coinglass.com/public/v2/liquidation_history?symbol=BTC&time_type=h1&limit=12';
-            const cg = await smartFetch(cgUrl);
-            if(cg && cg.data && Array.isArray(cg.data)) {
-              all['BTCUSDT'] = cg.data.map(function(d) {
-                return {
-                  sym: 'BTCUSDT', side: 'SELL',
-                  price: d.price || 0, qty: 0,
-                  usd: (d.longLiquidationUsd || 0) + (d.shortLiquidationUsd || 0),
-                  time: (d.createTime || 0) * 1000,
-                };
-              }).filter(function(r){ return r.usd > 0; });
-              binanceOk = true;
-            }
+            const spotResults = await Promise.allSettled(SYMS.slice(0,4).map(function(s) {
+              return smartFetch('https://api.binance.com/api/v3/aggTrades?symbol='+s+'&limit=500');
+            }));
+            SYMS.slice(0,4).forEach(function(sym, i) {
+              const r = spotResults[i];
+              if(r.status !== 'fulfilled' || !Array.isArray(r.value)) return;
+              const trades = r.value;
+              if(!trades.length) return;
+              gotData = true;
+              const avgPrice = trades.reduce(function(s,t){ return s + parseFloat(t.p); }, 0) / trades.length;
+              // Flag trades >5× average qty as likely forced sells
+              const avgQty = trades.reduce(function(s,t){ return s + parseFloat(t.q); }, 0) / trades.length;
+              all[sym] = trades
+                .filter(function(t) { return parseFloat(t.q) > avgQty * 5; })
+                .map(function(t) {
+                  const price = parseFloat(t.p);
+                  const qty   = parseFloat(t.q);
+                  return { sym, side: t.m ? 'SELL' : 'BUY', price, usd: price * qty, time: t.T };
+                })
+                .filter(function(r) { return r.usd > 50000; })
+                .slice(-15);
+            });
           } catch(_) {}
         }
 
-        // ── Strategy 3: Derive approximate liquidations from Binance funding + OI ──
-        if(!binanceOk) {
-          // Show a meaningful message instead of empty panel
-          if(panel) panel.innerHTML =
-            '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--warn);padding:8px 0">' +
-            '⚠️ Liquidation data requires Binance Futures API access.<br>' +
-            '<span style="color:var(--muted)">Binance fapi.binance.com may be geo-restricted in your region. ' +
-            'Try using a VPN or check your Cloudflare Worker proxy settings.</span></div>';
+        if(!gotData) {
+          panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--warn);line-height:1.8">' +
+            '⚠️ Liquidation APIs unavailable from your network.<br>' +
+            '<span style="color:var(--muted)">Coinglass and Binance Futures may be restricted. ' +
+            'Check your Cloudflare Worker proxy. Showing derived large-trade data where possible.</span></div>';
           return;
         }
 
@@ -7081,7 +7413,7 @@ self.onmessage=function(e){
       filterLiqs('all');
       _renderLiqSummary();
     } catch(e) {
-      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Liquidations unavailable — needs Binance Futures access</div>';
+      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Liquidations unavailable: ' + e.message + '</div>';
     }
   }
 
@@ -8822,81 +9154,166 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     '</div>';
   }
 
-  // ── Stock Fundamentals (Yahoo Finance quoteSummary) ───────────────────
+  // ── Stock Fundamentals — multi-source with fast fallbacks ─────────────
   async function _fxFetchFundamentals(sym) {
-    const panel  = document.getElementById('fxs-fund-panel');
-    const symEl  = document.getElementById('fxs-fund-sym');
+    const panel = document.getElementById('fxs-fund-panel');
+    const symEl = document.getElementById('fxs-fund-sym');
     if(!panel) return;
     panel.innerHTML = _skel(3);
-    if(symEl) symEl.textContent = '— '+sym;
+    if(symEl) symEl.textContent = '— ' + sym;
 
+    const TTL  = 6 * 60 * 60 * 1000; // 6h cache
+    const cKey = 'fundData2_' + sym;
+    const cached = _mktGet(cKey, TTL);
+    if(cached) { _renderFundamentals(panel, symEl, sym, cached); return; }
+
+    let data = null;
+
+    // Strategy 1: Yahoo v11 (more reliable than v10) — race query1 + query2 + proxy
     try {
-      const TTL  = 24 * 60 * 60 * 1000; // 24h cache — fundamentals don't change fast
-      const cKey = 'fundData_'+sym;
-      let data   = _mktGet(cKey, TTL);
-
-      if(!data) {
-        // Yahoo Finance quoteSummary v10 — free, no key
-        const url = 'https://query1.finance.yahoo.com/v10/finance/quoteSummary/'+sym+
-          '?modules=price,summaryDetail,defaultKeyStatistics,financialData';
-        const raw = await Promise.any([
-          smartFetch(url),
-          fetch(url, {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-          fetch('https://query2.finance.yahoo.com/v10/finance/quoteSummary/'+sym+
-            '?modules=price,summaryDetail,defaultKeyStatistics,financialData',
-            {signal:AbortSignal.timeout(8000)}).then(r=>r.json()),
-        ]).catch(function(){ return null; });
-        if(raw && raw.quoteSummary && raw.quoteSummary.result) {
-          data = raw.quoteSummary.result[0];
-          _mktSet(cKey, data);
-        }
+      const mods = 'price,summaryDetail,defaultKeyStatistics,financialData';
+      const raw = await Promise.any([
+        fetch('https://query1.finance.yahoo.com/v11/finance/quoteSummary/'+sym+'?modules='+mods, {signal:AbortSignal.timeout(5000)}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}),
+        fetch('https://query2.finance.yahoo.com/v11/finance/quoteSummary/'+sym+'?modules='+mods, {signal:AbortSignal.timeout(5000)}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}),
+        smartFetch('https://query1.finance.yahoo.com/v11/finance/quoteSummary/'+sym+'?modules='+mods),
+        fetch('https://query1.finance.yahoo.com/v10/finance/quoteSummary/'+sym+'?modules='+mods, {signal:AbortSignal.timeout(5000)}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}),
+      ]).catch(function(){ return null; });
+      if(raw && raw.quoteSummary && raw.quoteSummary.result && raw.quoteSummary.result[0]) {
+        data = { source:'Yahoo Finance', raw: raw.quoteSummary.result[0] };
       }
+    } catch(_) {}
 
-      if(!data) throw new Error('No fundamental data');
-
-      const price  = data.price       || {};
-      const sumDet = data.summaryDetail|| {};
-      const keyS   = data.defaultKeyStatistics || {};
-      const finD   = data.financialData|| {};
-
-      const fmtN = function(v) { if(!v || v.raw == null) return '—'; const n = v.raw; return n >= 1e12?'$'+(n/1e12).toFixed(2)+'T':n >= 1e9?'$'+(n/1e9).toFixed(2)+'B':n >= 1e6?'$'+(n/1e6).toFixed(2)+'M':n.toLocaleString(); };
-      const fmtP = function(v) { return v && v.raw != null ? (v.raw*100).toFixed(2)+'%' : '—'; };
-      const fmtV = function(v) { return v && v.raw != null ? v.raw.toFixed(2) : '—'; };
-      const fmtF = function(v) { return v && v.fmt ? v.fmt : '—'; };
-
-      const fields = [
-        { k:'Market Cap',    v: fmtN(price.marketCap)                  },
-        { k:'P/E Ratio',     v: fmtV(sumDet.trailingPE||keyS.trailingPE)},
-        { k:'Fwd P/E',       v: fmtV(sumDet.forwardPE ||keyS.forwardPE) },
-        { k:'EPS (TTM)',     v: fmtF(keyS.trailingEps)                  },
-        { k:'Div Yield',     v: fmtP(sumDet.dividendYield)              },
-        { k:'52W High',      v: fmtF(sumDet.fiftyTwoWeekHigh)           },
-        { k:'52W Low',       v: fmtF(sumDet.fiftyTwoWeekLow)            },
-        { k:'Revenue',       v: fmtN(finD.totalRevenue)                 },
-        { k:'Gross Margin',  v: fmtP(finD.grossMargins)                 },
-        { k:'Profit Margin', v: fmtP(finD.profitMargins)                },
-        { k:'Beta',          v: fmtV(sumDet.beta)                       },
-        { k:'Sector',        v: price.sector || '—'                     },
-      ].filter(function(f){ return f.v && f.v !== '—'; });
-
-      panel.innerHTML =
-        '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap">'+
-          '<span style="font-family:Orbitron,monospace;font-size:.9rem;font-weight:700;color:var(--accent)">'+(price.regularMarketPrice?.fmt || '—')+'</span>'+
-          '<span style="font-family:Share Tech Mono,monospace;font-size:.65rem;color:'+(((price.regularMarketChangePercent?.raw)||0)>=0?'var(--green)':'var(--red)')+'">'+
-            (price.regularMarketChangePercent?.fmt||'—')+'</span>'+
-          '<span style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted)">'+(price.longName||price.shortName||sym)+'</span>'+
-        '</div>'+
-        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'+
-        fields.map(function(f) {
-          return '<div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:4px;padding:4px 8px">'+
-            '<div style="font-family:Share Tech Mono,monospace;font-size:.48rem;color:var(--muted)">'+f.k+'</div>'+
-            '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text);font-weight:700">'+f.v+'</div>'+
-          '</div>';
-        }).join('')+
-        '</div>';
-    } catch(e) {
-      if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Fundamentals unavailable for '+sym+'</div>';
+    // Strategy 2: Yahoo v8 chart — gives price + 52w high/low, very reliable
+    if(!data) {
+      try {
+        const chartUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'?interval=1d&range=5d';
+        const raw = await Promise.any([
+          fetch(chartUrl, {signal:AbortSignal.timeout(4000)}).then(function(r){return r.json();}),
+          fetch('https://query2.finance.yahoo.com/v8/finance/chart/'+sym+'?interval=1d&range=5d', {signal:AbortSignal.timeout(4000)}).then(function(r){return r.json();}),
+          smartFetch(chartUrl),
+        ]).catch(function(){ return null; });
+        if(raw && raw.chart && raw.chart.result && raw.chart.result[0]) {
+          const meta = raw.chart.result[0].meta || {};
+          if(meta.regularMarketPrice) {
+            data = { source:'Yahoo Chart (price only)', minimal: {
+              price:    meta.regularMarketPrice,
+              prevClose:meta.chartPreviousClose || meta.previousClose,
+              high52:   meta.fiftyTwoWeekHigh,
+              low52:    meta.fiftyTwoWeekLow,
+              name:     meta.longName || meta.shortName || sym,
+              currency: meta.currency || 'USD',
+              exch:     meta.exchangeName || '',
+            }};
+          }
+        }
+      } catch(_) {}
     }
+
+    // Strategy 3: Stooq CSV — always works, even for IDX .JK stocks
+    if(!data) {
+      try {
+        const stooqSym = sym.toLowerCase().replace('-','.');
+        const url = 'https://stooq.com/q/d/l/?s='+stooqSym+'&i=d';
+        const text = await fetch(url, {signal:AbortSignal.timeout(4000)}).then(function(r){return r.text();});
+        if(text.includes('Date') && !text.includes('No data')) {
+          const rows = text.trim().split('\n').slice(1).filter(function(l){return l.trim();});
+          if(rows.length >= 2) {
+            const last = rows[rows.length-1].split(',');
+            const prev = rows[rows.length-2].split(',');
+            const price = parseFloat(last[4]||last[1]);
+            const prevP = parseFloat(prev[4]||prev[1]);
+            if(!isNaN(price) && price > 0) {
+              data = { source:'Stooq', minimal: {
+                price, prevClose: prevP,
+                name: sym, currency: sym.endsWith('.JK') ? 'IDR' : 'USD', exch:'',
+              }};
+            }
+          }
+        }
+      } catch(_) {}
+    }
+
+    if(!data) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted);line-height:1.8">'+
+        '⚠️ Fundamentals unavailable for <strong style="color:var(--accent)">'+sym+'</strong><br>'+
+        'Yahoo Finance (v10/v11) and Stooq both failed.<br>'+
+        '<span style="color:var(--muted)">Check ticker format: IDX → BBCA.JK · US → AAPL · HK → 0700.HK</span></div>';
+      return;
+    }
+
+    _mktSet(cKey, data);
+    _renderFundamentals(panel, symEl, sym, data);
+  }
+
+  function _renderFundamentals(panel, symEl, sym, data) {
+    if(symEl) symEl.textContent = '— ' + sym;
+
+    if(data.minimal) {
+      const m = data.minimal;
+      const chg = m.prevClose && m.prevClose > 0 ? ((m.price - m.prevClose) / m.prevClose * 100) : null;
+      const chgColor = chg == null ? 'var(--muted)' : chg >= 0 ? 'var(--green)' : 'var(--red)';
+      const isIDR = m.currency === 'IDR';
+      const priceStr = isIDR
+        ? m.price.toLocaleString('id-ID', {maximumFractionDigits:0}) + ' IDR'
+        : '$' + m.price.toFixed(2);
+      panel.innerHTML =
+        '<div style="margin-bottom:10px">'+
+          '<div style="font-family:Orbitron,monospace;font-size:.9rem;font-weight:700;color:var(--accent)">'+priceStr+'</div>'+
+          (chg!=null ? '<div style="font-family:Share Tech Mono,monospace;font-size:.65rem;color:'+chgColor+'">'+(chg>=0?'+':'')+chg.toFixed(2)+'% today</div>' : '')+
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted);margin-top:2px">'+m.name+(m.exch?' · '+m.exch:'')+'</div>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">'+
+          (m.high52 ? _fundCard('52W High', isIDR ? m.high52.toLocaleString('id-ID',{maximumFractionDigits:0}) : '$'+m.high52.toFixed(2)) : '')+
+          (m.low52  ? _fundCard('52W Low',  isIDR ? m.low52.toLocaleString('id-ID',{maximumFractionDigits:0})  : '$'+m.low52.toFixed(2))  : '')+
+        '</div>'+
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);margin-top:8px">'+
+          'via '+data.source+' · full fundamentals need Yahoo Finance access</div>';
+      return;
+    }
+
+    const r    = data.raw;
+    const p    = r.price || {};
+    const sd   = r.summaryDetail || {};
+    const ks   = r.defaultKeyStatistics || {};
+    const fd   = r.financialData || {};
+    const fmtN = function(v){if(!v||v.raw==null)return'—';const n=v.raw;return n>=1e12?'$'+(n/1e12).toFixed(2)+'T':n>=1e9?'$'+(n/1e9).toFixed(2)+'B':n>=1e6?'$'+(n/1e6).toFixed(2)+'M':n.toLocaleString();};
+    const fmtP = function(v){return v&&v.raw!=null?(v.raw*100).toFixed(2)+'%':'—';};
+    const fmtV = function(v){return v&&v.raw!=null?v.raw.toFixed(2):'—';};
+    const fmtF = function(v){return v&&v.fmt?v.fmt:'—';};
+    const chgPct = p.regularMarketChangePercent && p.regularMarketChangePercent.raw;
+    const chgColor = chgPct == null ? 'var(--muted)' : chgPct >= 0 ? 'var(--green)' : 'var(--red)';
+    const fields = [
+      {k:'Market Cap',   v:fmtN(p.marketCap)},
+      {k:'P/E Ratio',    v:fmtV(sd.trailingPE||ks.trailingPE)},
+      {k:'Fwd P/E',      v:fmtV(sd.forwardPE||ks.forwardPE)},
+      {k:'EPS (TTM)',    v:fmtF(ks.trailingEps)},
+      {k:'Div Yield',    v:fmtP(sd.dividendYield)},
+      {k:'52W High',     v:fmtF(sd.fiftyTwoWeekHigh)},
+      {k:'52W Low',      v:fmtF(sd.fiftyTwoWeekLow)},
+      {k:'Revenue',      v:fmtN(fd.totalRevenue)},
+      {k:'Gross Margin', v:fmtP(fd.grossMargins)},
+      {k:'Profit Margin',v:fmtP(fd.profitMargins)},
+      {k:'Beta',         v:fmtV(sd.beta)},
+      {k:'Sector',       v:p.sector||'—'},
+    ].filter(function(f){return f.v && f.v!=='—';});
+
+    panel.innerHTML =
+      '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap">'+
+        '<span style="font-family:Orbitron,monospace;font-size:.9rem;font-weight:700;color:var(--accent)">'+(p.regularMarketPrice&&p.regularMarketPrice.fmt||'—')+'</span>'+
+        '<span style="font-family:Share Tech Mono,monospace;font-size:.65rem;color:'+chgColor+'">'+(p.regularMarketChangePercent&&p.regularMarketChangePercent.fmt||'—')+'</span>'+
+        '<span style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted)">'+(p.longName||p.shortName||sym)+'</span>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'+
+        fields.map(function(f){return _fundCard(f.k,f.v);}).join('')+
+      '</div>'+
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);margin-top:8px">via '+data.source+'</div>';
+  }
+
+  function _fundCard(label, val) {
+    return '<div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:4px;padding:5px 8px">'+
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.48rem;color:var(--muted)">'+label+'</div>'+
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text);font-weight:700">'+val+'</div>'+
+    '</div>';
   }
 
   // ══ SCANNER TAB ════════════════════════════════════════════════════════════════════════
@@ -9558,69 +9975,89 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     const panel = document.getElementById('macroPulsePanel');
     if(!panel) return;
     panel.innerHTML = _skel(5);
-    try {
-    const TTL = 15 * 60 * 1000;
+    const TTL = 20 * 60 * 1000; // 20min cache — macro data moves slowly
+
     const ASSETS = [
-      { id: 'DXY',   yahoo: 'DX-Y.NYB', label: 'US Dollar (DXY)',   flip: true,  note: 'Strong USD = bearish crypto/EM' },
-      { id: 'GOLD',  yahoo: 'GC=F',     label: 'Gold (XAU/USD)',    flip: false, note: 'Risk-off hedge, positive for BTC' },
-      { id: 'SPY',   yahoo: 'SPY',      label: 'S&P 500',           flip: false, note: 'Risk-on = positive for crypto' },
-      { id: 'OIL',   yahoo: 'CL=F',     label: 'WTI Crude Oil',     flip: false, note: 'Inflation proxy, watch Fed reaction' },
-      { id: 'VIX',   yahoo: '^VIX',     label: 'VIX Fear Index',    flip: true,  note: 'High VIX = risk-off, crypto sells' },
-      { id: 'TNX',   yahoo: '^TNX',     label: '10Y Treasury Yield',flip: true,  note: 'Rising yields = pressure on crypto' },
-      { id: 'USDIDR',yahoo: 'USDIDR=X', label: 'USD/IDR',           flip: false, note: 'Local FX context for IDR traders' },
+      { id:'DXY',    stooq:'dx.f',    yahoo:'DX-Y.NYB', label:'US Dollar (DXY)',    flip:true,  note:'Strong USD = bearish crypto/EM' },
+      { id:'GOLD',   stooq:'gc.f',    yahoo:'GC=F',     label:'Gold (XAU/USD)',     flip:false, note:'Risk-off hedge, positive for BTC' },
+      { id:'SPY',    stooq:'spy.us',  yahoo:'SPY',      label:'S&P 500 (SPY)',      flip:false, note:'Risk-on = positive for crypto' },
+      { id:'OIL',    stooq:'cl.f',    yahoo:'CL=F',     label:'WTI Crude Oil',      flip:false, note:'Inflation proxy' },
+      { id:'VIX',    stooq:'vix.cboe',yahoo:'^VIX',     label:'VIX Fear Index',     flip:true,  note:'High VIX = risk-off, crypto sells' },
+      { id:'TNX',    stooq:'tnx.cboe',yahoo:'^TNX',     label:'10Y Treasury Yield', flip:true,  note:'Rising yields = pressure on crypto' },
+      { id:'USDIDR', stooq:'usdidr',  yahoo:'USDIDR=X', label:'USD/IDR',            flip:false, note:'Local FX context for IDR traders' },
     ];
 
-    const results = await Promise.allSettled(ASSETS.map(async function(a) {
-      const cacheKey = 'macro_'+a.id;
-      let closes = _mktGet(cacheKey, TTL);
-      if(!closes || bust) {
-        const ohlcv = await _yahooRace(a.yahoo, '1d', '60d');
-        const parsed = ohlcv.ohlcv;
-        if(!parsed || !parsed.closes || !parsed.closes.length) throw new Error('no data');
-        closes = parsed.closes;
-        _mktSet(cacheKey, closes);
-      }
-      const price   = closes[closes.length - 1];
-      const prev5   = closes[closes.length - 6] || closes[0];
-      const prev20  = closes[closes.length - 21] || closes[0];
-      const chg1w   = (price - prev5)  / prev5  * 100;
-      const chg1m   = (price - prev20) / prev20 * 100;
-      const trend   = _scanTrend(closes);
-      const rsi     = _scanCalcRSI(closes);
-      return Object.assign({}, a, { price, chg1w, chg1m, trend, rsi, closes });
-    }));
+    // Fetch each asset independently — show partial results as they arrive
+    let rowsRendered = [];
+    const renderPartial = function() {
+      if(!rowsRendered.length) return;
+      panel.innerHTML = rowsRendered.map(function(r) {
+        const isUp = r.chg1w > 0;
+        const cryptoImpact = r.flip ? !isUp : isUp;
+        const impColor = cryptoImpact ? 'var(--green)' : 'var(--red)';
+        const chgColor = isUp ? 'var(--green)' : 'var(--red)';
+        const priceStr = r.id==='VIX'||r.id==='TNX' ? r.price.toFixed(2)
+                       : r.id==='USDIDR' ? r.price.toLocaleString('id-ID',{maximumFractionDigits:0})
+                       : r.price >= 1000 ? r.price.toFixed(0) : r.price.toFixed(2);
+        return '<div class="macro-row">'+
+          '<span class="macro-name" title="'+r.note+'">'+r.label+'</span>'+
+          '<span class="macro-val" style="color:'+chgColor+'">'+priceStr+'</span>'+
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:'+chgColor+';min-width:54px">'+(r.chg1w>=0?'+':'')+r.chg1w.toFixed(1)+'% 1w</span>'+
+          '<span class="macro-signal" style="background:'+(cryptoImpact?'rgba(0,255,136,.1)':'rgba(255,45,85,.1)')+';color:'+impColor+';border:1px solid '+(cryptoImpact?'rgba(0,255,136,.3)':'rgba(255,45,85,.3)')+'">'+
+            (cryptoImpact ? '✅ Bullish for crypto' : '⚠️ Bearish for crypto')+'</span>'+
+          '<span class="macro-impact" style="color:var(--muted)">'+r.note+(r.rsi?' · RSI '+r.rsi:'')+'</span>'+
+        '</div>';
+      }).join('') + (rowsRendered.length < ASSETS.length ?
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);margin-top:6px">⟳ Loading '+
+        (ASSETS.length - rowsRendered.length)+' more assets...</div>' : '');
+    };
 
-    const rows = results.map(function(r) { return r.status === 'fulfilled' ? r.value : null; }).filter(Boolean);
-
-    if(!rows.length) {
-      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;color:var(--muted)">Macro data unavailable — check network</div>';
-      return;
+    // Fast CSV fetcher from stooq (CORS open, very fast)
+    async function fetchStooq(sym) {
+      const url = 'https://stooq.com/q/d/l/?s='+sym+'&i=d';
+      const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+      if(!r.ok) throw new Error('stooq '+r.status);
+      const text = await r.text();
+      if(!text.includes('Date') || text.includes('No data')) throw new Error('no data');
+      const rows = text.trim().split('\n').slice(1).filter(function(l){ return l.trim(); })
+        .map(function(l){ const p=l.split(','); return parseFloat(p[4]||p[1]); })
+        .filter(function(v){ return !isNaN(v) && v > 0; });
+      if(rows.length < 7) throw new Error('too few rows');
+      return rows;
     }
 
-    panel.innerHTML = rows.map(function(r) {
-      const isUp  = r.chg1w > 0;
-      const cryptoImpact = r.flip ? !isUp : isUp; // flip=true means asset rising is bearish for crypto
-      const impColor  = cryptoImpact ? 'var(--green)' : 'var(--red)';
-      const impLabel  = cryptoImpact ? '✅ Crypto positive' : '⚠️ Crypto negative';
-      const chgColor  = isUp ? 'var(--green)' : 'var(--red)';
-      const priceStr  = r.id==='VIX'||r.id==='TNX' ? r.price.toFixed(2)
-                      : r.id==='USDIDR'             ? r.price.toLocaleString('id-ID',{maximumFractionDigits:0})
-                      : r.price >= 1000             ? r.price.toFixed(0)
-                      :                               r.price.toFixed(2);
-      const rsiStr    = r.rsi ? ' · RSI '+r.rsi : '';
-      const trendStr  = r.trend ? ' · '+r.trend : '';
+    // Fetch all in parallel with individual error handling
+    await Promise.allSettled(ASSETS.map(async function(a) {
+      const cacheKey = 'macro2_'+a.id;
+      let closes = !bust && _mktGet(cacheKey, TTL);
+      if(!closes) {
+        // Race stooq (fast) vs Yahoo via proxy
+        closes = await Promise.any([
+          fetchStooq(a.stooq),
+          _yahooRace(a.yahoo, '1d', '60d').then(function(d) { return d.ohlcv.closes; }),
+        ]).catch(function() { return null; });
+        if(closes && closes.length >= 7) _mktSet(cacheKey, closes);
+      }
+      if(!closes || closes.length < 7) return; // skip failed asset silently
 
-      return '<div class="macro-row">'+
-        '<span class="macro-name" title="'+r.note+'">'+r.label+'</span>'+
-        '<span class="macro-val" style="color:'+chgColor+'">'+priceStr+'</span>'+
-        '<span style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:'+chgColor+';min-width:54px">'+(r.chg1w>0?'+':'')+r.chg1w.toFixed(1)+'% 1w</span>'+
-        '<span class="macro-signal" style="background:'+(cryptoImpact?'rgba(0,255,136,.1)':'rgba(255,45,85,.1)')+';color:'+impColor+';border:1px solid '+(cryptoImpact?'rgba(0,255,136,.3)':'rgba(255,45,85,.3)')+'">'+impLabel+'</span>'+
-        '<span class="macro-impact">'+r.note+trendStr+rsiStr+'</span>'+
-      '</div>';
-    }).join('');
-  } catch(e) {
-    if(panel) panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Macro pulse unavailable</div>';
-  }
+      const price = closes[closes.length-1];
+      const prev5 = closes[Math.max(0, closes.length-6)];
+      const prev20= closes[Math.max(0, closes.length-21)];
+      const chg1w = (price - prev5)  / prev5  * 100;
+      const chg1m = (price - prev20) / prev20 * 100;
+      const rsi   = _scanCalcRSI(closes);
+
+      rowsRendered.push(Object.assign({}, a, { price, chg1w, chg1m, rsi }));
+      // Sort to keep original asset order
+      rowsRendered.sort(function(a, b) {
+        return ASSETS.findIndex(function(x){ return x.id===a.id; }) - ASSETS.findIndex(function(x){ return x.id===b.id; });
+      });
+      renderPartial(); // update panel as each asset loads
+    }));
+
+    if(!rowsRendered.length) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;color:var(--muted)">Macro data unavailable — stooq.com and Yahoo Finance both blocked. Check your proxy.</div>';
+    }
   }
   // ══════════════════════════════════════════════════════
   //  POSITION SIZE CALCULATOR
@@ -9717,6 +10154,432 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
 
   // Auto-fill entry when a new symbol is analysed
   const _origUpdatePriceCard = window._origUpdatePriceCard;
+
+  // ══════════════════════════════════════════════════════════════════
+  //  AI CHAT ASSISTANT
+  // ══════════════════════════════════════════════════════════════════
+  let _aiChatHistory = [];
+  let _aiTyping = false;
+
+  function _buildAiContext() {
+    const sym   = document.getElementById('symbolInput')?.value?.trim() || '—';
+    const price = document.getElementById('pcPrice')?.textContent || '—';
+    const rsi   = document.getElementById('rsiVal')?.textContent || '—';
+    const macd  = document.getElementById('macdVal')?.textContent || '—';
+    const score = document.getElementById('scoreNum')?.textContent || '—';
+    const dir   = document.getElementById('pred-direction')?.textContent || '—';
+    const sig   = document.getElementById('tl-signal')?.textContent || '—';
+    const tf    = document.getElementById('chart-tf-label')?.textContent || '—';
+    const fng   = document.getElementById('fg-label')?.textContent || '—';
+    const atr   = document.getElementById('tl-atr')?.textContent || '—';
+    return `You are an expert crypto trading assistant. Current live market data context:
+- Symbol: ${sym} | Timeframe: ${tf}
+- Price: ${price} | ATR: ${atr}
+- Trade Score: ${score}/100
+- EMA55 Strategy Signal: ${sig}
+- RSI: ${rsi} | MACD: ${macd}
+- AI Prediction Direction: ${dir}
+- Fear & Greed Index: ${fng}
+The user is an Indonesian crypto trader. Be concise, practical and actionable. Give specific price levels where relevant. Use IDR context when appropriate. Format responses clearly with bullet points where helpful.`;
+  }
+
+  async function sendAiMessage() {
+    if(_aiTyping) return;
+    const input = document.getElementById('aiChatInput');
+    const msg = input?.value?.trim();
+    if(!msg) return;
+    input.value = '';
+    input.style.height = 'auto';
+    _appendAiMsg('user', msg);
+    _aiChatHistory.push({ role:'user', content: msg });
+    _aiTyping = true;
+    const btn = document.getElementById('aiSendBtn');
+    if(btn) { btn.textContent = '⟳ ...'; btn.disabled = true; }
+    const typingId = 'ai-typing-' + Date.now();
+    _appendAiMsg('typing', '···', typingId);
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: _buildAiContext(),
+          messages: _aiChatHistory.slice(-10)
+        })
+      });
+      const data = await response.json();
+      const reply = data.content?.[0]?.text || 'Sorry, I could not get a response. Make sure your Cloudflare Worker proxies api.anthropic.com.';
+      document.getElementById(typingId)?.remove();
+      _appendAiMsg('assistant', reply);
+      _aiChatHistory.push({ role:'assistant', content: reply });
+      if(_aiChatHistory.length > 20) _aiChatHistory = _aiChatHistory.slice(-20);
+    } catch(e) {
+      document.getElementById(typingId)?.remove();
+      _appendAiMsg('assistant', '⚠️ Could not connect to Claude API: ' + e.message + '\n\nEnsure your Cloudflare Worker proxies requests to api.anthropic.com and forwards the x-api-key header.');
+    }
+    _aiTyping = false;
+    if(btn) { btn.textContent = '⚡ SEND'; btn.disabled = false; }
+  }
+
+  function _appendAiMsg(role, text, id) {
+    const wrap = document.getElementById('aiChatMessages');
+    if(!wrap) return;
+    const isUser = role === 'user';
+    const isTyping = role === 'typing';
+    const div = document.createElement('div');
+    if(id) div.id = id;
+    div.style.cssText = `margin-bottom:12px;display:flex;flex-direction:column;align-items:${isUser?'flex-end':'flex-start'};`;
+    const formatted = isTyping ? '<span style="letter-spacing:4px;font-size:1.2rem">···</span>' : text
+      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--accent)">$1</strong>')
+      .replace(/`([^`]+)`/g, '<code style="background:rgba(0,229,255,.12);color:var(--accent);padding:1px 5px;border-radius:3px;font-family:Share Tech Mono,monospace;font-size:.85em">$1</code>')
+      .replace(/\n/g, '<br>');
+    div.innerHTML = `
+      <div style="max-width:85%;padding:10px 14px;border-radius:${isUser?'12px 12px 3px 12px':'12px 12px 12px 3px'};
+        background:${isUser?'rgba(0,229,255,.1)':'rgba(192,132,252,.08)'};
+        border:1px solid ${isUser?'rgba(0,229,255,.25)':'rgba(192,132,252,.2)'};
+        font-size:.82rem;line-height:1.6;color:var(--text);">${formatted}</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:3px;padding:0 4px;">
+        ${isUser?'You':'🤖 Claude'} · ${new Date().toLocaleTimeString()}
+      </div>`;
+    wrap.appendChild(div);
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  function aiQuickPrompt(type) {
+    const sym = document.getElementById('symbolInput')?.value?.trim() || 'BTC';
+    const prompts = {
+      analyze:  `Analyze the current ${sym} setup based on the live indicator data above. What's the overall picture and what should I watch for?`,
+      risk:     `Review the risk management for a ${sym} trade right now. Is the current indicator setup appropriate for entering, and what stop loss level would you recommend?`,
+      strategy: `Give me 3 specific, actionable tips for trading ${sym} using the EMA 55 cross strategy on this timeframe.`,
+      sentiment:`What does the current Fear & Greed index and market context suggest about timing a ${sym} trade right now?`,
+      entry:    `Based on current indicators for ${sym}, suggest a specific entry price zone, stop loss level, and 2 take profit targets with reasoning.`,
+    };
+    const input = document.getElementById('aiChatInput');
+    if(input) { input.value = prompts[type] || ''; input.focus(); }
+  }
+
+  function clearAiChat() {
+    _aiChatHistory = [];
+    const wrap = document.getElementById('aiChatMessages');
+    if(wrap) wrap.innerHTML = '<div style="color:var(--muted);font-family:\'Share Tech Mono\',monospace;font-size:.6rem;text-align:center;padding:20px 0">Chat cleared. Ask me anything about your trade setup.</div>';
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  PORTFOLIO TRACKER
+  // ══════════════════════════════════════════════════════════════════
+  let portfolio = (function() { try { return JSON.parse(localStorage.getItem('tl_portfolio') || '[]'); } catch(e) { return []; } })();
+
+  function _savePortfolio() { try { localStorage.setItem('tl_portfolio', JSON.stringify(portfolio)); } catch(e) {} }
+
+  function addPortfolioPosition() {
+    const sym = (document.getElementById('port-sym')?.value || '').trim().toUpperCase().replace(/[^A-Z0-9.]/g,'');
+    const qty = parseFloat(document.getElementById('port-qty')?.value) || 0;
+    const buy = parseFloat(document.getElementById('port-buy')?.value) || 0;
+    if(!sym || !qty || !buy) { alert('Please fill Symbol, Quantity and Avg Buy Price'); return; }
+    const existing = portfolio.find(p => p.sym === sym);
+    if(existing) {
+      const totalCost = existing.qty * existing.buy + qty * buy;
+      existing.qty = existing.qty + qty;
+      existing.buy = totalCost / existing.qty;
+    } else {
+      portfolio.push({ sym, qty, buy, current: null, addedAt: Date.now() });
+    }
+    _savePortfolio();
+    ['port-sym','port-qty','port-buy'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+    renderPortfolio();
+    _updatePortfolioSummary();
+  }
+
+  function removePortfolioPosition(sym) {
+    portfolio = portfolio.filter(p => p.sym !== sym);
+    _savePortfolio();
+    renderPortfolio();
+    _updatePortfolioSummary();
+  }
+
+  async function refreshPortfolio() {
+    if(!portfolio.length) return;
+    await Promise.allSettled(portfolio.map(async p => {
+      try {
+        const d = await smartFetch(`https://api.binance.com/api/v3/ticker/price?symbol=${p.sym}USDT`);
+        if(d.price) p.current = parseFloat(d.price);
+      } catch(e) {}
+    }));
+    _savePortfolio();
+    renderPortfolio();
+    _updatePortfolioSummary();
+  }
+
+  function renderPortfolio() {
+    const tbody = document.getElementById('portTbody');
+    if(!tbody) return;
+    if(!portfolio.length) {
+      tbody.innerHTML = '<tr><td colspan="9" style="padding:16px 8px;color:var(--muted);text-align:center">No positions yet. Add above.</td></tr>';
+      return;
+    }
+    const totalValue = portfolio.reduce((s,p) => s + ((p.current||p.buy)*p.qty), 0);
+    const fmtUSD = v => v >= 1e6 ? '$'+(v/1e6).toFixed(2)+'M' : v >= 1e3 ? '$'+(v/1e3).toFixed(1)+'K' : '$'+v.toFixed(2);
+    const fmtPrice = v => v >= 10000 ? '$'+v.toLocaleString(undefined,{maximumFractionDigits:2}) : v >= 1 ? '$'+v.toFixed(4) : '$'+v.toFixed(6);
+    tbody.innerHTML = portfolio.map(p => {
+      const curr   = p.current || p.buy;
+      const value  = curr * p.qty;
+      const cost   = p.buy * p.qty;
+      const pnl    = value - cost;
+      const pnlPct = cost > 0 ? (pnl / cost) * 100 : 0;
+      const alloc  = totalValue > 0 ? (value / totalValue * 100) : 0;
+      const pColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<tr style="border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer"
+        onclick="document.getElementById('symbolInput').value='${p.sym}';switchTab('analysis');setTimeout(fetchData,100)" title="Click to analyse ${p.sym}">
+        <td style="padding:6px 8px;font-family:'Orbitron',monospace;font-weight:700;color:var(--accent)">${p.sym}</td>
+        <td style="padding:6px 8px;text-align:right">${p.qty < 1 ? p.qty.toFixed(6) : p.qty.toFixed(3)}</td>
+        <td style="padding:6px 8px;text-align:right;color:var(--muted)">${fmtPrice(p.buy)}</td>
+        <td style="padding:6px 8px;text-align:right;color:${p.current?'var(--text)':'var(--muted)'}">${fmtPrice(curr)}${!p.current?' *':''}</td>
+        <td style="padding:6px 8px;text-align:right;font-weight:700">${fmtUSD(value)}</td>
+        <td style="padding:6px 8px;text-align:right;color:${pColor};font-weight:700">${pnl>=0?'+':''}${fmtUSD(Math.abs(pnl))}</td>
+        <td style="padding:6px 8px;text-align:right;color:${pColor}">${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%</td>
+        <td style="padding:6px 8px;text-align:right">
+          <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+            <div style="width:36px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${Math.min(100,alloc).toFixed(0)}%;background:var(--accent);border-radius:2px"></div>
+            </div>
+            ${alloc.toFixed(1)}%
+          </div>
+        </td>
+        <td style="padding:6px 8px">
+          <span onclick="event.stopPropagation();removePortfolioPosition('${p.sym}')" style="color:var(--red);cursor:pointer;font-size:.7rem;padding:4px 6px">✕</span>
+        </td>
+      </tr>`;
+    }).join('') + `<tr style="border-top:1px solid var(--border)">
+      <td colspan="9" style="padding:4px 8px;font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted)">* Using avg buy price — click ⟳ Refresh Prices to update live prices</td>
+    </tr>`;
+  }
+
+  function _updatePortfolioSummary() {
+    const totalValue = portfolio.reduce((s,p) => s + ((p.current||p.buy)*p.qty), 0);
+    const totalCost  = portfolio.reduce((s,p) => s + (p.buy * p.qty), 0);
+    const pnl        = totalValue - totalCost;
+    const pnlPct     = totalCost > 0 ? pnl / totalCost * 100 : 0;
+    const pColor     = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const fmtUSD     = v => v >= 1e6 ? '$'+(v/1e6).toFixed(2)+'M' : v >= 1e3 ? '$'+(v/1e3).toFixed(1)+'K' : '$'+v.toFixed(2);
+    const s = (id, v, c) => { const el = document.getElementById(id); if(el) { el.textContent = v; if(c) el.style.color = c; } };
+    s('port-total',  fmtUSD(totalValue), 'var(--accent)');
+    s('port-cost',   fmtUSD(totalCost),  'var(--muted)');
+    s('port-pnl',    (pnl>=0?'+':'')+fmtUSD(Math.abs(pnl)), pColor);
+    s('port-pnlpct', (pnlPct>=0?'+':'')+pnlPct.toFixed(2)+'%', pColor);
+    s('port-count',  String(portfolio.length));
+  }
+
+  // Init portfolio on load
+  renderPortfolio();
+  _updatePortfolioSummary();
+
+  // ══════════════════════════════════════════════════════════════════
+  //  SOCIAL SENTIMENT
+  // ══════════════════════════════════════════════════════════════════
+  async function fetchSocialSentiment() {
+    const panel = document.getElementById('socialSentimentPanel');
+    if(!panel) return;
+    panel.innerHTML = _skel(4);
+    try {
+      const cgData = await smartFetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,binancecoin,ripple,dogecoin,cardano,avalanche-2,chainlink,polkadot&order=market_cap_desc&sparkline=false&price_change_percentage=1h,24h,7d');
+      if(!Array.isArray(cgData)) throw new Error('bad data');
+      const sentimentData = cgData.map(c => {
+        const pct1h  = c.price_change_percentage_1h_in_currency  || 0;
+        const pct24h = c.price_change_percentage_24h || 0;
+        const pct7d  = c.price_change_percentage_7d_in_currency  || 0;
+        // Weighted sentiment: 7d trend matters most, then 24h, then 1h
+        let score = 50 + (pct7d * 2) + (pct24h * 1.5) + (pct1h * 0.5);
+        score = Math.min(99, Math.max(1, Math.round(score)));
+        const label = score >= 75 ? 'Very Bullish 🔥' : score >= 60 ? 'Bullish 📈' : score >= 45 ? 'Neutral ⟺' : score >= 30 ? 'Bearish 📉' : 'Very Bearish 💀';
+        const color = score >= 65 ? 'var(--green)' : score >= 45 ? 'var(--warn)' : 'var(--red)';
+        return { sym: c.symbol.toUpperCase(), name: c.name, pct24h, pct7d, score, label, color, price: c.current_price };
+      }).sort((a,b) => b.score - a.score);
+
+      const overall = Math.round(sentimentData.reduce((s,d) => s+d.score, 0) / sentimentData.length);
+      const oColor  = overall >= 65 ? 'var(--green)' : overall >= 45 ? 'var(--warn)' : 'var(--red)';
+      const oLabel  = overall >= 75 ? 'Markets feeling greedy 🔥' : overall >= 60 ? 'Cautiously bullish' : overall >= 45 ? 'Mixed signals ⟺' : overall >= 30 ? 'Fear spreading' : 'Extreme fear 💀';
+
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;gap:14px;padding:12px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+          <div style="font-family:'Orbitron',monospace;font-size:2rem;font-weight:900;color:${oColor}">${overall}</div>
+          <div style="flex:1">
+            <div style="font-family:'Orbitron',monospace;font-size:.75rem;font-weight:700;color:${oColor}">Overall Market Sentiment</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);margin-top:2px">${oLabel}</div>
+            <div style="height:6px;background:rgba(255,255,255,.05);border-radius:3px;margin-top:6px;overflow:hidden">
+              <div style="height:100%;width:${overall}%;background:${oColor};transition:width .8s"></div>
+            </div>
+          </div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);text-align:right">
+            Based on 1h/24h/7d<br>price momentum
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px">
+          ${sentimentData.map(d => {
+            const onclick = `document.getElementById('symbolInput').value='${d.sym}';switchTab('analysis');setTimeout(fetchData,100)`;
+            return `<div style="background:rgba(0,0,0,.3);border:1px solid ${d.color}33;border-radius:8px;padding:10px 12px;cursor:pointer" onclick="${onclick}">
+              <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+                <span style="font-family:'Orbitron',monospace;font-size:.65rem;font-weight:700;color:var(--accent)">${d.sym}</span>
+                <span style="font-family:'Share Tech Mono',monospace;font-size:.55rem;color:${d.pct24h>=0?'var(--green)':'var(--red)'}">${d.pct24h>=0?'+':''}${d.pct24h.toFixed(2)}%</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <div style="flex:1;height:5px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden">
+                  <div style="height:100%;width:${d.score}%;background:${d.color};transition:width .8s"></div>
+                </div>
+                <span style="font-family:'Orbitron',monospace;font-size:.58rem;font-weight:700;color:${d.color};min-width:24px">${d.score}</span>
+              </div>
+              <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:${d.color}">${d.label}</div>
+              <div style="font-family:'Share Tech Mono',monospace;font-size:.48rem;color:var(--muted);margin-top:2px">7d: ${d.pct7d>=0?'+':''}${d.pct7d.toFixed(1)}%</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    } catch(e) {
+      panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Sentiment unavailable: ${e.message}</div>`;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  DEFI ANALYTICS
+  // ══════════════════════════════════════════════════════════════════
+  async function fetchDefiData(bust) {
+    const panel = document.getElementById('defiPanel');
+    if(!panel) return;
+    const TTL = 10 * 60 * 1000;
+    try {
+      const [tvlRes, protRes] = await Promise.allSettled([
+        (function() {
+          const cached = !bust && _mktGet('defiTvl', TTL);
+          if(cached) return Promise.resolve(cached);
+          return Promise.any([
+            fetch('https://api.llama.fi/v2/historicalChainTvl', {signal:AbortSignal.timeout(7000)}).then(r=>r.json()),
+            smartFetch('https://api.llama.fi/v2/historicalChainTvl'),
+          ]).then(d => { _mktSet('defiTvl', d); return d; });
+        })(),
+        (function() {
+          const cached = !bust && _mktGet('defiProts', TTL);
+          if(cached) return Promise.resolve(cached);
+          return Promise.any([
+            fetch('https://api.llama.fi/protocols', {signal:AbortSignal.timeout(7000)}).then(r=>r.json()),
+            smartFetch('https://api.llama.fi/protocols'),
+          ]).then(d => { _mktSet('defiProts', d); return d; });
+        })(),
+      ]);
+
+      const tvl   = tvlRes.status   === 'fulfilled' ? tvlRes.value   : null;
+      const prots = protRes.status  === 'fulfilled' ? protRes.value  : null;
+      const currentTvl = Array.isArray(tvl) && tvl.length ? tvl[tvl.length-1]?.tvl : null;
+      const prevTvl    = Array.isArray(tvl) && tvl.length > 7 ? tvl[tvl.length-7]?.tvl : null;
+      const tvlChg     = currentTvl && prevTvl ? ((currentTvl - prevTvl) / prevTvl * 100) : null;
+      const topProts   = Array.isArray(prots) ? prots.filter(p=>p.tvl>1e8).sort((a,b)=>b.tvl-a.tvl).slice(0,12) : [];
+      const maxTvl     = topProts.length ? topProts[0].tvl : 1;
+      const fmtTvl     = v => v>=1e9?'$'+(v/1e9).toFixed(2)+'B':v>=1e6?'$'+(v/1e6).toFixed(1)+'M':'$'+v.toFixed(0);
+      const tvlColor   = tvlChg==null?'var(--muted)':tvlChg>5?'var(--green)':tvlChg>0?'#9acd32':tvlChg>-5?'var(--warn)':'var(--red)';
+
+      panel.innerHTML = `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+          <div style="background:rgba(99,179,237,.08);border:1px solid rgba(99,179,237,.25);border-radius:8px;padding:12px 18px;flex:1;min-width:130px">
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">Total DeFi TVL</div>
+            <div style="font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:#63b3ed">${currentTvl ? fmtTvl(currentTvl) : '—'}</div>
+            ${tvlChg!=null?`<div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:${tvlColor};margin-top:4px">${tvlChg>=0?'+':''}${tvlChg.toFixed(1)}% vs 7d ago</div>`:''}
+          </div>
+          <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:12px 18px;flex:1;min-width:130px">
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">Protocols Tracked</div>
+            <div style="font-family:'Orbitron',monospace;font-size:1.1rem;font-weight:700;color:var(--accent)">${prots ? prots.length.toLocaleString() : '—'}</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-top:4px">via DefiLlama (free)</div>
+          </div>
+          <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:12px 18px;flex:1;min-width:130px">
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">Capital Flow Signal</div>
+            <div style="font-family:'Orbitron',monospace;font-size:.85rem;font-weight:700;color:${tvlColor}">
+              ${tvlChg==null?'—':tvlChg>5?'🟢 GROWING':tvlChg>0?'📈 STABLE':tvlChg>-5?'⚠️ SHRINKING':'🔴 OUTFLOWS'}
+            </div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-top:4px">Capital flowing ${tvlChg!=null&&tvlChg>0?'IN ↑':'OUT ↓'}</div>
+          </div>
+        </div>
+        ${topProts.length ? `
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:#63b3ed;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Top Protocols by TVL</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            ${topProts.map((p, i) => {
+              const bw = (p.tvl / maxTvl * 100).toFixed(1);
+              const cc = (p.change_1d||0) >= 0 ? 'var(--green)' : 'var(--red)';
+              return `<div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">#${i+1}</span>
+                    <span style="font-family:'Orbitron',monospace;font-size:.6rem;font-weight:700;color:var(--accent)">${p.name}</span>
+                  </div>
+                  <span style="font-family:'Share Tech Mono',monospace;font-size:.48rem;padding:1px 5px;background:rgba(99,179,237,.1);color:#63b3ed;border-radius:3px">${p.category||'DeFi'}</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+                  <div style="flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden">
+                    <div style="height:100%;width:${bw}%;background:#63b3ed"></div>
+                  </div>
+                  <span style="font-family:'Share Tech Mono',monospace;font-size:.6rem;font-weight:700;color:var(--text)">${fmtTvl(p.tvl)}</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                  <span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">${p.chain||'Multi'}</span>
+                  ${p.change_1d!=null?`<span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:${cc}">${p.change_1d>=0?'+':''}${p.change_1d.toFixed(1)}% 24h</span>`:''}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>` : '<div style="color:var(--muted);font-size:.6rem">Protocol data unavailable</div>'}`;
+    } catch(e) {
+      panel.innerHTML = `<div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">DeFi data unavailable: ${e.message}</div>`;
+    }
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  TRADINGVIEW FALLBACK — shown when all data sources fail
+  // ══════════════════════════════════════════════════════════════════
+  function _showTradingViewFallback(sym) {
+    // Map our symbols to TradingView equivalents
+    const tvMap = {
+      // Forex
+      'EURUSD':'FX:EURUSD', 'USDIDR':'FX:USDIDR', 'USDJPY':'FX:USDJPY',
+      'EURIDR':'FX:EURIDR', 'GBPUSD':'FX:GBPUSD', 'AUDUSD':'FX:AUDUSD',
+      'USDCAD':'FX:USDCAD', 'USDCHF':'FX:USDCHF', 'NZDUSD':'FX:NZDUSD',
+      'USDSGD':'FX:USDSGD', 'USDMYR':'FX:USDMYR', 'USDCNY':'FX:USDCNY',
+      // Metals / Commodities
+      'XAUT':'OANDA:XAUUSD',    // Gold
+      'XAGUSD':'OANDA:XAGUSD',  // Silver
+      'USOIL':'NYMEX:CL1!',     // WTI Crude
+      // IDX Stocks
+      'ANTAM':'IDX:ANTM',
+      // Default crypto: use BINANCE prefix
+    };
+    const tvSym = tvMap[sym] || (
+      FOREX_PAIRS[sym]     ? `FX:${sym}` :
+      SPECIAL_PAIRS[sym]?.isStock ? `IDX:${sym.replace('.JK','')}` :
+      `BINANCE:${sym}USDT`
+    );
+
+    // Find the chart panel and inject TradingView widget
+    const chartWrap = document.querySelector('.chart-wrap');
+    if(!chartWrap) return;
+
+    const tvInterval = {'15m':'15','30m':'30','1h':'60','4h':'240','1d':'D','1w':'W','1M':'M'}[currentTF] || '60';
+
+    chartWrap.innerHTML = `
+      <div style="width:100%;height:100%;display:flex;flex-direction:column">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--warn);padding:6px 10px;background:rgba(255,184,0,.08);border-bottom:1px solid rgba(255,184,0,.2);display:flex;align-items:center;gap:8px">
+          ⚠️ Live data fetch failed — showing TradingView chart for <strong style="color:var(--accent)">${sym}</strong>
+          <span style="margin-left:auto;color:var(--muted)">indicators disabled · click ⚡ FETCH to retry</span>
+        </div>
+        <iframe
+          src="https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(tvSym)}&interval=${tvInterval}&theme=dark&style=1&locale=en&hide_top_toolbar=0&hide_legend=0&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0&studies=&withdateranges=1&hide_side_toolbar=0&referral_id=tradinglab"
+          style="width:100%;flex:1;border:none;min-height:190px"
+          allowtransparency="true"
+          frameborder="0"
+          scrolling="no"
+          loading="lazy"
+        ></iframe>
+      </div>`;
+    chartWrap.style.height = '240px';
+
+    // Also show a notice in the status panel
+    const pcPair = document.getElementById('pcPair');
+    if(pcPair) pcPair.textContent = 'TradingView fallback — ' + (tvMap[sym] || tvSym);
+  }
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
