@@ -968,28 +968,47 @@
       </div>
     </div>
 
-    <!-- Telegram Alerts Settings -->
+    <!-- Notifications: Telegram + Discord -->
     <div style="background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:12px;margin-bottom:14px">
-      <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px;margin-bottom:10px">📱 TELEGRAM ALERTS</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div>
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">BOT TOKEN</div>
-          <input id="cfg-tg-token" class="setting-input" type="password" placeholder="123456:ABC-DEF...">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px;margin-bottom:12px">🔔 NOTIFICATIONS</div>
+
+      <!-- Discord -->
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:#5865f2;font-weight:700;margin-bottom:8px">💬 Discord Webhook</div>
+        <div style="margin-bottom:8px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">WEBHOOK URL</div>
+          <input id="cfg-dc-webhook" class="setting-input" type="password" placeholder="https://discord.com/api/webhooks/...">
         </div>
-        <div>
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">CHAT ID</div>
-          <input id="cfg-tg-chatid" class="setting-input" placeholder="Your Telegram chat ID">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:8px;line-height:1.7">
+          1. Open Discord → your server → any channel → ⚙️ Edit Channel<br>
+          2. <strong style="color:#5865f2">Integrations</strong> → <strong style="color:#5865f2">Webhooks</strong> → <strong style="color:#5865f2">New Webhook</strong><br>
+          3. Click <strong style="color:#5865f2">Copy Webhook URL</strong> → paste above
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="settings-btn settings-save" onclick="saveDiscordConfig()" style="border-color:#5865f2;color:#5865f2;background:rgba(88,101,242,.1)">💾 SAVE DISCORD</button>
+          <button class="settings-btn" style="background:rgba(0,255,136,.08);border-color:var(--green);color:var(--green)" onclick="testDiscordAlert()">📤 SEND TEST</button>
+          <span id="dc-status" style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);display:flex;align-items:center"></span>
         </div>
       </div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:8px;line-height:1.7">
-        1. Message <strong style="color:var(--accent)">@BotFather</strong> on Telegram → /newbot → copy token<br>
-        2. Message <strong style="color:var(--accent)">@userinfobot</strong> → copy your Chat ID<br>
-        3. Send a test message to confirm ✅
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="settings-btn settings-save" onclick="saveTelegramConfig()">💾 SAVE TELEGRAM</button>
-        <button class="settings-btn" style="background:rgba(0,255,136,.08);border-color:var(--green);color:var(--green)" onclick="testTelegramAlert()">📤 SEND TEST</button>
-        <span id="tg-status" style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);display:flex;align-items:center"></span>
+
+      <!-- Telegram -->
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--warn);font-weight:700;margin-bottom:8px">📱 Telegram Bot (optional)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">BOT TOKEN</div>
+            <input id="cfg-tg-token" class="setting-input" type="password" placeholder="123456:ABC-DEF...">
+          </div>
+          <div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">CHAT ID</div>
+            <input id="cfg-tg-chatid" class="setting-input" placeholder="Your Telegram chat ID">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="settings-btn settings-save" onclick="saveTelegramConfig()">💾 SAVE TELEGRAM</button>
+          <button class="settings-btn" style="background:rgba(0,255,136,.08);border-color:var(--green);color:var(--green)" onclick="testTelegramAlert()">📤 SEND TEST</button>
+          <span id="tg-status" style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);display:flex;align-items:center"></span>
+        </div>
       </div>
     </div>
     <div class="settings-grid">
@@ -5533,8 +5552,9 @@ self.onmessage=function(e){
             icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📡</text></svg>'
           });
         }
-        // Telegram notification
+        // Telegram + Discord notifications
         _sendTelegramAlert(sym, a.dir, a.price, price);
+        _sendDiscordAlert(sym, a.dir, a.price, price);
         // Mark triggered in cloud
         if(_cloudEnabled) {
           _api('PUT', '/alerts', { id: a.id }).catch(function(e){ console.warn('[Cloud] alert trigger failed:', e.message); });
@@ -10968,11 +10988,87 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     if(!_cloudEnabled) return;
     try {
       const cfg = await _api('GET', '/telegram/config');
-      const tokenEl  = document.getElementById('cfg-tg-token');
-      const chatEl   = document.getElementById('cfg-tg-chatid');
+      const tokenEl = document.getElementById('cfg-tg-token');
+      const chatEl  = document.getElementById('cfg-tg-chatid');
       if(tokenEl && cfg.bot_token) tokenEl.placeholder = '••••••• (saved)';
       if(chatEl  && cfg.chat_id)   chatEl.value = cfg.chat_id;
     } catch(_) {}
+    // Also load Discord config
+    try {
+      const dc = await _api('GET', '/discord/config');
+      const webhookEl = document.getElementById('cfg-dc-webhook');
+      if(webhookEl && dc.webhook_url) webhookEl.placeholder = '••••••• (saved)';
+    } catch(_) {}
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  DISCORD ALERTS
+  // ══════════════════════════════════════════════════════════════════
+  async function saveDiscordConfig() {
+    const webhook = document.getElementById('cfg-dc-webhook')?.value?.trim();
+    const status  = document.getElementById('dc-status');
+    if(!webhook) { if(status) { status.textContent = 'Enter webhook URL'; status.style.color = 'var(--warn)'; } return; }
+    if(!webhook.startsWith('https://discord.com/api/webhooks/')) {
+      if(status) { status.textContent = '❌ Invalid webhook URL'; status.style.color = 'var(--red)'; } return;
+    }
+    if(!_cloudEnabled) { if(status) { status.textContent = '⚠️ Cloud not connected'; status.style.color = 'var(--warn)'; } return; }
+    try {
+      await _api('POST', '/discord/config', { webhook_url: webhook, enabled: true });
+      if(status) { status.textContent = '✅ Saved'; status.style.color = 'var(--green)'; }
+      setTimeout(function(){ if(status) status.textContent = ''; }, 3000);
+      // Clear field for security
+      document.getElementById('cfg-dc-webhook').value = '';
+      document.getElementById('cfg-dc-webhook').placeholder = '••••••• (saved)';
+    } catch(e) {
+      if(status) { status.textContent = '❌ ' + e.message; status.style.color = 'var(--red)'; }
+    }
+  }
+
+  async function testDiscordAlert() {
+    const status = document.getElementById('dc-status');
+    if(!_cloudEnabled) { if(status) { status.textContent = '⚠️ Cloud not connected'; status.style.color = 'var(--warn)'; } return; }
+    try {
+      if(status) { status.textContent = 'Sending...'; status.style.color = 'var(--muted)'; }
+      const sym   = document.getElementById('symbolInput')?.value || 'BTC';
+      const price = document.getElementById('pcPrice')?.textContent || '—';
+      await _api('POST', '/discord/send', {
+        embeds: [{
+          title: '📡 Crypto Risk System — Test Alert',
+          color: 0x00e5ff,
+          fields: [
+            { name: 'Symbol', value: '**' + sym + '**', inline: true },
+            { name: 'Price',  value: '**' + price + '**', inline: true },
+          ],
+          description: '✅ Discord alerts are working correctly!',
+          footer: { text: 'Crypto Risk System' },
+          timestamp: new Date().toISOString(),
+        }]
+      });
+      if(status) { status.textContent = '✅ Check your Discord channel!'; status.style.color = 'var(--green)'; }
+      setTimeout(function(){ if(status) status.textContent = ''; }, 4000);
+    } catch(e) {
+      if(status) { status.textContent = '❌ ' + e.message; status.style.color = 'var(--red)'; }
+    }
+  }
+
+  async function _sendDiscordAlert(sym, dir, price, currentPrice) {
+    if(!_cloudEnabled) return;
+    const isAbove = dir === 'above';
+    const emoji   = isAbove ? '🚀' : '📉';
+    const color   = isAbove ? 0x00ff88 : 0xff2d55;
+    _api('POST', '/discord/send', {
+      embeds: [{
+        title: emoji + ' Price Alert Triggered!',
+        color: color,
+        fields: [
+          { name: 'Symbol',  value: '**' + sym + '**',                             inline: true },
+          { name: 'Target',  value: (isAbove ? 'Above' : 'Below') + ' **$' + price.toLocaleString() + '**', inline: true },
+          { name: 'Current', value: '**$' + currentPrice.toLocaleString() + '**',  inline: true },
+        ],
+        footer: { text: 'Crypto Risk System' },
+        timestamp: new Date().toISOString(),
+      }]
+    }).catch(function(e){ console.warn('[Discord] send failed:', e.message); });
   }
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
