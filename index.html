@@ -892,6 +892,7 @@
       <div class="tagline">Multi-Proxy Auto-Fallback · Indonesia Ready ✓</div>
     </div>
     <div class="source-badge"><div class="live-dot" id="headerDot"></div><span id="sourceLabel">READY</span></div>
+    <span id="sync-badge" title="Cloud sync status" style="font-family:'Share Tech Mono',monospace;font-size:.56rem;padding:4px 10px;border:1px solid var(--border);border-radius:20px;color:var(--muted);cursor:pointer" onclick="switchTab('settings-cloud')">💾 Local only</span>
     <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀️ LIGHT</button>
     <button class="theme-btn" onclick="toggleSettings()" style="border-color:rgba(255,184,0,.4);color:var(--warn)">⚙️ SETTINGS</button>
   </header>
@@ -945,6 +946,52 @@
   <!-- ── Settings Panel (hidden by default) ── -->
   <div class="panel" id="settingsPanel" style="margin-bottom:14px;display:none;border-color:rgba(255,184,0,.3)">
     <div class="ptitle" style="color:var(--warn)">⚙️ Settings &amp; Customization</div>
+
+    <!-- Cloud Sync Settings -->
+    <div style="background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px;margin-bottom:10px">☁️ CLOUD SYNC</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">DATA WORKER URL</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--accent);padding:6px 8px;background:rgba(0,0,0,.3);border-radius:4px">crypto-data.irzaldi.workers.dev</div>
+        </div>
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">SECRET KEY (optional)</div>
+          <input id="cfg-secret" class="setting-input" type="password" placeholder="Your USER_SECRET value"
+            value="" onchange="localStorage.setItem('tl_data_secret',this.value);location.reload()">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="settings-btn settings-save" onclick="_checkCloud()">🔄 Test Connection</button>
+        <button class="settings-btn" style="background:rgba(0,255,136,.08);border-color:var(--green);color:var(--green)" onclick="_pullAllFromCloud()">⬇️ Pull from Cloud</button>
+        <span id="sync-badge-settings" style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Status: checking...</span>
+      </div>
+    </div>
+
+    <!-- Telegram Alerts Settings -->
+    <div style="background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px;margin-bottom:10px">📱 TELEGRAM ALERTS</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">BOT TOKEN</div>
+          <input id="cfg-tg-token" class="setting-input" type="password" placeholder="123456:ABC-DEF...">
+        </div>
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">CHAT ID</div>
+          <input id="cfg-tg-chatid" class="setting-input" placeholder="Your Telegram chat ID">
+        </div>
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:8px;line-height:1.7">
+        1. Message <strong style="color:var(--accent)">@BotFather</strong> on Telegram → /newbot → copy token<br>
+        2. Message <strong style="color:var(--accent)">@userinfobot</strong> → copy your Chat ID<br>
+        3. Send a test message to confirm ✅
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="settings-btn settings-save" onclick="saveTelegramConfig()">💾 SAVE TELEGRAM</button>
+        <button class="settings-btn" style="background:rgba(0,255,136,.08);border-color:var(--green);color:var(--green)" onclick="testTelegramAlert()">📤 SEND TEST</button>
+        <span id="tg-status" style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);display:flex;align-items:center"></span>
+      </div>
+    </div>
     <div class="settings-grid">
       <div class="setting-item"><label class="setting-label" for="cfg-defaultSym">Default Symbol</label><input class="setting-input" id="cfg-defaultSym" value="BTC" placeholder="BTC"></div>
       <div class="setting-item"><label class="setting-label" for="cfg-defaultTF">Default Timeframe</label>
@@ -2972,6 +3019,122 @@ self.onmessage=function(e){
   ];
   const WORKER_URL = WORKERS[0];
   let _workerFailed = false;
+
+  // ══════════════════════════════════════════════════════════════════
+  //  CLOUD SYNC — data worker API
+  //  Set DATA_WORKER_URL after deploying crypto-data.irzaldi.workers.dev
+  // ══════════════════════════════════════════════════════════════════
+  const DATA_WORKER_URL = 'https://crypto-data.irzaldi.workers.dev';
+  const DATA_SECRET     = localStorage.getItem('tl_data_secret') || '';
+
+  let _cloudEnabled = false;   // set to true after first successful sync
+  let _syncPending  = false;   // debounce flag
+
+  // Generic API call to data worker
+  async function _api(method, path, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if(DATA_SECRET) headers['X-User-Secret'] = DATA_SECRET;
+    const opts = { method, headers };
+    if(body) opts.body = JSON.stringify(body);
+    const res = await fetch(DATA_WORKER_URL + path, opts);
+    if(!res.ok) { const e = await res.json().catch(()=>({error:res.status})); throw new Error(e.error||res.status); }
+    return res.json();
+  }
+
+  // Check if cloud is reachable
+  async function _checkCloud() {
+    try {
+      const h = await _api('GET', '/health');
+      _cloudEnabled = h.status === 'ok' && h.db === true;
+      _updateSyncBadge(_cloudEnabled ? 'connected' : 'no-db');
+      if(_cloudEnabled) _pullAllFromCloud();
+    } catch(e) {
+      _cloudEnabled = false;
+      _updateSyncBadge('offline');
+    }
+  }
+
+  // Pull all data from cloud on load
+  async function _pullAllFromCloud() {
+    try {
+      const data = await _api('GET', '/sync');
+      // Portfolio
+      if(data.portfolio && data.portfolio.length) {
+        portfolio = data.portfolio.map(p => ({
+          sym: p.sym, qty: p.qty, buy: p.buy_price,
+          current: p.current || null, addedAt: p.added_at,
+        }));
+        renderPortfolio(); _updatePortfolioSummary();
+      }
+      // Trade journal
+      if(data.journal && data.journal.length) {
+        tradeJournal = data.journal.map(j => ({
+          id:j.id, date:j.date, pair:j.pair, dir:j.direction,
+          entry:j.entry, size:j.qty, sl:j.sl, tp:j.tp,
+          exit:j.exit_price, pnl:j.pnl, pnlPct:j.pnl_pct,
+          rr:j.rr, status:j.status, notes:j.notes,
+        }));
+        renderJournal(); updateSessionPnL();
+      }
+      // Watchlist
+      if(data.watchlist && data.watchlist.length) {
+        watchlist = data.watchlist;
+        saveWatchlist(); renderWatchlistUI();
+      }
+      // Alerts
+      if(data.alerts) {
+        priceAlerts = data.alerts.map(a => ({
+          id:a.id, sym:a.sym, dir:a.direction,
+          price:a.price, triggered:!!a.triggered,
+        }));
+        renderAlerts();
+      }
+      // Settings
+      if(data.settings && data.settings.tl_cfg) {
+        CFG = Object.assign({}, DEFAULTS, data.settings.tl_cfg);
+        applySettings();
+      }
+      // Custom pairs
+      if(data.customPairs && data.customPairs.length) {
+        data.customPairs.forEach(p => {
+          if(!customPairs.find(c => c.sym === p.sym)) {
+            customPairs.push({ sym:p.sym, label:p.label, type:p.type });
+          }
+        });
+        saveCustomPairs(); renderCustomPairBtns();
+      }
+      _updateSyncBadge('synced');
+      console.log('[Cloud] Pull complete:', new Date().toLocaleTimeString());
+    } catch(e) {
+      console.warn('[Cloud] Pull failed:', e.message);
+      _updateSyncBadge('error');
+    }
+  }
+
+  // Debounced push — batches rapid saves into one request
+  function _debouncedPush(fn) {
+    if(!_cloudEnabled) return;
+    clearTimeout(_debouncedPush._timer);
+    _debouncedPush._timer = setTimeout(fn, 800);
+  }
+
+  // Sync badge UI
+  function _updateSyncBadge(state) {
+    const el = document.getElementById('sync-badge');
+    if(!el) return;
+    const states = {
+      connected: ['☁️ Cloud',         'var(--accent)', 'Connecting to cloud...'],
+      synced:    ['☁️ Synced',         'var(--green)',  'All data saved to cloud'],
+      saving:    ['☁️ Saving...',      'var(--warn)',   'Saving to cloud...'],
+      offline:   ['💾 Local only',     'var(--muted)',  'Cloud not reachable — using local storage'],
+      'no-db':   ['⚠️ DB not linked',  'var(--warn)',   'D1 database not linked to worker yet'],
+      error:     ['⚠️ Sync error',     'var(--red)',    'Cloud sync failed — check worker'],
+    };
+    const [text, color, title] = states[state] || states.offline;
+    el.textContent = text;
+    el.style.color = color;
+    el.title = title;
+  }
   let _bestWorker = null;
 
   async function workerFetch(url) {
@@ -5321,19 +5484,28 @@ self.onmessage=function(e){
   }
 
   let priceAlerts=[];
-  function addAlert(){
-    const dir=document.getElementById('alertDir').value;
-    const price=parseFloat(document.getElementById('alertPrice').value);
-    if(!price||isNaN(price)) return;
-    const sym=(document.getElementById('symbolInput').value||'BTC').toUpperCase();
-    const id=Date.now();
-    priceAlerts.push({id,sym,dir,price,triggered:false});
-    document.getElementById('alertPrice').value='';
+  function addAlert() {
+    const dir   = document.getElementById('alertDir').value;
+    const price = parseFloat(document.getElementById('alertPrice').value);
+    if(!price || isNaN(price)) return;
+    const sym = (document.getElementById('symbolInput').value || 'BTC').toUpperCase();
+    const id  = Date.now();
+    priceAlerts.push({ id, sym, dir, price, triggered: false });
+    document.getElementById('alertPrice').value = '';
     renderAlerts();
-
-    if(Notification&&Notification.permission==='default') Notification.requestPermission();
+    if(Notification && Notification.permission === 'default') Notification.requestPermission();
+    if(_cloudEnabled) {
+      _api('POST', '/alerts', { sym, direction: dir, price })
+        .catch(function(e){ console.warn('[Cloud] alert save failed:', e.message); });
+    }
   }
-  function removeAlert(id){ priceAlerts=priceAlerts.filter(a=>a.id!==id); renderAlerts(); }
+  function removeAlert(id) {
+    priceAlerts = priceAlerts.filter(a => a.id !== id);
+    renderAlerts();
+    if(_cloudEnabled) {
+      _api('DELETE', '/alerts?id=' + id).catch(function(e){ console.warn('[Cloud] alert delete failed:', e.message); });
+    }
+  }
   function renderAlerts(){
     const wrap=document.getElementById('alertList');
     if(!priceAlerts.length){ wrap.innerHTML='<div style="font-family:\'Share Tech Mono\',monospace;font-size:.6rem;color:var(--muted)">No alerts set.</div>'; return; }
@@ -5347,18 +5519,27 @@ self.onmessage=function(e){
       </div>
     `).join('');
   }
-  function checkAlerts(price, sym){
-    priceAlerts.forEach(a=>{
-      if(a.triggered||a.sym!==sym) return;
-      const hit=(a.dir==='above'&&price>=a.price)||(a.dir==='below'&&price<=a.price);
-      if(hit){
-        a.triggered=true;
+  function checkAlerts(price, sym) {
+    priceAlerts.forEach(function(a) {
+      if(a.triggered || a.sym !== sym) return;
+      const hit = (a.dir === 'above' && price >= a.price) || (a.dir === 'below' && price <= a.price);
+      if(hit) {
+        a.triggered = true;
         renderAlerts();
-        if(Notification&&Notification.permission==='granted'){
-          new Notification(`🔔 ${sym} Alert Triggered!`,{body:`Price ${a.dir==='above'?'crossed above':'dropped below'} ${fmtP(a.price)} — now at ${fmtP(price)}`});
+        // Browser notification
+        if(Notification && Notification.permission === 'granted') {
+          new Notification('🔔 ' + sym + ' Alert Triggered!', {
+            body: 'Price ' + (a.dir==='above'?'crossed above':'dropped below') + ' ' + fmtP(a.price) + ' — now at ' + fmtP(price),
+            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📡</text></svg>'
+          });
         }
-
-        setStatus(`🔔 ALERT: ${sym} ${a.dir==='above'?'crossed above':'dropped below'} ${fmtP(a.price)}!`,'loading');
+        // Telegram notification
+        _sendTelegramAlert(sym, a.dir, a.price, price);
+        // Mark triggered in cloud
+        if(_cloudEnabled) {
+          _api('PUT', '/alerts', { id: a.id }).catch(function(e){ console.warn('[Cloud] alert trigger failed:', e.message); });
+        }
+        setStatus('🔔 ALERT: ' + sym + ' ' + (a.dir==='above'?'crossed above':'dropped below') + ' ' + fmtP(a.price) + '!', 'loading');
       }
     });
   }
@@ -5413,7 +5594,10 @@ self.onmessage=function(e){
 
   let tradeJournal = JSON.parse(localStorage.getItem('tl_journal')||'[]');
 
-  function saveJournal(){ try{localStorage.setItem('tl_journal',JSON.stringify(tradeJournal));}catch(e){} }
+  function saveJournal() {
+    try { localStorage.setItem('tl_journal', JSON.stringify(tradeJournal)); } catch(e) {}
+    // Cloud sync is done per-operation (add/delete) not on full save
+  }
 
   function addJournalTrade(){
     const pair  = (document.getElementById('tj-pair').value||'—').toUpperCase();
@@ -5447,20 +5631,37 @@ self.onmessage=function(e){
     saveJournal();
     renderJournal();
     updateSessionPnL();
+    // Sync to cloud
+    if(_cloudEnabled) {
+      _updateSyncBadge('saving');
+      _api('POST', '/journal', {
+        date:trade.date, pair:trade.pair, direction:trade.dir,
+        entry:trade.entry, qty:trade.size, sl:trade.sl, tp:trade.tp,
+        exit_price:trade.exit, pnl:trade.pnl, pnl_pct:trade.pnlPct,
+        rr:trade.rr, status:trade.status, notes:trade.notes,
+      }).then(function(){ _updateSyncBadge('synced'); })
+        .catch(function(e){ console.warn('[Cloud] journal save failed:', e.message); _updateSyncBadge('error'); });
+    }
 
     ['tj-pair','tj-entry','tj-size','tj-sl','tj-tp','tj-exit','tj-notes'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.value='';
     });
   }
 
-  function deleteJournalTrade(id){
-    tradeJournal=tradeJournal.filter(t=>t.id!==id);
+  function deleteJournalTrade(id) {
+    tradeJournal = tradeJournal.filter(t => t.id !== id);
     saveJournal(); renderJournal(); updateSessionPnL();
+    if(_cloudEnabled) {
+      _api('DELETE', '/journal?id=' + id).catch(function(e){ console.warn('[Cloud] journal delete failed:', e.message); });
+    }
   }
 
-  function clearJournal(){
+  function clearJournal() {
     if(!confirm('Clear ALL journal entries?')) return;
-    tradeJournal=[]; saveJournal(); renderJournal(); updateSessionPnL();
+    tradeJournal = []; saveJournal(); renderJournal(); updateSessionPnL();
+    if(_cloudEnabled) {
+      _api('DELETE', '/journal?id=all').catch(function(e){ console.warn('[Cloud] journal clear failed:', e.message); });
+    }
   }
 
   function renderJournal(){
@@ -5797,6 +5998,9 @@ self.onmessage=function(e){
     CFG.refreshSec = parseInt(document.getElementById('cfg-refreshSec').value)||30;
     CFG.chartCandles = parseInt(document.getElementById('cfg-chartCandles').value)||60;
     localStorage.setItem('tl_cfg', JSON.stringify(CFG));
+    if(_cloudEnabled) {
+      _api('POST', '/settings', { tl_cfg: CFG }).catch(function(e){ console.warn('[Cloud] settings save failed:', e.message); });
+    }
     const s = document.getElementById('settingsSaveStatus');
     s.textContent = '✓ Saved!'; setTimeout(()=>s.textContent='', 2000);
     // Immediately redraw chart with new candle count if data already loaded
@@ -6116,13 +6320,19 @@ self.onmessage=function(e){
 
   fetchMarketOverview();
   updateTicker();
+
+  // ── Init cloud sync on load ───────────────────────────────────────
+  setTimeout(_checkCloud, 500); // check after page is ready
   setInterval(fetchMarketOverview, 60000);
   setInterval(updateTicker, 10000);
 
   let watchlist = JSON.parse(localStorage.getItem('tl_watchlist')||'["BTC","ETH","SOL"]');
   let wlPrices = {};
 
-  function saveWatchlist(){ try{ localStorage.setItem('tl_watchlist',JSON.stringify(watchlist)); }catch(e){} }
+  function saveWatchlist() {
+    try { localStorage.setItem('tl_watchlist', JSON.stringify(watchlist)); } catch(e) {}
+    // Cloud sync done per add/remove
+  }
 
   function addWatchlist() {
     const sym = document.getElementById('wlInput').value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
@@ -6132,16 +6342,20 @@ self.onmessage=function(e){
     document.getElementById('wlInput').value='';
     renderWatchlistUI();
     fetchWatchlistItem(sym);
-    // New symbol has no cached scan data yet — clear any stale entry
     if(typeof _scanCache !== 'undefined') delete _scanCache[sym];
+    if(_cloudEnabled) {
+      _api('POST', '/watchlist', { sym }).catch(function(e){ console.warn('[Cloud] watchlist add failed:', e.message); });
+    }
   }
 
   function removeWatchlistItem(sym) {
-    watchlist = watchlist.filter(s=>s!==sym);
+    watchlist = watchlist.filter(s => s !== sym);
     saveWatchlist();
     renderWatchlistUI();
-    // Remove from scan cache so it doesn't linger if re-added later
     if(typeof _scanCache !== 'undefined') delete _scanCache[sym];
+    if(_cloudEnabled) {
+      _api('DELETE', '/watchlist?sym=' + encodeURIComponent(sym)).catch(function(e){ console.warn('[Cloud] watchlist remove failed:', e.message); });
+    }
   }
 
   function renderWatchlistUI() {
@@ -10374,7 +10588,12 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   // ══════════════════════════════════════════════════════════════════
   let portfolio = (function() { try { return JSON.parse(localStorage.getItem('tl_portfolio') || '[]'); } catch(e) { return []; } })();
 
-  function _savePortfolio() { try { localStorage.setItem('tl_portfolio', JSON.stringify(portfolio)); } catch(e) {} }
+  function _savePortfolio() {
+    try { localStorage.setItem('tl_portfolio', JSON.stringify(portfolio)); } catch(e) {}
+    if(!_cloudEnabled) return;
+    _updateSyncBadge('saving');
+    // Sync happens via addPortfolioPosition / removePortfolioPosition directly
+  }
 
   function addPortfolioPosition() {
     const sym = (document.getElementById('port-sym')?.value || '').trim().toUpperCase().replace(/[^A-Z0-9.]/g,'');
@@ -10393,6 +10612,13 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     ['port-sym','port-qty','port-buy'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
     renderPortfolio();
     _updatePortfolioSummary();
+    // Sync to cloud
+    if(_cloudEnabled) {
+      _updateSyncBadge('saving');
+      _api('POST', '/portfolio', { sym, qty, buy_price: buy }).then(function() {
+        _updateSyncBadge('synced');
+      }).catch(function(e) { console.warn('[Cloud] portfolio save failed:', e.message); _updateSyncBadge('error'); });
+    }
   }
 
   function removePortfolioPosition(sym) {
@@ -10400,6 +10626,9 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     _savePortfolio();
     renderPortfolio();
     _updatePortfolioSummary();
+    if(_cloudEnabled) {
+      _api('DELETE', '/portfolio?sym=' + encodeURIComponent(sym)).catch(function(e) { console.warn('[Cloud] portfolio delete failed:', e.message); });
+    }
   }
 
   async function refreshPortfolio() {
@@ -10683,6 +10912,67 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     // Also show a notice in the status panel
     const pcPair = document.getElementById('pcPair');
     if(pcPair) pcPair.textContent = 'TradingView fallback — ' + (tvMap[sym] || tvSym);
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  TELEGRAM ALERTS
+  // ══════════════════════════════════════════════════════════════════
+  async function saveTelegramConfig() {
+    const token  = document.getElementById('cfg-tg-token')?.value?.trim();
+    const chatId = document.getElementById('cfg-tg-chatid')?.value?.trim();
+    const status = document.getElementById('tg-status');
+    if(!token || !chatId) { if(status) { status.textContent='Enter bot token and chat ID'; status.style.color='var(--warn)'; } return; }
+    if(!_cloudEnabled) { if(status) { status.textContent='⚠️ Cloud not connected — deploy data worker first'; status.style.color='var(--warn)'; } return; }
+    try {
+      await _api('POST', '/telegram/config', { bot_token: token, chat_id: chatId, enabled: 1 });
+      if(status) { status.textContent='✅ Saved'; status.style.color='var(--green)'; }
+      setTimeout(function(){ if(status) status.textContent=''; }, 3000);
+    } catch(e) {
+      if(status) { status.textContent='❌ ' + e.message; status.style.color='var(--red)'; }
+    }
+  }
+
+  async function testTelegramAlert() {
+    const status = document.getElementById('tg-status');
+    if(!_cloudEnabled) { if(status) { status.textContent='⚠️ Cloud not connected'; status.style.color='var(--warn)'; } return; }
+    try {
+      if(status) { status.textContent='Sending...'; status.style.color='var(--muted)'; }
+      const sym   = document.getElementById('symbolInput')?.value || 'BTC';
+      const price = document.getElementById('pcPrice')?.textContent || '—';
+      await _api('POST', '/telegram/send', {
+        message: '🔔 <b>Crypto Risk System — Test Alert</b>\n\n' +
+                 '📊 Symbol: <b>' + sym + '</b>\n' +
+                 '💰 Price: <b>' + price + '</b>\n\n' +
+                 '✅ Telegram alerts are working correctly!'
+      });
+      if(status) { status.textContent='✅ Message sent! Check Telegram'; status.style.color='var(--green)'; }
+    } catch(e) {
+      if(status) { status.textContent='❌ ' + e.message; status.style.color='var(--red)'; }
+    }
+  }
+
+  async function _sendTelegramAlert(sym, dir, price, currentPrice) {
+    if(!_cloudEnabled) return;
+    const emoji = dir === 'above' ? '🚀' : '📉';
+    const msg = emoji + ' <b>Price Alert Triggered!</b>\n\n' +
+      '📊 Symbol: <b>' + sym + '</b>\n' +
+      '🎯 Target: <b>' + (dir === 'above' ? 'Above' : 'Below') + ' $' + price.toLocaleString() + '</b>\n' +
+      '💰 Current: <b>$' + currentPrice.toLocaleString() + '</b>\n\n' +
+      '⏰ ' + new Date().toLocaleString('id-ID');
+    _api('POST', '/telegram/send', { message: msg }).catch(function(e){ console.warn('[Telegram] send failed:', e.message); });
+  }
+
+  // Load telegram config into settings fields when settings panel opens
+  async function _loadTelegramConfig() {
+    if(!_cloudEnabled) return;
+    try {
+      const cfg = await _api('GET', '/telegram/config');
+      const tokenEl  = document.getElementById('cfg-tg-token');
+      const chatEl   = document.getElementById('cfg-tg-chatid');
+      if(tokenEl && cfg.bot_token) tokenEl.placeholder = '••••••• (saved)';
+      if(chatEl  && cfg.chat_id)   chatEl.value = cfg.chat_id;
+    } catch(_) {}
   }
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
