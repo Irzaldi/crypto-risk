@@ -2,9 +2,33 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#03070d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="CryptoRisk">
 <meta name="description" content="Live crypto trading risk analysis tool — multi-timeframe signals, EMA strategy, prediction AI, trade journal and risk management for Indonesia traders.">
 <title>Live Crypto Risk System — Multi-Timeframe Analysis</title>
+<script>
+// PWA install prompt handler
+let _pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e) {
+  e.preventDefault(); _pwaPrompt = e;
+  const btn = document.getElementById('pwa-install-btn');
+  if(btn) btn.style.display = 'inline-flex';
+});
+window.addEventListener('appinstalled', function() {
+  const btn = document.getElementById('pwa-install-btn');
+  if(btn) btn.style.display = 'none';
+  _pwaPrompt = null;
+});
+function installPWA() {
+  if(!_pwaPrompt) return;
+  _pwaPrompt.prompt();
+  _pwaPrompt.userChoice.then(function() { _pwaPrompt = null; });
+}
+</script>
 <!-- Non-blocking Google Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -892,7 +916,11 @@
       <div class="tagline">Multi-Proxy Auto-Fallback · Indonesia Ready ✓</div>
     </div>
     <div class="source-badge"><div class="live-dot" id="headerDot"></div><span id="sourceLabel">READY</span></div>
+    <button id="pwa-install-btn" onclick="installPWA()" style="display:none;align-items:center;gap:5px;padding:4px 10px;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.3);color:var(--accent);border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer;letter-spacing:1px">
+      📲 Install App
+    </button>
     <span id="sync-badge" title="Cloud sync status" style="font-family:'Share Tech Mono',monospace;font-size:.56rem;padding:4px 10px;border:1px solid var(--border);border-radius:20px;color:var(--muted);cursor:pointer" onclick="switchTab('settings-cloud')">💾 Local only</span>
+    <button onclick="_showKeyboardHelp()" style="padding:4px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer" title="Keyboard shortcuts (?)">⌨️ ?</button>
     <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀️ LIGHT</button>
     <button class="theme-btn" onclick="toggleSettings()" style="border-color:rgba(255,184,0,.4);color:var(--warn)">⚙️ SETTINGS</button>
   </header>
@@ -1169,11 +1197,29 @@
         <button class="tf-btn" id="chart-type-area" onclick="setChartType('area',this)" style="min-height:28px;padding:2px 8px;font-size:.52rem">📊 Area</button>
       </span>
       <span style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted)" id="chart-tf-label"></span>
+      <button id="ob-toggle-btn" onclick="toggleOrderBook()" style="font-family:'Share Tech Mono',monospace;font-size:.52rem;padding:2px 8px;border:1px solid rgba(0,229,255,.25);border-radius:4px;color:var(--accent);background:rgba(0,229,255,.06);cursor:pointer;margin-left:4px">📖 Order Book</button>
       <a id="tv-link" href="https://www.tradingview.com/chart/?symbol=BINANCE:BTCUSDT" target="_blank" rel="noopener"
         style="font-family:'Share Tech Mono',monospace;font-size:.52rem;padding:2px 8px;border:1px solid rgba(0,229,255,.25);border-radius:4px;color:var(--accent);text-decoration:none;white-space:nowrap;background:rgba(0,229,255,.06);margin-left:4px"
         title="Open full chart on TradingView">📺 TradingView</a>
     </div>
     <div class="chart-wrap"><canvas id="miniChart"></canvas></div>
+    <div id="orderbook-panel" style="display:none;margin-top:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border)">
+        <span style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px">📖 ORDER BOOK</span>
+        <span id="ob-spread" style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted)"></span>
+        <button onclick="document.getElementById('orderbook-panel').style.display='none';document.getElementById('ob-toggle-btn').textContent='📖 Order Book'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--green);padding:4px 8px;letter-spacing:1px;border-bottom:1px solid var(--border)">BIDS</div>
+          <div id="ob-bids" style="max-height:180px;overflow-y:auto"></div>
+        </div>
+        <div style="border-left:1px solid var(--border)">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--red);padding:4px 8px;letter-spacing:1px;border-bottom:1px solid var(--border)">ASKS</div>
+          <div id="ob-asks" style="max-height:180px;overflow-y:auto"></div>
+        </div>
+      </div>
+    </div>
     <div class="chart-legend">
       <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#00ff88"></div>EMA 8</div>
       <div class="chart-legend-item"><div class="chart-legend-dot" style="background:#00e5ff"></div>EMA 21</div>
@@ -1776,6 +1822,66 @@
       <canvas id="equityCurveCanvas" height="90" style="width:100%;display:block;border-radius:4px"></canvas>
     </div>
   </div><!-- end Trade Journal panel -->
+
+  <!-- ── Risk/Reward Calculator ── -->
+  <div class="panel" style="margin-bottom:14px;border-color:rgba(255,184,0,.2)">
+    <div class="ptitle" style="color:var(--warn)">⚖️ Risk/Reward Calculator
+      <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">auto-fills from current analysis · real-time P&L preview</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px">
+      <div><label class="rm-label">Entry Price</label>
+        <input type="number" id="rr-entry" class="alert-input" style="width:100%" step="any" placeholder="84000" oninput="calcRR()"></div>
+      <div><label class="rm-label">Stop Loss</label>
+        <input type="number" id="rr-sl" class="alert-input" style="width:100%" step="any" placeholder="82000" oninput="calcRR()"></div>
+      <div><label class="rm-label">Take Profit 1</label>
+        <input type="number" id="rr-tp1" class="alert-input" style="width:100%" step="any" placeholder="88000" oninput="calcRR()"></div>
+      <div><label class="rm-label">Take Profit 2</label>
+        <input type="number" id="rr-tp2" class="alert-input" style="width:100%" step="any" placeholder="92000" oninput="calcRR()"></div>
+      <div><label class="rm-label">Position Size ($)</label>
+        <input type="number" id="rr-size" class="alert-input" style="width:100%" step="any" placeholder="1000" oninput="calcRR()"></div>
+    </div>
+    <!-- Results -->
+    <div id="rr-results" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
+      <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">RISK ($)</div>
+        <div id="rr-risk-usd" style="font-family:'Orbitron',monospace;font-size:.8rem;font-weight:700;color:var(--red)">—</div>
+      </div>
+      <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">REWARD TP1 ($)</div>
+        <div id="rr-reward1-usd" style="font-family:'Orbitron',monospace;font-size:.8rem;font-weight:700;color:var(--green)">—</div>
+      </div>
+      <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">R:R RATIO TP1</div>
+        <div id="rr-ratio1" style="font-family:'Orbitron',monospace;font-size:.8rem;font-weight:700;color:var(--accent)">—</div>
+      </div>
+      <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;text-align:center">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">R:R RATIO TP2</div>
+        <div id="rr-ratio2" style="font-family:'Orbitron',monospace;font-size:.8rem;font-weight:700;color:var(--purple)">—</div>
+      </div>
+    </div>
+    <!-- Visual risk bar -->
+    <div id="rr-bar-wrap" style="display:none;margin-bottom:10px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">TRADE VISUALIZER
+        <span id="rr-win-rate" style="color:var(--accent);margin-left:8px"></span>
+      </div>
+      <div style="height:24px;background:rgba(255,255,255,.04);border-radius:6px;overflow:hidden;display:flex">
+        <div id="rr-bar-risk"    style="height:100%;background:var(--red);transition:width .4s;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#fff;white-space:nowrap;overflow:hidden"></div>
+        <div id="rr-bar-entry"   style="height:100%;width:4px;background:var(--accent)"></div>
+        <div id="rr-bar-reward1" style="height:100%;background:rgba(0,255,136,.6);transition:width .4s;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#fff;white-space:nowrap;overflow:hidden"></div>
+        <div id="rr-bar-reward2" style="height:100%;background:rgba(0,255,136,.3);transition:width .4s;display:flex;align-items:center;justify-content:center;font-family:'Share Tech Mono',monospace;font-size:.5rem;color:#fff;white-space:nowrap;overflow:hidden"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:3px">
+        <span id="rr-sl-label"></span>
+        <span id="rr-entry-label" style="color:var(--accent)">ENTRY</span>
+        <span id="rr-tp1-label" style="color:var(--green)">TP1</span>
+        <span id="rr-tp2-label" style="color:rgba(0,255,136,.5)">TP2</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="rrAutoFill()" class="pair-btn" style="font-size:.54rem;border-color:rgba(255,184,0,.4);color:var(--warn)">⚡ Auto-fill from Analysis</button>
+      <button onclick="rrLogTrade()" class="alert-add-btn" style="font-size:.54rem">📓 Log to Journal</button>
+    </div>
+  </div>
 
   </div><!-- end .wrap / end #page-analysis -->
 
@@ -4474,7 +4580,13 @@ self.onmessage=function(e){
     const pct=((price-open24)/open24*100);
     document.getElementById('pcPrice').textContent=fmtP(price);
     window._lastAnalysisPrice = price;
+    window._lastAnalysisSym   = sym;
     document.getElementById('pcPair').textContent=pair;
+    // Auto-fill journal entry fields
+    const tjPairEl  = document.getElementById('tj-pair');
+    const tjEntryEl = document.getElementById('tj-entry');
+    if(tjPairEl  && !tjPairEl.value)  tjPairEl.value  = sym;
+    if(tjEntryEl && !tjEntryEl.value) tjEntryEl.value = price;
     // Update TradingView link for current symbol
     (function() {
       const tvLinkEl = document.getElementById('tv-link');
@@ -11262,6 +11374,299 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         timestamp: new Date().toISOString(),
       }]
     }).catch(function(e){ console.warn('[Discord] send failed:', e.message); });
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  KEYBOARD SHORTCUTS
+  // ══════════════════════════════════════════════════════════════════
+  document.addEventListener('keydown', function(e) {
+    // Ignore when typing in an input/textarea
+    const tag = document.activeElement?.tagName?.toLowerCase();
+    if(tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    switch(e.key) {
+      case 'f': case 'F':
+        // F = Fetch / refresh current symbol
+        e.preventDefault();
+        fetchData();
+        break;
+      case '1': switchTab('analysis');  break;
+      case '2': switchTab('market');    break;
+      case '3': switchTab('onchain');   break;
+      case '4': switchTab('scanner');   break;
+      case '5': switchTab('fxstocks');  break;
+      case '6': switchTab('ai');        break;
+      case '7': switchTab('portfolio'); break;
+      case 'Escape':
+        // Close settings panel if open
+        const sp = document.getElementById('settingsPanel');
+        if(sp && sp.style.display !== 'none') { sp.style.display = 'none'; return; }
+        break;
+      case 'b': case 'B':
+        // B = fetch BTC
+        if(!e.ctrlKey && !e.metaKey) {
+          const inp = document.getElementById('symbolInput');
+          if(inp) { inp.value = 'BTC'; fetchData(); }
+        }
+        break;
+      case 'e': case 'E':
+        // E = fetch ETH
+        if(!e.ctrlKey && !e.metaKey) {
+          const inp = document.getElementById('symbolInput');
+          if(inp) { inp.value = 'ETH'; fetchData(); }
+        }
+        break;
+      case 'ArrowRight':
+        // Next timeframe
+        if(e.altKey) {
+          e.preventDefault();
+          const tfs = ['15m','30m','1h','4h','1d','1w','1M'];
+          const idx = tfs.indexOf(currentTF);
+          if(idx < tfs.length - 1) { currentTF = tfs[idx+1]; document.getElementById('tf-'+currentTF)?.click(); }
+        }
+        break;
+      case 'ArrowLeft':
+        // Prev timeframe
+        if(e.altKey) {
+          e.preventDefault();
+          const tfs = ['15m','30m','1h','4h','1d','1w','1M'];
+          const idx = tfs.indexOf(currentTF);
+          if(idx > 0) { currentTF = tfs[idx-1]; document.getElementById('tf-'+currentTF)?.click(); }
+        }
+        break;
+      case '?':
+        // Show keyboard shortcut help
+        _showKeyboardHelp();
+        break;
+    }
+  });
+
+  function _showKeyboardHelp() {
+    const existing = document.getElementById('kb-help-modal');
+    if(existing) { existing.remove(); return; }
+    const modal = document.createElement('div');
+    modal.id = 'kb-help-modal';
+    modal.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;background:#060c14;border:1px solid var(--accent);border-radius:12px;padding:24px;min-width:300px;max-width:420px;box-shadow:0 0 40px rgba(0,229,255,.2)';
+    modal.innerHTML = `
+      <div style="font-family:'Orbitron',monospace;font-size:.7rem;color:var(--accent);margin-bottom:16px;letter-spacing:2px">⌨️ KEYBOARD SHORTCUTS</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;line-height:2;color:var(--text)">
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:4px">
+          <span style="color:var(--accent)">F</span><span>Fetch current symbol</span>
+          <span style="color:var(--accent)">B</span><span>Load BTC</span>
+          <span style="color:var(--accent)">E</span><span>Load ETH</span>
+          <span style="color:var(--accent)">1–7</span><span>Switch tabs</span>
+          <span style="color:var(--accent)">Alt + ← →</span><span>Previous / Next timeframe</span>
+          <span style="color:var(--accent)">Esc</span><span>Close settings panel</span>
+          <span style="color:var(--accent)">?</span><span>Toggle this help</span>
+        </div>
+      </div>
+      <button onclick="document.getElementById('kb-help-modal').remove()" style="margin-top:14px;width:100%;padding:8px;background:rgba(0,229,255,.1);border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;cursor:pointer;letter-spacing:1px">CLOSE</button>
+    `;
+    document.body.appendChild(modal);
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', function handler(e) {
+        if(!modal.contains(e.target)) { modal.remove(); document.removeEventListener('click', handler); }
+      });
+    }, 100);
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  ORDER BOOK
+  // ══════════════════════════════════════════════════════════════════
+  let _obTimer = null;
+
+  function toggleOrderBook() {
+    const panel = document.getElementById('orderbook-panel');
+    const btn   = document.getElementById('ob-toggle-btn');
+    if(!panel) return;
+    const visible = panel.style.display !== 'none';
+    if(visible) {
+      panel.style.display = 'none';
+      if(btn) btn.textContent = '📖 Order Book';
+      clearInterval(_obTimer); _obTimer = null;
+    } else {
+      panel.style.display = 'block';
+      if(btn) btn.textContent = '📖 Hide Book';
+      _fetchOrderBook();
+      _obTimer = setInterval(_fetchOrderBook, 3000); // refresh every 3s
+    }
+  }
+
+  async function _fetchOrderBook() {
+    const sym = (document.getElementById('symbolInput')?.value || 'BTC').trim().toUpperCase();
+    // Only works for crypto pairs on Binance
+    if(window.FOREX_PAIRS?.[sym] || window.COMMODITY_PAIRS?.[sym] || sym === 'ANTAM') {
+      const bids = document.getElementById('ob-bids');
+      const asks = document.getElementById('ob-asks');
+      if(bids) bids.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);padding:8px">Order book only available for crypto pairs</div>';
+      if(asks) asks.innerHTML = '';
+      return;
+    }
+    const ticker = sym + 'USDT';
+    try {
+      const data = await smartFetch(`https://api.binance.com/api/v3/depth?symbol=${ticker}&limit=15`);
+      if(!data.bids || !data.asks) return;
+
+      const maxVol = Math.max(
+        ...data.bids.slice(0,10).map(b => parseFloat(b[1])),
+        ...data.asks.slice(0,10).map(a => parseFloat(a[1]))
+      );
+
+      const fmtRow = (price, qty, side) => {
+        const p = parseFloat(price), q = parseFloat(qty);
+        const pct = maxVol > 0 ? (q / maxVol * 100) : 0;
+        const color = side === 'bid' ? 'var(--green)' : 'var(--red)';
+        const bgColor = side === 'bid' ? 'rgba(0,255,136,' : 'rgba(255,45,85,';
+        return `<div style="position:relative;padding:2px 8px;display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.54rem">
+          <div style="position:absolute;${side==='bid'?'right':'left'}:0;top:0;height:100%;width:${pct.toFixed(1)}%;background:${bgColor}0.07);pointer-events:none"></div>
+          <span style="color:${color};position:relative">${p >= 1 ? p.toLocaleString(undefined,{maximumFractionDigits:2}) : p.toFixed(6)}</span>
+          <span style="color:var(--muted);position:relative">${q >= 1000 ? (q/1000).toFixed(2)+'K' : q.toFixed(4)}</span>
+        </div>`;
+      };
+
+      const bidsEl = document.getElementById('ob-bids');
+      const asksEl = document.getElementById('ob-asks');
+      const spreadEl = document.getElementById('ob-spread');
+
+      if(bidsEl) bidsEl.innerHTML = data.bids.slice(0,12).map(b => fmtRow(b[0], b[1], 'bid')).join('');
+      if(asksEl) asksEl.innerHTML = data.asks.slice(0,12).map(a => fmtRow(a[0], a[1], 'ask')).join('');
+
+      if(spreadEl && data.bids[0] && data.asks[0]) {
+        const bid = parseFloat(data.bids[0][0]);
+        const ask = parseFloat(data.asks[0][0]);
+        const spread = ((ask - bid) / bid * 100).toFixed(4);
+        spreadEl.textContent = `Spread: ${spread}%`;
+      }
+    } catch(e) {
+      console.warn('[OrderBook] fetch failed:', e.message);
+    }
+  }
+
+  // Stop order book when symbol changes
+  const _obOrigFetchData = window.fetchData;
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  RISK/REWARD CALCULATOR
+  // ══════════════════════════════════════════════════════════════════
+  function calcRR() {
+    const entry = parseFloat(document.getElementById('rr-entry')?.value) || 0;
+    const sl    = parseFloat(document.getElementById('rr-sl')?.value)    || 0;
+    const tp1   = parseFloat(document.getElementById('rr-tp1')?.value)   || 0;
+    const tp2   = parseFloat(document.getElementById('rr-tp2')?.value)   || 0;
+    const size  = parseFloat(document.getElementById('rr-size')?.value)  || 0;
+
+    const s = (id, v, c) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.textContent = v;
+      if(c) el.style.color = c;
+    };
+
+    if(!entry || !sl) {
+      ['rr-risk-usd','rr-reward1-usd','rr-ratio1','rr-ratio2'].forEach(id => s(id, '—'));
+      return;
+    }
+
+    const risk    = Math.abs(entry - sl);
+    const riskPct = (risk / entry * 100);
+    const isLong  = sl < entry;
+
+    // Validate direction
+    if(isLong && tp1 && tp1 < entry) { s('rr-ratio1', 'TP1 < Entry!', 'var(--red)'); return; }
+    if(!isLong && tp1 && tp1 > entry) { s('rr-ratio1', 'TP1 > Entry!', 'var(--red)'); return; }
+
+    const riskUsd = size > 0 ? (riskPct / 100) * size : null;
+
+    s('rr-risk-usd', riskUsd != null ? '-$' + riskUsd.toFixed(2) + ' (' + riskPct.toFixed(2) + '%)' : riskPct.toFixed(3) + '%', 'var(--red)');
+
+    if(tp1) {
+      const reward1    = Math.abs(tp1 - entry);
+      const reward1Pct = (reward1 / entry * 100);
+      const ratio1     = reward1 / risk;
+      const reward1Usd = riskUsd != null ? (reward1Pct / 100) * size : null;
+      s('rr-reward1-usd', reward1Usd != null ? '+$' + reward1Usd.toFixed(2) + ' (' + reward1Pct.toFixed(2) + '%)' : reward1Pct.toFixed(3) + '%', 'var(--green)');
+      s('rr-ratio1', '1 : ' + ratio1.toFixed(2), ratio1 >= 2 ? 'var(--green)' : ratio1 >= 1 ? 'var(--warn)' : 'var(--red)');
+
+      // Break-even win rate
+      const beWr = (1 / (1 + ratio1) * 100).toFixed(1);
+      s('rr-win-rate', 'Break-even win rate: ' + beWr + '%', 'var(--accent)');
+
+      if(tp2) {
+        const reward2 = Math.abs(tp2 - entry);
+        const ratio2  = reward2 / risk;
+        s('rr-ratio2', '1 : ' + ratio2.toFixed(2), ratio2 >= 3 ? 'var(--green)' : ratio2 >= 2 ? 'var(--accent)' : 'var(--warn)');
+      } else {
+        s('rr-ratio2', '—', 'var(--muted)');
+      }
+
+      // Update visual bar
+      const barWrap = document.getElementById('rr-bar-wrap');
+      if(barWrap) {
+        barWrap.style.display = 'block';
+        const total = risk + reward1 + (tp2 ? Math.abs(tp2 - entry) : 0) + risk * 0.1;
+        const riskW    = (risk / total * 100).toFixed(1);
+        const reward1W = (reward1 / total * 100).toFixed(1);
+        const reward2W = tp2 ? (Math.abs(tp2 - entry) / total * 100).toFixed(1) : '0';
+        document.getElementById('rr-bar-risk').style.width    = riskW + '%';
+        document.getElementById('rr-bar-reward1').style.width = reward1W + '%';
+        document.getElementById('rr-bar-reward2').style.width = reward2W + '%';
+        document.getElementById('rr-bar-risk').textContent    = riskW > 8 ? '-' + riskPct.toFixed(1) + '%' : '';
+        document.getElementById('rr-bar-reward1').textContent = reward1W > 8 ? '+' + (reward1/entry*100).toFixed(1) + '%' : '';
+
+        const fmt = v => v >= 1000 ? '$' + (v/1000).toFixed(1) + 'k' : '$' + v.toFixed(v >= 1 ? 2 : 6);
+        s('rr-sl-label', 'SL: ' + fmt(sl));
+        s('rr-entry-label', 'ENTRY: ' + fmt(entry));
+        s('rr-tp1-label', 'TP1: ' + fmt(tp1));
+        if(tp2) s('rr-tp2-label', 'TP2: ' + fmt(tp2));
+      }
+    }
+  }
+
+  function rrAutoFill() {
+    // Fill from current analysis data
+    const price = window._lastAnalysisPrice;
+    const sym   = window._lastAnalysisSym || document.getElementById('symbolInput')?.value || '';
+    if(!price) { alert('Fetch a symbol first to auto-fill'); return; }
+
+    // Try to get ATR for SL estimation
+    const atrEl  = document.getElementById('tl-atr');
+    const atrVal = atrEl ? parseFloat(atrEl.textContent?.replace(/[^0-9.]/g,'')) : null;
+    const slDist = atrVal && atrVal > 0 ? atrVal * 1.5 : price * 0.025; // 1.5× ATR or 2.5%
+
+    // Try to get TP levels from S&R if available
+    const snrResEl = document.querySelector('.snr-res .snr-price');
+    const snrSupEl = document.querySelector('.snr-sup .snr-price');
+
+    document.getElementById('rr-entry').value = price;
+    document.getElementById('rr-sl').value    = (price - slDist).toFixed(price >= 1 ? 2 : 6);
+    document.getElementById('rr-tp1').value   = (price + slDist * 2).toFixed(price >= 1 ? 2 : 6);
+    document.getElementById('rr-tp2').value   = (price + slDist * 3.5).toFixed(price >= 1 ? 2 : 6);
+    calcRR();
+  }
+
+  function rrLogTrade() {
+    const entry = document.getElementById('rr-entry')?.value;
+    const sl    = document.getElementById('rr-sl')?.value;
+    const tp    = document.getElementById('rr-tp1')?.value;
+    const sym   = window._lastAnalysisSym || document.getElementById('symbolInput')?.value || '';
+
+    // Pre-fill journal fields and scroll to it
+    const tjPair  = document.getElementById('tj-pair');
+    const tjEntry = document.getElementById('tj-entry');
+    const tjSl    = document.getElementById('tj-sl');
+    const tjTp    = document.getElementById('tj-tp');
+    if(tjPair)  tjPair.value  = sym;
+    if(tjEntry) tjEntry.value = entry;
+    if(tjSl)    tjSl.value    = sl;
+    if(tjTp)    tjTp.value    = tp;
+
+    // Scroll to journal
+    const journalEl = document.getElementById('tj-tbody');
+    if(journalEl) journalEl.scrollIntoView({ behavior:'smooth', block:'start' });
   }
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
