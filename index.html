@@ -2343,10 +2343,11 @@
           <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">AI PROVIDER</div>
           <select id="ai-provider" onchange="onAiProviderChange()" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
             <option value="worker">🔧 Cloudflare Worker (default)</option>
-            <option value="claude">🤖 Claude (Anthropic)</option>
-            <option value="openai">💚 OpenAI (GPT-4)</option>
-            <option value="gemini">♊ Gemini (Google)</option>
+            <option value="openrouter">🆓 OpenRouter (free models)</option>
             <option value="groq">⚡ Groq (fast + free)</option>
+            <option value="gemini">♊ Gemini (Google)</option>
+            <option value="claude">🤖 Claude (Anthropic)</option>
+            <option value="openai">💚 OpenAI (GPT)</option>
           </select>
         </div>
         <div style="flex:1;min-width:140px" id="ai-model-wrap">
@@ -2388,7 +2389,7 @@
           style="padding:12px 20px;background:rgba(192,132,252,.2);border:1px solid rgba(192,132,252,.5);color:#c084fc;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.6rem;cursor:pointer;white-space:nowrap;letter-spacing:1px;align-self:flex-end">⚡ SEND</button>
       </div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:6px;line-height:1.8">
-        Shift+Enter for newline · Model: claude-sonnet-4-5 · Live indicator context auto-injected
+        Shift+Enter for newline · Live indicator context auto-injected · <span id='ai-provider-hint' style='color:var(--warn)'>Select a provider above</span>
         &nbsp;·&nbsp; <span id="ai-status-badge" style="color:var(--warn)">⚙️ Requires /ai route on your Cloudflare Worker</span>
       </div>
     </div>
@@ -10460,34 +10461,61 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   // ── AI provider config ─────────────────────────────────────────────
   const AI_PROVIDERS = {
     worker: {
-      label: 'Cloudflare Worker',
+      label: 'Cloudflare Worker (default)',
       models: ['claude-sonnet-4-5'],
       needsKey: false,
+      hint: 'Uses your crypto-data worker — no key needed',
+    },
+    openrouter: {
+      label: 'OpenRouter (FREE models available)',
+      models: [
+        'meta-llama/llama-3.3-70b-instruct:free',
+        'google/gemini-2.0-flash-exp:free',
+        'mistralai/mistral-7b-instruct:free',
+        'microsoft/phi-3-mini-128k-instruct:free',
+        'qwen/qwen-2.5-72b-instruct:free',
+      ],
+      needsKey: true,
+      keyName: 'ai_key_openrouter',
+      hint: 'Free API key at openrouter.ai — no credit card needed',
+    },
+    groq: {
+      label: 'Groq (fast + free)',
+      models: [
+        'llama-3.3-70b-versatile',
+        'llama-3.1-8b-instant',
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+      ],
+      needsKey: true,
+      keyName: 'ai_key_groq',
+      hint: 'Free API key at console.groq.com',
+    },
+    gemini: {
+      label: 'Gemini (Google)',
+      models: [
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-2.5-pro',
+      ],
+      needsKey: true,
+      keyName: 'ai_key_gemini',
+      hint: 'Free API key at aistudio.google.com',
     },
     claude: {
       label: 'Claude (Anthropic)',
       models: ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5-20251001'],
       needsKey: true,
       keyName: 'ai_key_claude',
+      hint: 'Paid — get key at console.anthropic.com',
     },
     openai: {
-      label: 'OpenAI',
-      models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+      label: 'OpenAI (GPT)',
+      models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'],
       needsKey: true,
       keyName: 'ai_key_openai',
-    },
-    gemini: {
-      label: 'Gemini (Google)',
-      models: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'],
-      needsKey: true,
-      keyName: 'ai_key_gemini',
-    },
-    groq: {
-      label: 'Groq',
-      models: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'llama3-8b-8192'],
-      needsKey: true,
-      keyName: 'ai_key_groq',
-      hint: 'Free at console.groq.com',
+      hint: 'Paid — get key at platform.openai.com',
     },
   };
 
@@ -10509,6 +10537,10 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       const saved = localStorage.getItem(cfg.keyName);
       if(keyEl) keyEl.placeholder = saved ? '••••••• (saved — enter new to change)' : (cfg.hint || 'sk-...');
     }
+    // Show provider hint
+    const hintEl = document.getElementById('ai-provider-hint');
+    if(hintEl && cfg.hint) { hintEl.textContent = cfg.hint; hintEl.style.color = 'var(--warn)'; }
+    else if(hintEl) hintEl.textContent = '';
     // Save provider preference
     localStorage.setItem('ai_provider', provider);
     localStorage.setItem('ai_model', cfg.models[0]);
@@ -10637,6 +10669,24 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         const data = await res.json();
         if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
         else if(data.error) throw new Error(data.error.message);
+
+      } else if(provider === 'openrouter') {
+        // ── OpenRouter API (OpenAI-compatible, has free models) ────────
+        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-10)];
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method:'POST',
+          headers:{
+            'Content-Type':'application/json',
+            'Authorization':'Bearer '+apiKey,
+            'HTTP-Referer':'https://crypto-risk.vercel.app',
+            'X-Title':'Crypto Risk System',
+          },
+          body:JSON.stringify({ model, messages:msgs, max_tokens:1000 }),
+          signal:AbortSignal.timeout(30000)
+        });
+        const data = await res.json();
+        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
+        else if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
       }
     } catch(e) {
       reply = '⚠️ **' + (cfg?.label||'AI') + ' error:** ' + e.message;
