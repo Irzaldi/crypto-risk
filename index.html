@@ -3977,7 +3977,7 @@ self.onmessage=function(e){
         // via proxy
         smartFetch(urlF).then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter (ECB)' })),
         // direct (CORS open)
-        fetch(urlF, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+        fetch(urlF, {signal:AbortSignal.timeout(4000)}).then(r=>r.json())
           .then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter direct' }))
       );
     }
@@ -3999,7 +3999,7 @@ self.onmessage=function(e){
       };
       sources.push(
         smartFetch(urlC).then(d => ({ rates: parseCross(d), label: 'Frankfurter cross' })),
-        fetch(urlC, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+        fetch(urlC, {signal:AbortSignal.timeout(4000)}).then(r=>r.json())
           .then(d => ({ rates: parseCross(d), label: 'Frankfurter cross direct' }))
       );
     }
@@ -4010,7 +4010,7 @@ self.onmessage=function(e){
       if(fp.base !== 'EUR' && fp.base !== 'USD') {  // EUR/USD already covered above
         sources.push(
           smartFetch(urlG).then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter (ECB)' })),
-          fetch(urlG, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+          fetch(urlG, {signal:AbortSignal.timeout(4000)}).then(r=>r.json())
             .then(d => ({ rates: parseFrankfurter(d, fp.base, fp.quote), label: 'Frankfurter direct' }))
         );
       }
@@ -4034,7 +4034,7 @@ self.onmessage=function(e){
       };
       sources.push(
         smartFetch(urlER).then(async d => ({ rates: await parseER(d), label: 'ER-API' })),
-        fetch(urlER, {signal:AbortSignal.timeout(8000)}).then(r=>r.json())
+        fetch(urlER, {signal:AbortSignal.timeout(4000)}).then(r=>r.json())
           .then(async d => ({ rates: await parseER(d), label: 'ER-API direct' }))
       );
     }
@@ -4279,7 +4279,7 @@ self.onmessage=function(e){
     // Race all sources: stooq (fastest) + Yahoo query1 + Yahoo query2 + proxy
     const { ohlcv, src } = await Promise.any([
       fetchStooqCSV(stooqSym),
-      _yahooRace(cp.yahoo, interval, range).then(d => ({ohlcv:d.ohlcv, src:'Yahoo Finance'})),
+      Promise.race([_yahooRace(cp.yahoo, interval, range), new Promise((_,rj)=>setTimeout(()=>rj(new Error('Yahoo timeout')),5000))]).then(d => ({ohlcv:d.ohlcv, src:'Yahoo Finance'})),
       // Alternative stooq symbols for Silver/Oil in case primary fails
       sym==='XAGUSD' ? fetchStooqCSV('xag') : sym==='XAUT' ? fetchStooqCSV('xau') : fetchStooqCSV(stooqSym+'.us'),
     ]).catch(() => { throw new Error(`${cp.display}: Yahoo Finance and Stooq both failed`); });
@@ -4341,10 +4341,11 @@ self.onmessage=function(e){
         }, url:'stooq' };
       });
 
-    const { ohlcv, url } = await Promise.any([
-      _yahooRace(ticker, interval, range),
-      stooqPromise,
-      // Additional stooq direct attempt with ANTM ticker variant
+    const { ohlcv, url } = await Promise.race([
+      Promise.any([
+        _yahooRace(ticker, interval, range),
+        stooqPromise,
+        // Additional stooq direct attempt with ANTM ticker variant
       fetch('https://stooq.com/q/d/l/?s=antm&i=d', {signal:AbortSignal.timeout(5000)}).then(async r=>{
         const text = await r.text();
         if(!text.includes('Date')||text.includes('No data')) throw new Error('bad');
@@ -4353,7 +4354,9 @@ self.onmessage=function(e){
         const rows=lines.map(l=>l.split(','));
         return {ohlcv:{closes:rows.map(r=>+r[4]),opens:rows.map(r=>+r[1]),highs:rows.map(r=>+r[2]),lows:rows.map(r=>+r[3]),volumes:rows.map(r=>+(r[5]||0))},url:'stooq2'};
       }),
-    ]).catch(() => { throw new Error('ANTAM: all sources failed'); });
+      ]).catch(() => { throw new Error('ANTAM: all sources failed'); }),
+      new Promise((_,rj) => setTimeout(() => rj(new Error('ANTAM: 10s timeout')), 10000))
+    ]);
 
     const { closes, opens, highs, lows, volumes } = ohlcv;
     const price = closes[closes.length-1];
@@ -4387,6 +4390,20 @@ self.onmessage=function(e){
     initProgress();
     activeProgress('proxy');
     workingExchangeId = null;
+
+    // ── Restore chart canvas if TradingView iframe was shown ──────────
+    // This ensures the canvas is always ready for drawMiniChart()
+    window._tvFallbackSym = null; // clear TV fallback state on new fetch
+    if(!document.getElementById('miniChart')) {
+      const chartWrap = document.querySelector('.chart-wrap');
+      if(chartWrap) {
+        chartWrap.innerHTML = '<canvas id="miniChart"></canvas>';
+        chartWrap.style.height = '200px';
+        // Re-attach ResizeObserver
+        if(_chartObserver) { _chartObserver.disconnect(); _chartObserver = null; }
+        _setupChartObserver();
+      }
+    }
 
     const pb=document.getElementById('pred-pass-badge');
     if(pb){ pb.textContent='WAITING'; pb.style.borderColor='var(--border)'; pb.style.color='var(--muted)'; pb.style.background='rgba(255,255,255,.03)'; }
@@ -4626,6 +4643,17 @@ self.onmessage=function(e){
       const tvSym = tvMap[sym] || (FOREX_PAIRS[sym] ? `FX:${sym}` : SPECIAL_PAIRS[sym]?.isStock ? `IDX:${sym.replace('.JK','')}` : `BINANCE:${sym}USDT`);
       const tvInt = {'15m':'15','30m':'30','1h':'60','4h':'240','1d':'D','1w':'W','1M':'M'}[currentTF]||'60';
       tvLinkEl.href = `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSym)}&interval=${tvInt}`;
+      // For forex/stocks/commodities: make TV button more prominent as primary chart
+      const isAlt = !!(window.FOREX_PAIRS?.[sym] || window.COMMODITY_PAIRS?.[sym] || sym === 'ANTAM');
+      if(isAlt) {
+        tvLinkEl.style.background = 'rgba(0,229,255,.15)';
+        tvLinkEl.style.borderColor = 'var(--accent)';
+        tvLinkEl.title = 'Open full TradingView chart (recommended for ' + sym + ')';
+      } else {
+        tvLinkEl.style.background = 'rgba(0,229,255,.06)';
+        tvLinkEl.style.borderColor = 'rgba(0,229,255,.25)';
+        tvLinkEl.title = 'Open full chart on TradingView';
+      }
     })();
     const ce=document.getElementById('pc24h');
     ce.textContent=(pct>=0?'+':'')+pct.toFixed(2)+'%';
@@ -11259,8 +11287,8 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     chartWrap.innerHTML = `
       <div style="width:100%;height:100%;display:flex;flex-direction:column">
         <div style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--warn);padding:6px 10px;background:rgba(255,184,0,.08);border-bottom:1px solid rgba(255,184,0,.2);display:flex;align-items:center;gap:8px">
-          ⚠️ Live data fetch failed — showing TradingView chart for <strong style="color:var(--accent)">${sym}</strong>
-          <span style="margin-left:auto;color:var(--muted)">indicators disabled · click ⚡ FETCH to retry</span>
+          📺 TradingView chart — <strong style="color:var(--accent)">${sym}</strong>
+          <span style="margin-left:auto;color:var(--muted)">live data sources unavailable · indicators disabled · click ⚡ FETCH to retry</span>
         </div>
         <iframe
           src="https://www.tradingview.com/widgetembed/?symbol=${encodeURIComponent(tvSym)}&interval=${tvInterval}&theme=dark&style=1&locale=en&hide_top_toolbar=0&hide_legend=0&allow_symbol_change=0&save_image=0&details=0&hotlist=0&calendar=0&studies=&withdateranges=1&hide_side_toolbar=0&referral_id=tradinglab"
@@ -11273,6 +11301,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       </div>`;
     chartWrap.style.height = '240px';
 
+    window._tvFallbackSym = sym; // track which sym is showing TV
     // Also show a notice in the status panel
     const pcPair = document.getElementById('pcPair');
     if(pcPair) pcPair.textContent = 'TradingView fallback — ' + (tvMap[sym] || tvSym);
