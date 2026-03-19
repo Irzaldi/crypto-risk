@@ -11151,7 +11151,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     const webhook = document.getElementById('cfg-dc-webhook')?.value?.trim();
     const status  = document.getElementById('dc-status');
     if(!webhook) { if(status) { status.textContent = 'Enter webhook URL'; status.style.color = 'var(--warn)'; } return; }
-    if(!webhook.startsWith('https://discord.com/api/webhooks/')) {
+    if(!webhook.includes('/api/webhooks/')) {
       if(status) { status.textContent = '❌ Invalid webhook URL'; status.style.color = 'var(--red)'; } return;
     }
     if(!_cloudEnabled) { if(status) { status.textContent = '⚠️ Cloud not connected'; status.style.color = 'var(--warn)'; } return; }
