@@ -2337,6 +2337,32 @@
         <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">Powered by Claude · Uses your live indicator data as context</span>
         <button onclick="clearAiChat()" class="theme-btn" style="margin-left:auto;font-size:.52rem;padding:3px 10px;border-color:rgba(192,132,252,.4);color:#c084fc">🗑 Clear</button>
       </div>
+      <!-- AI Provider selector -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px">
+        <div style="flex:1;min-width:140px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">AI PROVIDER</div>
+          <select id="ai-provider" onchange="onAiProviderChange()" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
+            <option value="worker">🔧 Cloudflare Worker (default)</option>
+            <option value="claude">🤖 Claude (Anthropic)</option>
+            <option value="openai">💚 OpenAI (GPT-4)</option>
+            <option value="gemini">♊ Gemini (Google)</option>
+            <option value="groq">⚡ Groq (fast + free)</option>
+          </select>
+        </div>
+        <div style="flex:1;min-width:140px" id="ai-model-wrap">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">MODEL</div>
+          <select id="ai-model" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
+            <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
+          </select>
+        </div>
+        <div style="flex:2;min-width:180px" id="ai-key-wrap" style="display:none">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">API KEY <span style="color:var(--warn)">(stored locally only)</span></div>
+          <div style="display:flex;gap:4px">
+            <input id="ai-api-key" type="password" placeholder="sk-..." style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
+            <button onclick="saveAiKey()" style="padding:6px 10px;background:rgba(192,132,252,.15);border:1px solid rgba(192,132,252,.4);color:#c084fc;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.55rem;cursor:pointer;white-space:nowrap">SAVE</button>
+          </div>
+        </div>
+      </div>
       <!-- Quick prompts -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
         <button class="pair-btn" onclick="aiQuickPrompt('analyze')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📊 Analyze Current</button>
@@ -4253,8 +4279,9 @@ self.onmessage=function(e){
           stepProgress('proxy','done');
           stepProgress('exchange','done');
         } else {
-          setStatus(`✗ ${sym} unavailable — ${e.message}`,'error');
+          setStatus(`✗ ${sym} unavailable — ${e.message}. Showing TradingView chart.`,'error');
           document.getElementById('fetchBtn').disabled=false;
+          _showTradingViewFallback(sym);
           return;
         }
       }
@@ -4271,8 +4298,9 @@ self.onmessage=function(e){
         stepProgress('proxy','done');
         stepProgress('exchange','done');
       } catch(e) {
-        setStatus(`✗ ${cp.display} unavailable — ${e.message}`,'error');
+        setStatus(`✗ ${cp.display} unavailable — ${e.message}. Showing TradingView chart.`,'error');
         document.getElementById('fetchBtn').disabled=false;
+        _showTradingViewFallback(sym);
         return;
       }
     }
@@ -4288,7 +4316,8 @@ self.onmessage=function(e){
         stepProgress('proxy','done');
         stepProgress('exchange','done');
       } catch(e) {
-        setStatus('✗ ANTAM unavailable — Yahoo Finance & Stooq both blocked by proxy. Try again or use TradingView for ANTM.JK','error');
+        setStatus('✗ ANTAM unavailable — Yahoo Finance & Stooq both failed. Showing TradingView.','error');
+        _showTradingViewFallback('ANTAM');
         document.getElementById('fetchBtn').disabled=false;
         return;
       }
@@ -6038,7 +6067,15 @@ self.onmessage=function(e){
   }
   function toggleSettings() {
     const p = document.getElementById('settingsPanel');
-    p.style.display = p.style.display==='none' ? 'block' : 'none';
+    const opening = p.style.display === 'none';
+    p.style.display = opening ? 'block' : 'none';
+    if(opening) {
+      // Load saved Discord + Telegram config into fields
+      setTimeout(_loadTelegramConfig, 200);
+      // Populate secret field
+      const secEl = document.getElementById('cfg-secret');
+      if(secEl) secEl.value = localStorage.getItem('tl_data_secret') || '';
+    }
   }
 
   // Theme toggle — button is hidden (dark-only UI) but function must exist
@@ -10420,10 +10457,96 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
 The user is an Indonesian crypto trader. Be concise, practical and actionable. Give specific price levels where relevant. Use IDR context when appropriate. Format responses clearly with bullet points where helpful.`;
   }
 
+  // ── AI provider config ─────────────────────────────────────────────
+  const AI_PROVIDERS = {
+    worker: {
+      label: 'Cloudflare Worker',
+      models: ['claude-sonnet-4-5'],
+      needsKey: false,
+    },
+    claude: {
+      label: 'Claude (Anthropic)',
+      models: ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5-20251001'],
+      needsKey: true,
+      keyName: 'ai_key_claude',
+    },
+    openai: {
+      label: 'OpenAI',
+      models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+      needsKey: true,
+      keyName: 'ai_key_openai',
+    },
+    gemini: {
+      label: 'Gemini (Google)',
+      models: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-2.0-flash'],
+      needsKey: true,
+      keyName: 'ai_key_gemini',
+    },
+    groq: {
+      label: 'Groq',
+      models: ['llama-3.3-70b-versatile', 'mixtral-8x7b-32768', 'llama3-8b-8192'],
+      needsKey: true,
+      keyName: 'ai_key_groq',
+      hint: 'Free at console.groq.com',
+    },
+  };
+
+  function onAiProviderChange() {
+    const provider = document.getElementById('ai-provider')?.value || 'worker';
+    const cfg      = AI_PROVIDERS[provider];
+    if(!cfg) return;
+    // Update model dropdown
+    const modelSel = document.getElementById('ai-model');
+    if(modelSel) {
+      modelSel.innerHTML = cfg.models.map(m => `<option value="${m}">${m}</option>`).join('');
+    }
+    // Show/hide API key field
+    const keyWrap = document.getElementById('ai-key-wrap');
+    if(keyWrap) keyWrap.style.display = cfg.needsKey ? 'block' : 'none';
+    // Load saved key
+    if(cfg.needsKey) {
+      const keyEl = document.getElementById('ai-api-key');
+      const saved = localStorage.getItem(cfg.keyName);
+      if(keyEl) keyEl.placeholder = saved ? '••••••• (saved — enter new to change)' : (cfg.hint || 'sk-...');
+    }
+    // Save provider preference
+    localStorage.setItem('ai_provider', provider);
+    localStorage.setItem('ai_model', cfg.models[0]);
+  }
+
+  function saveAiKey() {
+    const provider = document.getElementById('ai-provider')?.value || 'worker';
+    const cfg      = AI_PROVIDERS[provider];
+    const key      = document.getElementById('ai-api-key')?.value?.trim();
+    if(!key || !cfg?.keyName) return;
+    localStorage.setItem(cfg.keyName, key);
+    document.getElementById('ai-api-key').value = '';
+    document.getElementById('ai-api-key').placeholder = '••••••• (saved)';
+    const badge = document.getElementById('ai-status-badge');
+    if(badge) { badge.textContent = '✅ Key saved'; badge.style.color = 'var(--green)'; }
+    setTimeout(function(){ if(badge) badge.textContent = '⚙️ Ready'; }, 2000);
+  }
+
+  // Init AI provider dropdowns on load
+  (function() {
+    const savedProvider = localStorage.getItem('ai_provider') || 'worker';
+    const providerSel   = document.getElementById('ai-provider');
+    if(providerSel) providerSel.value = savedProvider;
+    onAiProviderChange();
+    const savedModel = localStorage.getItem('ai_model');
+    if(savedModel) {
+      const modelSel = document.getElementById('ai-model');
+      if(modelSel) {
+        const opt = modelSel.querySelector(`option[value="${savedModel}"]`);
+        if(opt) modelSel.value = savedModel;
+      }
+    }
+  })();
+
   async function sendAiMessage() {
     if(_aiTyping) return;
     const input = document.getElementById('aiChatInput');
-    const msg = input?.value?.trim();
+    const msg   = input?.value?.trim();
     if(!msg) return;
     input.value = '';
     input.style.height = 'auto';
@@ -10435,81 +10558,101 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     const typingId = 'ai-typing-' + Date.now();
     _appendAiMsg('typing', '···', typingId);
 
-    // Build request payload
-    const payload = {
-      model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
-      system: _buildAiContext(),
-      messages: _aiChatHistory.slice(-10)
-    };
-
+    const provider = document.getElementById('ai-provider')?.value || 'worker';
+    const model    = document.getElementById('ai-model')?.value || 'claude-sonnet-4-5';
+    const cfg      = AI_PROVIDERS[provider];
+    const apiKey   = cfg?.needsKey ? localStorage.getItem(cfg.keyName) : null;
+    const systemPrompt = _buildAiContext();
     let reply = null;
 
-    // ── Strategy 1: Route through Cloudflare Worker /ai endpoint ──────────
-    // The worker injects the x-api-key server-side and handles CORS.
-    // Worker must have a route: POST /ai → forwards to api.anthropic.com/v1/messages
-    for(const workerBase of WORKERS) {
-      try {
-        const res = await fetch(`${workerBase}/ai`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(30000)
-        });
-        if(!res.ok) {
-          const errText = await res.text().catch(()=>'');
-          throw new Error(`Worker ${res.status}: ${errText.slice(0,120)}`);
+    try {
+      if(provider === 'worker' || (!apiKey && provider !== 'worker')) {
+        // ── Route through Cloudflare Worker ───────────────────────────
+        if(provider !== 'worker' && !apiKey) {
+          throw new Error('No API key saved for ' + cfg.label + '. Enter your key above and click SAVE.');
         }
-        const data = await res.json();
-        if(data.content?.[0]?.text) { reply = data.content[0].text; break; }
-        if(data.error)               throw new Error(data.error.message || JSON.stringify(data.error));
-        if(data.text)                { reply = data.text; break; }  // some worker wrappers return {text}
-      } catch(e) {
-        console.warn('Worker AI attempt failed:', e.message);
-        // continue to next worker / strategy
-      }
-    }
+        const payload = { model, max_tokens:1000, system:systemPrompt, messages:_aiChatHistory.slice(-10) };
+        for(const workerBase of [DATA_WORKER_URL, ...WORKERS]) {
+          try {
+            const headers = { 'Content-Type':'application/json' };
+            if(DATA_SECRET) headers['X-User-Secret'] = DATA_SECRET;
+            const res = await fetch(workerBase + '/ai', { method:'POST', headers, body:JSON.stringify(payload), signal:AbortSignal.timeout(30000) });
+            if(!res.ok) { const t = await res.text().catch(()=>''); throw new Error(res.status+': '+t.slice(0,100)); }
+            const data = await res.json();
+            if(data.content?.[0]?.text) { reply = data.content[0].text; break; }
+            if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+          } catch(e) { console.warn('Worker AI failed:', e.message); }
+        }
 
-    // ── Strategy 2: Direct fetch to api.anthropic.com ─────────────────────
-    // Works when the page is served from a context where CORS is allowed
-    // (e.g. Cloudflare Pages with headers, or a browser extension).
-    if(!reply) {
-      try {
+      } else if(provider === 'claude') {
+        // ── Direct Claude API ──────────────────────────────────────────
         const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true'
-          },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(30000)
+          method:'POST',
+          headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
+          body:JSON.stringify({ model, max_tokens:1000, system:systemPrompt, messages:_aiChatHistory.slice(-10) }),
+          signal:AbortSignal.timeout(30000)
         });
         const data = await res.json();
-        if(data.content?.[0]?.text) {
-          reply = data.content[0].text;
-        } else if(data.error) {
-          throw new Error(`API error ${res.status}: ${data.error.message || data.error.type}`);
-        }
-      } catch(e) {
-        console.warn('Direct API attempt failed:', e.message);
+        if(data.content?.[0]?.text) reply = data.content[0].text;
+        else if(data.error) throw new Error(data.error.message);
+
+      } else if(provider === 'openai') {
+        // ── OpenAI API ─────────────────────────────────────────────────
+        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-10)];
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+apiKey },
+          body:JSON.stringify({ model, messages:msgs, max_tokens:1000 }),
+          signal:AbortSignal.timeout(30000)
+        });
+        const data = await res.json();
+        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
+        else if(data.error) throw new Error(data.error.message);
+
+      } else if(provider === 'gemini') {
+        // ── Google Gemini API ──────────────────────────────────────────
+        const geminiMsgs = _aiChatHistory.slice(-10).map(function(m) {
+          return { role: m.role === 'assistant' ? 'model' : 'user', parts:[{ text: m.content }] };
+        });
+        // Prepend system as first user message if history starts with assistant
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json' },
+          body:JSON.stringify({ system_instruction:{ parts:[{ text:systemPrompt }] }, contents:geminiMsgs }),
+          signal:AbortSignal.timeout(30000)
+        });
+        const data = await res.json();
+        if(data.candidates?.[0]?.content?.parts?.[0]?.text) reply = data.candidates[0].content.parts[0].text;
+        else if(data.error) throw new Error(data.error.message);
+
+      } else if(provider === 'groq') {
+        // ── Groq API (OpenAI-compatible) ───────────────────────────────
+        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-10)];
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+apiKey },
+          body:JSON.stringify({ model, messages:msgs, max_tokens:1000 }),
+          signal:AbortSignal.timeout(30000)
+        });
+        const data = await res.json();
+        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
+        else if(data.error) throw new Error(data.error.message);
       }
+    } catch(e) {
+      reply = '⚠️ **' + (cfg?.label||'AI') + ' error:** ' + e.message;
     }
 
     document.getElementById(typingId)?.remove();
+    const badge = document.getElementById('ai-status-badge');
 
-    if(reply) {
+    if(reply && !reply.startsWith('⚠️')) {
       _appendAiMsg('assistant', reply);
       _aiChatHistory.push({ role:'assistant', content: reply });
       if(_aiChatHistory.length > 20) _aiChatHistory = _aiChatHistory.slice(-20);
-      // Update status badge to show connected
-      const badge = document.getElementById('ai-status-badge');
-      if(badge) { badge.textContent = '✅ Connected to Claude'; badge.style.color = 'var(--green)'; }
+      if(badge) { badge.textContent = '✅ Connected · ' + (cfg?.label||'AI'); badge.style.color = 'var(--green)'; }
     } else {
-      _appendAiMsg('assistant', _aiErrorMessage());
-      // Update status badge to show error
-      const badge = document.getElementById('ai-status-badge');
-      if(badge) { badge.textContent = '❌ Not connected — see error above'; badge.style.color = 'var(--red)'; }
+      _appendAiMsg('assistant', reply || _aiErrorMessage());
+      if(badge) { badge.textContent = '❌ Error — see chat'; badge.style.color = 'var(--red)'; }
     }
 
     _aiTyping = false;
