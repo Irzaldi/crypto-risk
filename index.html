@@ -1210,7 +1210,7 @@ function installPWA() {
     <div class="chart-wrap"><canvas id="miniChart"></canvas></div>
     <div id="orderbook-panel" style="display:none;margin-top:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-bottom:1px solid var(--border)">
-        <span style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px">📖 ORDER BOOK</span>
+        <span class="ob-panel-title" style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px">📖 ORDER BOOK</span>
         <span id="ob-spread" style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted)"></span>
         <button onclick="document.getElementById('orderbook-panel').style.display='none';document.getElementById('ob-toggle-btn').textContent='📖 Order Book'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:.7rem">✕</button>
       </div>
@@ -4115,6 +4115,17 @@ self.onmessage=function(e){
       }, 800);
     }
 
+    // Warn if we got too few candles for reliable indicators
+    if(closes.length < 30) {
+      setTimeout(function() {
+        const sb = document.getElementById('statusBar');
+        if(sb) {
+          sb.textContent = `⚠️ ${sym}: Only ${closes.length} daily candles — some indicators may be inaccurate. Consider using 1d or 1w timeframe.`;
+          sb.className = 'status-bar loading';
+        }
+      }, 1200);
+    }
+
     return {
       price,
       high24: Math.max(...highs.slice(-2)),
@@ -4148,7 +4159,7 @@ self.onmessage=function(e){
     const parseUrl = (url) =>
       smartFetch(url).then(d => { const o = _parseYahooChart(d); if(!o) throw new Error('empty'); return { ohlcv:o, url }; });
     const directUrl = (url) =>
-      fetch(url, {signal: AbortSignal.timeout(8000)})
+      fetch(url, {signal: AbortSignal.timeout(5000)})
         .then(r => r.json())
         .then(d => { const o = _parseYahooChart(d); if(!o) throw new Error('empty'); return { ohlcv:o, url }; });
     // Race proxy + direct fetch on both query1 and query2 simultaneously
@@ -4412,7 +4423,7 @@ self.onmessage=function(e){
 
     // ── FOREX: dedicated FX API, skip crypto exchanges entirely ──────────────
     if(FOREX_PAIRS[sym]) {
-      setStatus(`⟳ Fetching ${FOREX_PAIRS[sym].display} via FX API...`,'loading');
+      setStatus(`⟳ Fetching ${FOREX_PAIRS[sym].display} — trying Stooq → Frankfurter → ER-API...`,'loading');
       activeProgress('exchange');
       try {
         data = await tryForex(sym);
@@ -4441,7 +4452,7 @@ self.onmessage=function(e){
     // ── COMMODITIES: Silver & Oil via Yahoo Finance futures ───────────────────
     if(!data && COMMODITY_PAIRS[sym]) {
       const cp = COMMODITY_PAIRS[sym];
-      setStatus(`⟳ Fetching ${cp.display} via Yahoo Finance (${cp.yahoo})...`,'loading');
+      setStatus(`⟳ Fetching ${cp.display} — trying Stooq → Yahoo Finance...`,'loading');
       activeProgress('exchange');
       try {
         data = await tryCommodity(sym);
@@ -11745,14 +11756,13 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     const bidsEl   = document.getElementById('ob-bids');
     const asksEl   = document.getElementById('ob-asks');
     const spreadEl = document.getElementById('ob-spread');
-    const panel    = document.getElementById('orderbook-panel');
     if(!bidsEl) return;
 
-    // Update panel title
-    const titleEl = panel?.querySelector('span[style*="letter-spacing"]');
-    if(titleEl) titleEl.textContent = '💱 BID / ASK SPREAD';
+    // Update panel header label safely
+    const obHeaderSpan = document.querySelector('#orderbook-panel .ob-panel-title');
+    if(obHeaderSpan) obHeaderSpan.textContent = '💱 BID / ASK SPREAD';
     if(asksEl) asksEl.innerHTML = '';
-    bidsEl.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);padding:8px">Fetching spread data...</div>';
+    bidsEl.innerHTML = '<div style="padding:12px;font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted)">⟳ Fetching spread data...</div>';
 
     try {
       let bid = null, ask = null, price = null, src = '';
@@ -11760,61 +11770,82 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       const cp = window.COMMODITY_PAIRS?.[sym];
 
       if(isForex && fp) {
-        // Use fawazahmed0 for current rate + synthetic spread
+        // Try fawazahmed0 (fast CDN) then open.er-api as fallback
         const base = fp.base.toLowerCase(), quote = fp.quote.toLowerCase();
-        const url  = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${base}.json`;
-        const data = await fetch(url, {signal:AbortSignal.timeout(5000)}).then(r=>r.json());
-        price = data[base]?.[quote];
-        if(!price) throw new Error('No rate');
-        // FX spreads are typically 0.01-0.1% depending on pair
-        const spreadPct = sym.includes('IDR') ? 0.0008 : sym.includes('JPY') ? 0.0002 : 0.0003;
-        bid = price * (1 - spreadPct);
-        ask = price * (1 + spreadPct);
-        src = 'fawazahmed0 CDN';
+        const r = await Promise.any([
+          fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${base}.json`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(d=>{ const p=d[base]?.[quote]; if(!p) throw new Error('no rate'); return {price:p,src:'fawazahmed0'}; }),
+          fetch(`https://open.er-api.com/v6/latest/${fp.base}`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(d=>{ const p=d.rates?.[fp.quote]; if(!p) throw new Error('no rate'); return {price:p,src:'ER-API'}; }),
+        ]);
+        price = r.price; src = r.src;
+        if(!price || isNaN(price)) throw new Error('No valid rate');
+        const pct = sym.includes('IDR') ? 0.0008 : sym.includes('JPY') ? 0.00015 : sym.includes('MYR') || sym.includes('SGD') ? 0.0005 : 0.0003;
+        bid = price * (1 - pct);
+        ask = price * (1 + pct);
 
       } else if(isCommodity && cp) {
-        // Use Stooq CSV for commodity price
+        // Try stooq first, then Yahoo v8 chart as fallback
         const stooqSym = cp.stooq || 'gc.f';
-        const text = await fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=d`, {signal:AbortSignal.timeout(5000)}).then(r=>r.text());
-        if(text.includes('Date') && !text.includes('No data')) {
-          const rows = text.trim().split('\n').slice(1).filter(l=>l.trim());
-          const last = rows[rows.length-1]?.split(',');
-          price = parseFloat(last?.[4] || last?.[1]);
-          // Futures spreads: Gold ~0.05%, Silver ~0.1%, Oil ~0.02%
-          const spreadPct = sym==='XAGUSD' ? 0.001 : sym==='USOIL' ? 0.0002 : 0.0005;
-          bid = price * (1 - spreadPct);
-          ask = price * (1 + spreadPct);
-          src = 'Stooq';
-        }
+        const r = await Promise.any([
+          fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=d`, {signal:AbortSignal.timeout(5000)}).then(async r => {
+            const text = await r.text();
+            if(!text.includes('Date') || text.includes('No data')) throw new Error('no stooq data');
+            const rows = text.trim().split('\n').slice(1).filter(l=>l.trim());
+            const last = rows[rows.length-1]?.split(',');
+            const p = parseFloat(last?.[4] || last?.[1]);
+            if(!p || isNaN(p)) throw new Error('bad price');
+            return { price: p, src: 'Stooq' };
+          }),
+          _yahooRace(cp.yahoo, '1d', '5d').then(d => {
+            const p = d.ohlcv.closes[d.ohlcv.closes.length-1];
+            if(!p || isNaN(p)) throw new Error('bad price');
+            return { price: p, src: 'Yahoo Finance' };
+          }),
+        ]).catch(()=>null);
+        if(!r || !r.price) throw new Error('Could not fetch commodity price');
+        price = r.price; src = r.src;
+        const pct = sym==='XAGUSD' ? 0.001 : sym==='USOIL' ? 0.0002 : 0.0005;
+        bid = price * (1 - pct);
+        ask = price * (1 + pct);
 
       } else if(isStock) {
-        // Use Yahoo v8 chart for stock price
+        // Yahoo v8 + Stooq fallback
         const ticker = sym === 'ANTAM' ? 'ANTM.JK' : sym;
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
-        const data = await Promise.any([
-          fetch(url, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
-          smartFetch(url)
+        const stooqTicker = sym === 'ANTAM' ? 'antm.jk' : sym.toLowerCase();
+        const r = await Promise.any([
+          Promise.any([
+            fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+            fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+          ]).then(d => { const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice; if(!p||isNaN(p)) throw new Error('no price'); return {price:p, src:'Yahoo Finance'}; }),
+          fetch(`https://stooq.com/q/d/l/?s=${stooqTicker}&i=d`, {signal:AbortSignal.timeout(5000)}).then(async r => {
+            const text = await r.text();
+            if(!text.includes('Date') || text.includes('No data')) throw new Error('no data');
+            const rows = text.trim().split('\n').slice(1).filter(l=>l.trim());
+            const last = rows[rows.length-1]?.split(',');
+            const p = parseFloat(last?.[4] || last?.[1]);
+            if(!p || isNaN(p)) throw new Error('bad price');
+            return { price: p, src: 'Stooq' };
+          }),
         ]).catch(()=>null);
-        const meta = data?.chart?.result?.[0]?.meta;
-        price = meta?.regularMarketPrice;
-        if(price) {
-          // Stock spread varies, typically 0.05-0.2% for liquid stocks
-          const spreadPct = sym.endsWith('.JK') ? 0.001 : 0.0005;
-          bid = price * (1 - spreadPct);
-          ask = price * (1 + spreadPct);
-          src = 'Yahoo Finance';
-        }
+        if(!r || !r.price) throw new Error('Could not fetch stock price');
+        price = r.price; src = r.src;
+        const pct = sym.endsWith('.JK') ? 0.001 : 0.0005;
+        bid = price * (1 - pct);
+        ask = price * (1 + pct);
       }
 
-      if(!price || !bid || !ask) throw new Error('Could not fetch price');
+      if(!price || !bid || !ask || isNaN(price)) throw new Error('No valid price data');
 
       const spread    = ask - bid;
       const spreadPct = (spread / price * 100);
       const isIDR     = sym.includes('IDR') || sym === 'ANTAM';
-      const fmtP      = v => isIDR ? v.toLocaleString('id-ID',{maximumFractionDigits:0})+' IDR'
-                           : v >= 1000 ? '$'+v.toLocaleString(undefined,{maximumFractionDigits:2})
-                           : v >= 1    ? '$'+v.toFixed(4)
-                           :             '$'+v.toFixed(6);
+      // Use the global fmtP (don't shadow it)
+      const _fmt = v => {
+        if(isNaN(v) || v == null) return '—';
+        if(isIDR) return 'Rp ' + Math.round(v).toLocaleString('id-ID');
+        if(v >= 10000) return '$' + v.toLocaleString(undefined, {maximumFractionDigits:2});
+        if(v >= 1)     return '$' + v.toFixed(4);
+        return '$' + v.toFixed(6);
+      };
 
       // Spread quality label
       const quality = spreadPct < 0.02 ? '🟢 Tight' : spreadPct < 0.1 ? '🟡 Normal' : '🔴 Wide';
@@ -11823,20 +11854,20 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         <div style="padding:10px;font-family:'Share Tech Mono',monospace;font-size:.6rem">
           <div style="margin-bottom:12px">
             <div style="font-size:.52rem;color:var(--muted);margin-bottom:3px">BID (BUY at)</div>
-            <div style="font-size:.9rem;font-weight:700;color:var(--green);font-family:'Orbitron',monospace">${fmtP(bid)}</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--green);font-family:'Orbitron',monospace">${_fmt(bid)}</div>
           </div>
           <div style="margin-bottom:12px">
             <div style="font-size:.52rem;color:var(--muted);margin-bottom:3px">ASK (SELL at)</div>
-            <div style="font-size:.9rem;font-weight:700;color:var(--red);font-family:'Orbitron',monospace">${fmtP(ask)}</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--red);font-family:'Orbitron',monospace">${_fmt(ask)}</div>
           </div>
           <div style="margin-bottom:12px">
             <div style="font-size:.52rem;color:var(--muted);margin-bottom:3px">MID PRICE</div>
-            <div style="font-size:.75rem;font-weight:700;color:var(--accent);font-family:'Orbitron',monospace">${fmtP(price)}</div>
+            <div style="font-size:.75rem;font-weight:700;color:var(--accent);font-family:'Orbitron',monospace">${_fmt(price)}</div>
           </div>
           <div style="padding:8px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px">
             <div style="display:flex;justify-content:space-between;margin-bottom:4px">
               <span style="color:var(--muted)">Spread</span>
-              <span style="color:var(--text)">${fmtP(spread)}</span>
+              <span style="color:var(--text)">${_fmt(spread)}</span>
             </div>
             <div style="display:flex;justify-content:space-between;margin-bottom:4px">
               <span style="color:var(--muted)">Spread %</span>
