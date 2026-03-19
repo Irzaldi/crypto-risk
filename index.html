@@ -11748,8 +11748,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         const stooqSym = cp.stooq || 'gc.f';
         const text = await fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=d`, {signal:AbortSignal.timeout(5000)}).then(r=>r.text());
         if(text.includes('Date') && !text.includes('No data')) {
-          const rows = text.trim().split('
-').slice(1).filter(l=>l.trim());
+          const rows = text.trim().split('\n').slice(1).filter(l=>l.trim());
           const last = rows[rows.length-1]?.split(',');
           price = parseFloat(last?.[4] || last?.[1]);
           // Futures spreads: Gold ~0.05%, Silver ~0.1%, Oil ~0.02%
@@ -11910,8 +11909,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       '',
       '⏰ ' + new Date().toLocaleString('id-ID'),
       'via Crypto Risk System',
-    ].join('
-');
+    ].join('\n');
 
     navigator.clipboard.writeText(text).then(function() {
       const btn = document.getElementById('copy-setup-btn');
@@ -11965,8 +11963,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         return [p.sym, p.qty, p.buy, curr, value.toFixed(2), pnl.toFixed(2), pnlPct, alloc, new Date(p.addedAt).toLocaleDateString('id-ID')];
       })
     ];
-    const csv = rows.map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(',')).join('
-');
+    const csv = rows.map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
     const blob = new Blob([csv], {type:'text/csv'});
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
