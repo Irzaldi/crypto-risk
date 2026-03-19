@@ -1181,7 +1181,12 @@ function installPWA() {
   </div>
 
   <div class="price-row">
-    <div class="pcard"><div class="pcard-label">💵 Last Price</div><div class="pcard-value" id="pcPrice">—</div><div class="pcard-sub" id="pcPair">waiting...</div></div>
+    <div class="pcard" style="position:relative"><div class="pcard-label">💵 Last Price
+      <span style="display:flex;gap:4px;float:right">
+        <button id="idr-toggle-btn" onclick="toggleIDR()" style="font-size:.44rem;padding:1px 5px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:3px;cursor:pointer;font-family:'Share Tech Mono',monospace">🇮🇩 IDR</button>
+        <button id="copy-setup-btn" onclick="copyTradeSetup()" style="font-size:.44rem;padding:1px 5px;background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:3px;cursor:pointer;font-family:'Share Tech Mono',monospace">📋 Copy Setup</button>
+      </span>
+    </div><div class="pcard-value" id="pcPrice">—</div><div class="pcard-sub" id="pcPair">waiting...</div></div>
     <div class="pcard"><div class="pcard-label">📊 24h Change</div><div class="pcard-value" id="pc24h">—</div><div class="pcard-sub" id="pc24hAbs">—</div></div>
     <div class="pcard"><div class="pcard-label">📈 24h High</div><div class="pcard-value" id="pcHigh" style="color:var(--green)">—</div><div class="pcard-sub">session high</div></div>
     <div class="pcard"><div class="pcard-label">📉 24h Low</div><div class="pcard-value" id="pcLow" style="color:var(--red)">—</div><div class="pcard-sub">session low</div></div>
@@ -1887,6 +1892,8 @@ function installPWA() {
 
   <!-- ══ PAGE: Market Dashboard ══ -->
   <div class="page-content" id="page-market">
+  <!-- Market session timer bar -->
+  <div id="session-timer" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:5px 20px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--border);min-height:26px"></div>
   <div class="wrap" style="padding-top:0">
 
     <!-- Refresh row -->
@@ -2188,6 +2195,25 @@ function installPWA() {
             <button class="ind-tab"        id="scan-filter-buy"  onclick="filterScanner('buy')">🟢 BUY</button>
             <button class="ind-tab"        id="scan-filter-sell" onclick="filterScanner('sell')">🔴 SELL</button>
             <button class="ind-tab"        id="scan-filter-neut" onclick="filterScanner('neut')">🟡 NEUTRAL</button>
+            <button class="ind-tab" onclick="document.getElementById('scan-adv-filter').style.display=document.getElementById('scan-adv-filter').style.display==='none'?'flex':'none'">⚙️ Filters</button>
+          </span>
+        </div>
+        <!-- Advanced filter row -->
+        <div id="scan-adv-filter" style="display:none;gap:8px;flex-wrap:wrap;align-items:flex-end;padding:8px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;margin-bottom:8px">
+          <div><div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:3px">RSI MIN</div>
+            <input type="number" id="sf-rsi-min" class="alert-input" style="width:60px" placeholder="0" min="0" max="100" oninput="applyScannerFilter()"></div>
+          <div><div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:3px">RSI MAX</div>
+            <input type="number" id="sf-rsi-max" class="alert-input" style="width:60px" placeholder="100" min="0" max="100" oninput="applyScannerFilter()"></div>
+          <div><div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:3px">SCORE MIN</div>
+            <input type="number" id="sf-score-min" class="alert-input" style="width:60px" placeholder="0" min="0" max="100" oninput="applyScannerFilter()"></div>
+          <div><div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:3px">24H% MIN</div>
+            <input type="number" id="sf-pct-min" class="alert-input" style="width:60px" placeholder="-999" oninput="applyScannerFilter()"></div>
+          <div><div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:3px">24H% MAX</div>
+            <input type="number" id="sf-pct-max" class="alert-input" style="width:60px" placeholder="999" oninput="applyScannerFilter()"></div>
+          <button onclick="resetScannerFilter()" class="tf-btn" style="font-size:.52rem">↺ Reset</button>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted)">e.g. RSI &lt; 30 = oversold · Score &gt; 70 = strong signal</span>
+        </div>
+        <div style='display:none'>
           </span>
         </div>
         <div style="overflow-x:auto">
@@ -2509,6 +2535,7 @@ function installPWA() {
       <div class="ptitle" style="color:var(--green)">💼 Portfolio Tracker
         <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">live P&amp;L · persisted across sessions</span>
         <button onclick="refreshPortfolio()" class="wl-add-btn" style="margin-left:auto;padding:4px 10px;font-size:.52rem">⟳ Refresh Prices</button>
+        <button onclick="exportPortfolioCSV()" class="wl-add-btn" style="padding:4px 10px;font-size:.52rem;border-color:var(--green);color:var(--green)">📊 Export CSV</button>
       </div>
       <!-- Add form -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
@@ -5694,7 +5721,8 @@ self.onmessage=function(e){
             icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📡</text></svg>'
           });
         }
-        // Telegram + Discord notifications
+        // Sound + Telegram + Discord notifications
+        _playAlertSound();
         _sendTelegramAlert(sym, a.dir, a.price, price);
         _sendDiscordAlert(sym, a.dir, a.price, price);
         // Mark triggered in cloud
@@ -9955,6 +9983,17 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     if(_scanFilter === 'buy')  rows = rows.filter(function(r){ return r.sig && r.sig.includes('BUY'); });
     if(_scanFilter === 'sell') rows = rows.filter(function(r){ return r.sig && r.sig.includes('SELL'); });
     if(_scanFilter === 'neut') rows = rows.filter(function(r){ return r.sig && (r.sig.includes('NEUTRAL') || r.sig === '—'); });
+    // Advanced filters
+    if(_scanAdvFilter) {
+      rows = rows.filter(function(r) {
+        const rsi   = r.rsi   != null ? parseFloat(r.rsi)   : 50;
+        const score = r.score != null ? parseFloat(r.score) : 0;
+        const pct   = r.pct   != null ? parseFloat(r.pct)   : 0;
+        return rsi   >= _scanAdvFilter.rsiMin   && rsi   <= _scanAdvFilter.rsiMax &&
+               score >= _scanAdvFilter.scoreMin &&
+               pct   >= _scanAdvFilter.pctMin   && pct   <= _scanAdvFilter.pctMax;
+      });
+    }
 
     // Sort
     rows.sort(function(a, b) {
@@ -11497,12 +11536,12 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
 
   async function _fetchOrderBook() {
     const sym = (document.getElementById('symbolInput')?.value || 'BTC').trim().toUpperCase();
-    // Only works for crypto pairs on Binance
-    if(window.FOREX_PAIRS?.[sym] || window.COMMODITY_PAIRS?.[sym] || sym === 'ANTAM') {
-      const bids = document.getElementById('ob-bids');
-      const asks = document.getElementById('ob-asks');
-      if(bids) bids.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);padding:8px">Order book only available for crypto pairs</div>';
-      if(asks) asks.innerHTML = '';
+    // For forex/stocks/commodities — show bid/ask spread info instead of order book
+    const isForex = window.FOREX_PAIRS?.[sym];
+    const isCommodity = window.COMMODITY_PAIRS?.[sym];
+    const isStock = sym === 'ANTAM' || (window.SPECIAL_PAIRS?.[sym]?.isStock);
+    if(isForex || isCommodity || isStock) {
+      await _fetchBidAskSpread(sym, isForex, isCommodity, isStock);
       return;
     }
     const ticker = sym + 'USDT';
@@ -11667,6 +11706,386 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     // Scroll to journal
     const journalEl = document.getElementById('tj-tbody');
     if(journalEl) journalEl.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  BID/ASK SPREAD FOR FOREX / STOCKS / COMMODITIES
+  // ══════════════════════════════════════════════════════════════════
+  async function _fetchBidAskSpread(sym, isForex, isCommodity, isStock) {
+    const bidsEl   = document.getElementById('ob-bids');
+    const asksEl   = document.getElementById('ob-asks');
+    const spreadEl = document.getElementById('ob-spread');
+    const panel    = document.getElementById('orderbook-panel');
+    if(!bidsEl) return;
+
+    // Update panel title
+    const titleEl = panel?.querySelector('span[style*="letter-spacing"]');
+    if(titleEl) titleEl.textContent = '💱 BID / ASK SPREAD';
+    if(asksEl) asksEl.innerHTML = '';
+    bidsEl.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);padding:8px">Fetching spread data...</div>';
+
+    try {
+      let bid = null, ask = null, price = null, src = '';
+      const fp = window.FOREX_PAIRS?.[sym];
+      const cp = window.COMMODITY_PAIRS?.[sym];
+
+      if(isForex && fp) {
+        // Use fawazahmed0 for current rate + synthetic spread
+        const base = fp.base.toLowerCase(), quote = fp.quote.toLowerCase();
+        const url  = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${base}.json`;
+        const data = await fetch(url, {signal:AbortSignal.timeout(5000)}).then(r=>r.json());
+        price = data[base]?.[quote];
+        if(!price) throw new Error('No rate');
+        // FX spreads are typically 0.01-0.1% depending on pair
+        const spreadPct = sym.includes('IDR') ? 0.0008 : sym.includes('JPY') ? 0.0002 : 0.0003;
+        bid = price * (1 - spreadPct);
+        ask = price * (1 + spreadPct);
+        src = 'fawazahmed0 CDN';
+
+      } else if(isCommodity && cp) {
+        // Use Stooq CSV for commodity price
+        const stooqSym = cp.stooq || 'gc.f';
+        const text = await fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=d`, {signal:AbortSignal.timeout(5000)}).then(r=>r.text());
+        if(text.includes('Date') && !text.includes('No data')) {
+          const rows = text.trim().split('
+').slice(1).filter(l=>l.trim());
+          const last = rows[rows.length-1]?.split(',');
+          price = parseFloat(last?.[4] || last?.[1]);
+          // Futures spreads: Gold ~0.05%, Silver ~0.1%, Oil ~0.02%
+          const spreadPct = sym==='XAGUSD' ? 0.001 : sym==='USOIL' ? 0.0002 : 0.0005;
+          bid = price * (1 - spreadPct);
+          ask = price * (1 + spreadPct);
+          src = 'Stooq';
+        }
+
+      } else if(isStock) {
+        // Use Yahoo v8 chart for stock price
+        const ticker = sym === 'ANTAM' ? 'ANTM.JK' : sym;
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`;
+        const data = await Promise.any([
+          fetch(url, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+          smartFetch(url)
+        ]).catch(()=>null);
+        const meta = data?.chart?.result?.[0]?.meta;
+        price = meta?.regularMarketPrice;
+        if(price) {
+          // Stock spread varies, typically 0.05-0.2% for liquid stocks
+          const spreadPct = sym.endsWith('.JK') ? 0.001 : 0.0005;
+          bid = price * (1 - spreadPct);
+          ask = price * (1 + spreadPct);
+          src = 'Yahoo Finance';
+        }
+      }
+
+      if(!price || !bid || !ask) throw new Error('Could not fetch price');
+
+      const spread    = ask - bid;
+      const spreadPct = (spread / price * 100);
+      const isIDR     = sym.includes('IDR') || sym === 'ANTAM';
+      const fmtP      = v => isIDR ? v.toLocaleString('id-ID',{maximumFractionDigits:0})+' IDR'
+                           : v >= 1000 ? '$'+v.toLocaleString(undefined,{maximumFractionDigits:2})
+                           : v >= 1    ? '$'+v.toFixed(4)
+                           :             '$'+v.toFixed(6);
+
+      // Spread quality label
+      const quality = spreadPct < 0.02 ? '🟢 Tight' : spreadPct < 0.1 ? '🟡 Normal' : '🔴 Wide';
+
+      bidsEl.innerHTML = `
+        <div style="padding:10px;font-family:'Share Tech Mono',monospace;font-size:.6rem">
+          <div style="margin-bottom:12px">
+            <div style="font-size:.52rem;color:var(--muted);margin-bottom:3px">BID (BUY at)</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--green);font-family:'Orbitron',monospace">${fmtP(bid)}</div>
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:.52rem;color:var(--muted);margin-bottom:3px">ASK (SELL at)</div>
+            <div style="font-size:.9rem;font-weight:700;color:var(--red);font-family:'Orbitron',monospace">${fmtP(ask)}</div>
+          </div>
+          <div style="margin-bottom:12px">
+            <div style="font-size:.52rem;color:var(--muted);margin-bottom:3px">MID PRICE</div>
+            <div style="font-size:.75rem;font-weight:700;color:var(--accent);font-family:'Orbitron',monospace">${fmtP(price)}</div>
+          </div>
+          <div style="padding:8px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="color:var(--muted)">Spread</span>
+              <span style="color:var(--text)">${fmtP(spread)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="color:var(--muted)">Spread %</span>
+              <span style="color:var(--text)">${spreadPct.toFixed(4)}%</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="color:var(--muted)">Quality</span>
+              <span>${quality}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:var(--muted)">Source</span>
+              <span style="color:var(--accent)">${src}</span>
+            </div>
+          </div>
+          <div style="margin-top:8px;font-size:.5rem;color:var(--muted);line-height:1.6">
+            ⚠️ Spread is estimated from live mid-price.<br>Actual broker spread may vary.
+          </div>
+        </div>`;
+
+      if(spreadEl) spreadEl.textContent = 'Spread: ' + spreadPct.toFixed(4) + '% · ' + src;
+
+    } catch(e) {
+      bidsEl.innerHTML = `<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);padding:8px">Spread data unavailable: ${e.message}</div>`;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  PRICE CHANGE BADGES ON PAIR BUTTONS (live 24h %)
+  // ══════════════════════════════════════════════════════════════════
+  async function _updatePairButtonBadges() {
+    try {
+      const syms = ['BTC','ETH','SOL','XRP','BNB','DOGE','ADA','AVAX','LINK','LTC'];
+      const tickers = syms.map(s => s+'USDT').join(',');
+      const data = await smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${encodeURIComponent(JSON.stringify(syms.map(s=>s+'USDT')))}]`);
+      if(!Array.isArray(data)) return;
+      data.forEach(function(t) {
+        const sym = t.symbol.replace('USDT','');
+        const pct = parseFloat(t.priceChangePercent);
+        // Find all pair buttons for this sym
+        document.querySelectorAll('.pair-btn').forEach(function(btn) {
+          if(btn.textContent.trim() === sym) {
+            const color = pct >= 0 ? 'var(--green)' : 'var(--red)';
+            // Check if badge already added
+            let badge = btn.querySelector('.pb-badge');
+            if(!badge) {
+              badge = document.createElement('span');
+              badge.className = 'pb-badge';
+              badge.style.cssText = `font-size:.45rem;margin-left:3px;vertical-align:middle`;
+              btn.appendChild(badge);
+            }
+            badge.textContent = (pct>=0?'+':'')+pct.toFixed(1)+'%';
+            badge.style.color = color;
+          }
+        });
+      });
+    } catch(e) { /* silent fail — badges are optional */ }
+  }
+  // Run on load + every 60s
+  setTimeout(_updatePairButtonBadges, 2000);
+  setInterval(_updatePairButtonBadges, 60000);
+
+  // ══════════════════════════════════════════════════════════════════
+  //  COPY TRADE SETUP TO CLIPBOARD
+  // ══════════════════════════════════════════════════════════════════
+  function copyTradeSetup() {
+    const sym    = document.getElementById('symbolInput')?.value || '—';
+    const price  = document.getElementById('pcPrice')?.textContent || '—';
+    const score  = document.getElementById('scoreNum')?.textContent || '—';
+    const sig    = document.getElementById('tl-signal')?.textContent || '—';
+    const rsi    = document.getElementById('rsiVal')?.textContent || '—';
+    const macd   = document.getElementById('macdVal')?.textContent || '—';
+    const dir    = document.getElementById('pred-direction')?.textContent || '—';
+    const entry  = document.getElementById('rr-entry')?.value || price;
+    const sl     = document.getElementById('rr-sl')?.value || '—';
+    const tp1    = document.getElementById('rr-tp1')?.value || '—';
+    const tp2    = document.getElementById('rr-tp2')?.value || '—';
+    const ratio1 = document.getElementById('rr-ratio1')?.textContent || '—';
+    const tf     = document.getElementById('chart-tf-label')?.textContent || '—';
+
+    const text = [
+      '📡 TRADE SETUP — ' + sym,
+      '━━━━━━━━━━━━━━━━━━━━━━━',
+      '📊 Timeframe: ' + tf,
+      '💰 Price: ' + price,
+      '⚡ Signal: ' + sig,
+      '🎯 Score: ' + score + '/100',
+      '🔮 AI Direction: ' + dir,
+      '',
+      '📈 INDICATORS',
+      '• RSI: ' + rsi,
+      '• MACD: ' + macd,
+      '',
+      '⚖️ TRADE PLAN',
+      '• Entry: ' + entry,
+      '• Stop Loss: ' + sl,
+      '• TP1: ' + tp1,
+      '• TP2: ' + tp2,
+      '• R:R Ratio: ' + ratio1,
+      '',
+      '⏰ ' + new Date().toLocaleString('id-ID'),
+      'via Crypto Risk System',
+    ].join('
+');
+
+    navigator.clipboard.writeText(text).then(function() {
+      const btn = document.getElementById('copy-setup-btn');
+      if(btn) {
+        btn.textContent = '✅ Copied!';
+        btn.style.color = 'var(--green)';
+        setTimeout(function(){ btn.textContent = '📋 Copy Setup'; btn.style.color = ''; }, 2000);
+      }
+    }).catch(function() {
+      alert(text); // fallback if clipboard not available
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  ALERT SOUND
+  // ══════════════════════════════════════════════════════════════════
+  function _playAlertSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [523, 659, 784]; // C5, E5, G5 — pleasant chord
+      notes.forEach(function(freq, i) {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.4);
+        osc.start(ctx.currentTime + i * 0.1);
+        osc.stop(ctx.currentTime + i * 0.1 + 0.5);
+      });
+    } catch(e) { /* audio not available */ }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  EXPORT PORTFOLIO TO CSV
+  // ══════════════════════════════════════════════════════════════════
+  function exportPortfolioCSV() {
+    if(!portfolio || !portfolio.length) { alert('No portfolio positions to export'); return; }
+    const totalValue = portfolio.reduce((s,p) => s + ((p.current||p.buy)*p.qty), 0);
+    const rows = [
+      ['Symbol','Quantity','Avg Buy Price','Current Price','Value (USD)','P&L (USD)','P&L %','Allocation %','Added'],
+      ...portfolio.map(function(p) {
+        const curr   = p.current || p.buy;
+        const value  = curr * p.qty;
+        const cost   = p.buy * p.qty;
+        const pnl    = value - cost;
+        const pnlPct = cost > 0 ? (pnl/cost*100).toFixed(2) : '0';
+        const alloc  = totalValue > 0 ? (value/totalValue*100).toFixed(1) : '0';
+        return [p.sym, p.qty, p.buy, curr, value.toFixed(2), pnl.toFixed(2), pnlPct, alloc, new Date(p.addedAt).toLocaleDateString('id-ID')];
+      })
+    ];
+    const csv = rows.map(r => r.map(v => '"'+String(v).replace(/"/g,'""')+'"').join(',')).join('
+');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'portfolio_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  IDR PRICE TOGGLE
+  // ══════════════════════════════════════════════════════════════════
+  let _showIDR = false;
+  let _usdIdrRate = 0;
+
+  async function _fetchUSDIDR() {
+    if(_usdIdrRate > 0) return _usdIdrRate;
+    try {
+      const data = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json', {signal:AbortSignal.timeout(4000)}).then(r=>r.json());
+      _usdIdrRate = data?.usd?.idr || 0;
+    } catch(e) { _usdIdrRate = 0; }
+    return _usdIdrRate;
+  }
+
+  async function toggleIDR() {
+    _showIDR = !_showIDR;
+    const btn = document.getElementById('idr-toggle-btn');
+    if(!_showIDR) {
+      if(btn) { btn.textContent = '🇮🇩 IDR'; btn.style.background = 'rgba(255,255,255,.04)'; }
+      // Restore original USD prices
+      if(window._lastAnalysisPrice) {
+        document.getElementById('pcPrice').textContent = fmtP(window._lastAnalysisPrice);
+      }
+      return;
+    }
+    if(btn) { btn.textContent = '💵 USD'; btn.style.background = 'rgba(255,184,0,.15)'; }
+    const rate = await _fetchUSDIDR();
+    if(!rate) { alert('Could not fetch USD/IDR rate'); _showIDR = false; return; }
+    // Show IDR price in main display
+    if(window._lastAnalysisPrice) {
+      const idrPrice = window._lastAnalysisPrice * rate;
+      document.getElementById('pcPrice').textContent = 'Rp ' + idrPrice.toLocaleString('id-ID', {maximumFractionDigits:0});
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  MARKET SESSION TIMER
+  // ══════════════════════════════════════════════════════════════════
+  function _updateSessionTimer() {
+    const el = document.getElementById('session-timer');
+    if(!el) return;
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const wib = new Date(utc + 7 * 3600000); // UTC+7 (WIB)
+    const h = wib.getHours(), m = wib.getMinutes();
+    const timeStr = wib.toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'});
+    const day = wib.getDay(); // 0=Sun, 6=Sat
+
+    const sessions = [];
+    const isWeekday = day >= 1 && day <= 5;
+
+    // Crypto — always open
+    sessions.push({ name:'⛓ Crypto', open:true, note:'24/7' });
+
+    // IDX (Jakarta): 09:00–16:15 WIB weekdays
+    if(isWeekday) {
+      const idxOpen  = h > 9 || (h === 9 && m >= 0);
+      const idxClose = h < 16 || (h === 16 && m <= 15);
+      sessions.push({ name:'🇮🇩 IDX', open: idxOpen && idxClose, note: idxOpen && idxClose ? '09:00–16:15' : 'Closed' });
+    } else {
+      sessions.push({ name:'🇮🇩 IDX', open:false, note:'Weekend' });
+    }
+
+    // NYSE/NASDAQ: 09:30–16:00 EST = 21:30–04:00 WIB
+    const nyOpen  = (h === 21 && m >= 30) || h === 22 || h === 23 || h < 4;
+    const nyClose = h === 4 && m === 0;
+    sessions.push({ name:'🇺🇸 NYSE', open: isWeekday && (nyOpen && !nyClose), note:'21:30–04:00 WIB' });
+
+    // London: 08:00–16:30 UTC = 15:00–23:30 WIB
+    const lseOpen  = h >= 15 && (h < 23 || (h === 23 && m <= 30));
+    sessions.push({ name:'🇬🇧 LSE', open: isWeekday && lseOpen, note:'15:00–23:30 WIB' });
+
+    // Forex major sessions
+    const fxTokyo   = (h >= 1 && h < 10);
+    const fxLondon  = (h >= 15 && h < 23);
+    const fxNewYork = (h >= 21 || h < 4);
+    const fxOpen    = fxTokyo || fxLondon || fxNewYork;
+    sessions.push({ name:'💱 Forex', open:fxOpen, note: fxTokyo?'Tokyo':fxLondon&&fxNewYork?'London+NY':fxLondon?'London':fxNewYork?'New York':'Quiet' });
+
+    el.innerHTML = `<span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">WIB ${timeStr}</span>` +
+      sessions.map(function(s) {
+        return `<span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;padding:1px 6px;border-radius:3px;background:${s.open?'rgba(0,255,136,.1)':'rgba(255,255,255,.04)'};color:${s.open?'var(--green)':'var(--muted)'};border:1px solid ${s.open?'rgba(0,255,136,.3)':'var(--border)'}">
+          ${s.name} ${s.open?'●':'○'}
+        </span>`;
+      }).join('');
+  }
+  setInterval(_updateSessionTimer, 30000);
+  setTimeout(_updateSessionTimer, 500);
+
+  // ══════════════════════════════════════════════════════════════════
+  //  SCANNER ADVANCED FILTERS
+  // ══════════════════════════════════════════════════════════════════
+  let _scanAdvFilter = { rsiMin:0, rsiMax:100, scoreMin:0, pctMin:-999, pctMax:999 };
+
+  function applyScannerFilter() {
+    const rsiMin   = parseFloat(document.getElementById('sf-rsi-min')?.value)   || 0;
+    const rsiMax   = parseFloat(document.getElementById('sf-rsi-max')?.value)   || 100;
+    const scoreMin = parseFloat(document.getElementById('sf-score-min')?.value) || 0;
+    const pctMin   = parseFloat(document.getElementById('sf-pct-min')?.value)   || -999;
+    const pctMax   = parseFloat(document.getElementById('sf-pct-max')?.value)   || 999;
+    _scanAdvFilter = { rsiMin, rsiMax, scoreMin, pctMin, pctMax };
+    _renderScanTable(_scanResults);
+  }
+
+  function resetScannerFilter() {
+    _scanAdvFilter = { rsiMin:0, rsiMax:100, scoreMin:0, pctMin:-999, pctMax:999 };
+    ['sf-rsi-min','sf-rsi-max','sf-score-min','sf-pct-min','sf-pct-max'].forEach(function(id) {
+      const el = document.getElementById(id); if(el) el.value = '';
+    });
+    _renderScanTable(_scanResults);
   }
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
