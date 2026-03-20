@@ -715,7 +715,39 @@ function installPWA() {
     input, select, textarea { font-size: 16px !important; }
 
     /* ── Fix bottom nav overlap ── */
-    .wrap { padding-bottom: 80px !important; }
+    .wrap { padding-bottom: 90px !important; }
+
+    /* ── Mobile page tabs hide on mobile (use bottom nav instead) ── */
+    .page-tabs { display: none !important; }
+
+    /* ── Mobile section headers more finger-friendly ── */
+    .mob-section-header { min-height: 48px; display: flex; align-items: center; }
+
+    /* ── Mobile nav labels smaller so 5 fit ── */
+    .mobile-nav-btn .nav-label { font-size: .48rem; letter-spacing: .5px; }
+    .mobile-nav-btn { padding: 6px 2px 10px; }
+
+    /* ── AI chat textarea on mobile ── */
+    #aiChatInput { font-size: 16px !important; }
+
+    /* ── Portfolio table scrollable ── */
+    #portTbody tr td { font-size: .55rem; padding: 5px 4px; }
+
+    /* ── Scanner table on mobile ── */
+    .scan-table th, .scan-table td { font-size: .52rem; padding: 5px 4px; }
+
+    /* ── Order book panel height limit ── */
+    #ob-bids, #ob-asks { max-height: 250px; }
+
+    /* ── Market tab panels ── */
+    .mob-page .panel { margin-bottom: 10px; }
+
+    /* ── Session timer wraps on mobile ── */
+    #session-timer { gap: 4px; padding: 4px 12px; }
+    #session-timer span { font-size: .46rem !important; padding: 1px 4px !important; }
+
+    /* ── Make AI provider select legible ── */
+    #ai-provider, #ai-model { font-size: 14px !important; }
 
     /* ── Scroll isolation for nested panels ── */
     .news-scroll, .ind-scroll, .hm-rows, .bt-trades-scroll {
@@ -927,7 +959,7 @@ function installPWA() {
 
   <!-- ── Page Tabs ── -->
   <div class="page-tabs">
-    <button class="page-tab active" onclick="switchTab('analysis')" id="tab-analysis">🔬 Analysis</button>
+    <button class="page-tab active" onclick="switchTab('analysis')" id="tab-analysis">🔬 Analysis<span id="alert-fire-badge" style="display:none;margin-left:5px;background:var(--red);color:#fff;border-radius:50%;font-size:.45rem;padding:1px 5px;font-family:Share Tech Mono,monospace;vertical-align:middle">!</span></button>
     <button class="page-tab" onclick="switchTab('market')" id="tab-market">🌐 Market Dashboard</button>
     <button class="page-tab" onclick="switchTab('onchain')" id="tab-onchain">🔎 On-Chain &amp; Macro</button>
     <button class="page-tab" onclick="switchTab('scanner')" id="tab-scanner">📡 Scanner &amp; Macro</button>
@@ -1702,6 +1734,7 @@ function installPWA() {
       </select>
       <input type="number" id="alertPrice" aria-label="Alert price level" placeholder="Enter price level..." class="alert-input" step="any">
       <button class="alert-add-btn" onclick="addAlert()">+ ADD ALERT</button>
+    <button onclick="requestNotificationPermission()" id="notif-perm-btn" style="display:none;font-family:'Share Tech Mono',monospace;font-size:.54rem;padding:6px 12px;background:rgba(255,184,0,.1);border:1px solid rgba(255,184,0,.3);color:var(--warn);border-radius:6px;cursor:pointer">🔔 Enable Browser Alerts</button>
     </div>
     <div id="alertList"><div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">No alerts set. Add one above.</div></div>
     <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);margin-top:8px">⚠️ Alerts only work while this tab is open. Browser notifications will fire when price crosses your level.</div>
@@ -1892,6 +1925,11 @@ function installPWA() {
 
   <!-- ══ PAGE: Market Dashboard ══ -->
   <div class="page-content" id="page-market">
+  <!-- Offline banner -->
+  <div id="offline-banner" style="display:none;align-items:center;justify-content:center;gap:8px;padding:6px 20px;background:rgba(255,45,85,.15);border-bottom:1px solid rgba(255,45,85,.3);font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--red)">
+    📡 NO INTERNET CONNECTION — showing last cached data
+    <button onclick="window.location.reload()" style="padding:2px 8px;background:rgba(255,45,85,.2);border:1px solid var(--red);color:var(--red);border-radius:4px;cursor:pointer;font-family:inherit;font-size:inherit">Retry</button>
+  </div>
   <!-- Market session timer bar -->
   <div id="session-timer" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:5px 20px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--border);min-height:26px"></div>
   <div class="wrap" style="padding-top:0">
@@ -2496,12 +2534,16 @@ function installPWA() {
           </div>
         </div>
       </div>
+      <!-- AI Market Summary auto-generate -->
+      <div id="ai-market-summary" style="display:none;padding:10px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;margin-bottom:10px;font-family:'Rajdhani',sans-serif;font-size:.82rem;line-height:1.6;color:var(--text)"></div>
+
       <!-- Quick prompts -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
         <button class="pair-btn" onclick="aiQuickPrompt('analyze')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📊 Analyze Current</button>
         <button class="pair-btn" onclick="aiQuickPrompt('risk')"    style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">⚖️ Risk Check</button>
         <button class="pair-btn" onclick="aiQuickPrompt('strategy')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">🎓 Strategy Tips</button>
         <button class="pair-btn" onclick="aiQuickPrompt('sentiment')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">😱 Market Mood</button>
+        <button class="pair-btn" onclick="aiAnalyzeJournal()" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📓 Analyze Journal</button>
         <button class="pair-btn" onclick="aiQuickPrompt('entry')"    style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📍 Entry/Exit Plan</button>
       </div>
       <!-- Chat messages -->
@@ -2578,6 +2620,15 @@ function installPWA() {
           </tbody>
         </table>
       </div>
+    </div>
+
+    <!-- Portfolio Performance Chart -->
+    <div class="panel" style="margin-bottom:14px;border-color:rgba(0,229,255,.2)">
+      <div class="ptitle" style="color:var(--accent)">📈 Portfolio Performance
+        <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">cumulative P&L · equity curve</span>
+      </div>
+      <canvas id="portPerfChart" height="100" style="width:100%;display:block;border-radius:6px;background:rgba(0,0,0,.3)"></canvas>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:6px;text-align:center" id="portPerfNote">Add positions and refresh prices to see performance</div>
     </div>
 
     <!-- Social Sentiment panel -->
@@ -4908,6 +4959,8 @@ self.onmessage=function(e){
 
     // Store ATR for position size calculator
     if(atr) window._lastATR = atr;
+    // Pattern alerts
+    if(patterns && patterns.length) _checkPatternAlerts(patterns, sym);
     // Auto-fill entry price if field is empty
     psAutoFill();
     // Run custom indicator plugins with current data + computed indicators
@@ -6769,19 +6822,21 @@ self.onmessage=function(e){
       return t;
     }
 
-    const homeTab     = makeTab('home', true);
-    const analysisTab = makeTab('analysis', false);
-    const scoreTab    = makeTab('score', false);
-    const journalTab  = makeTab('journal', false);
-    const moreTab     = makeTab('more', false);
+    // ── 5 mobile pages ──────────────────────────────────────────────
+    const homeTab      = makeTab('home', true);
+    const analysisTab  = makeTab('analysis', false);
+    const marketTab    = makeTab('market', false);
+    const portfolioTab = makeTab('portfolio', false);
+    const moreTab      = makeTab('more', false);
 
+    // ══ HOME tab: search + price overview + quick stats ══════════════
     homeTab.innerHTML = `
       <div class="mob-search-row">
-        <input class="mob-search-input" placeholder="BTC, ETH, SOL..." aria-label="Symbol search"
+        <input class="mob-search-input" placeholder="BTC, ETH, SOL, USDIDR..." aria-label="Symbol search"
           value="${document.getElementById('symbolInput').value}"
           maxlength="12"
-          oninput="document.getElementById('symbolInput').value=this.value"
-          onkeydown="if(event.key==='Enter'){document.getElementById('symbolInput').value=this.value;fetchData()}">
+          oninput="document.getElementById('symbolInput').value=this.value.toUpperCase()"
+          onkeydown="if(event.key==='Enter'){document.getElementById('symbolInput').value=this.value.toUpperCase();fetchData()}">
       </div>
       <div class="mob-tf-row" id="mob-tf-row"></div>
       <div class="mob-pairs-row" id="mob-pairs-row"></div>
@@ -6795,27 +6850,30 @@ self.onmessage=function(e){
       <div class="mob-status" id="mob-statusBar">⬡ Ready — tap ⚡ to fetch</div>
       <div class="mob-progress"><div class="mob-progress-bar" id="mob-progressBar"></div></div>`;
 
+    // Clone TF buttons
     const mobTfRow = homeTab.querySelector('#mob-tf-row');
-    document.querySelectorAll('.tf-btn').forEach(btn => {
+    document.querySelectorAll('.tf-btn').forEach(function(btn) {
       const cl = btn.cloneNode(true);
       const tf = (btn.getAttribute('onclick')||'').match(/'([^']+)'/)?.[1];
-      if(tf) cl.onclick = () => {
+      if(tf) cl.onclick = function() {
         setTF(tf, btn);
-        document.querySelectorAll('#mob-tf-row .tf-btn, .tf-row .tf-btn').forEach(b=>b.classList.remove('active'));
+        document.querySelectorAll('#mob-tf-row .tf-btn, .tf-row .tf-btn').forEach(function(b){ b.classList.remove('active'); });
         cl.classList.add('active'); btn.classList.add('active');
       };
       if(btn.classList.contains('active')) cl.classList.add('active');
       mobTfRow.appendChild(cl);
     });
 
+    // Clone pair buttons
     const mobPairsRow = homeTab.querySelector('#mob-pairs-row');
-    document.querySelectorAll('.pairs .pair-btn').forEach(btn => {
+    document.querySelectorAll('.pairs .pair-btn').forEach(function(btn) {
       const cl = btn.cloneNode(true);
       cl.setAttribute('onclick', btn.getAttribute('onclick'));
       if(btn.classList.contains('active')) cl.classList.add('active');
       mobPairsRow.appendChild(cl);
     });
 
+    // Market overview cards
     const mktGridEl = wrap.querySelector('.mkt-grid');
     if(mktGridEl) {
       const lbl = document.createElement('div');
@@ -6825,6 +6883,7 @@ self.onmessage=function(e){
       homeTab.appendChild(mktGridEl);
     }
 
+    // Price row + Session P&L
     const priceRowEl = wrap.querySelector('.price-row');
     if(priceRowEl) {
       const sec = makeMobSection('💵 PRICE', true);
@@ -6839,7 +6898,16 @@ self.onmessage=function(e){
       homeTab.appendChild(sec.wrap);
     }
 
-    const chartPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#miniChart'));
+    // Score + Fear & Greed preview on home
+    const scoreRingEl = wrap.querySelector('#scoreRing')?.closest('.panel');
+    if(scoreRingEl) {
+      const sec = makeMobSection('🎯 TRADE SCORE', true);
+      sec.body.appendChild(scoreRingEl);
+      homeTab.appendChild(sec.wrap);
+    }
+
+    // ══ ANALYSIS tab: chart + indicators + all analysis panels ═══════
+    const chartPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#miniChart'); });
     if(chartPanelEl) analysisTab.appendChild(chartPanelEl);
 
     const mainGridEl = wrap.querySelector('.main-grid');
@@ -6849,21 +6917,28 @@ self.onmessage=function(e){
       analysisTab.appendChild(sec.wrap);
     }
 
-    const tlPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.textContent.includes('TradingLab Strategy'));
+    const tlPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.textContent.includes('TradingLab Strategy'); });
     if(tlPanelEl) {
-      const sec = makeMobSection('🎓 TRADINGLAB STRATEGY', true);
+      const sec = makeMobSection('🎓 TRADINGLAB SIGNAL', true);
       sec.body.appendChild(tlPanelEl);
       analysisTab.appendChild(sec.wrap);
     }
 
-    const mtfPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#mtfPanel'));
+    const mtfPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#mtfPanel'); });
     if(mtfPanelEl) {
       const sec = makeMobSection('🌐 MULTI-TIMEFRAME', false);
       sec.body.appendChild(mtfPanelEl);
       analysisTab.appendChild(sec.wrap);
     }
 
-    const ichiPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.textContent.includes('Ichimoku'));
+    const predPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#predPanel'); });
+    if(predPanelEl) {
+      const sec = makeMobSection('🤖 AI PREDICTION', false);
+      sec.body.appendChild(predPanelEl);
+      analysisTab.appendChild(sec.wrap);
+    }
+
+    const ichiPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.textContent.includes('Ichimoku'); });
     if(ichiPanelEl) {
       const sec = makeMobSection('☁️ ICHIMOKU', false);
       sec.body.appendChild(ichiPanelEl);
@@ -6886,52 +6961,162 @@ self.onmessage=function(e){
       analysisTab.appendChild(sec.wrap);
     }
 
-    const scorePanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#scoreRing'));
-    if(scorePanelEl) scoreTab.appendChild(scorePanelEl);
-
-    const predPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#predPanel'));
-    if(predPanelEl) {
-      const sec = makeMobSection('🤖 AI PREDICTION', true);
-      sec.body.appendChild(predPanelEl);
-      scoreTab.appendChild(sec.wrap);
+    // R/R Calculator
+    const rrPanel = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#rr-entry'); });
+    if(rrPanel) {
+      const sec = makeMobSection('⚖️ RISK/REWARD CALC', false);
+      sec.body.appendChild(rrPanel);
+      analysisTab.appendChild(sec.wrap);
     }
 
-    const riskPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#rmAccount'));
-    if(riskPanelEl) {
-      const sec = makeMobSection('⚖️ RISK MANAGER', false);
-      sec.body.appendChild(riskPanelEl);
-      scoreTab.appendChild(sec.wrap);
+    // Order book
+    const obPanel = document.getElementById('orderbook-panel');
+    if(obPanel) {
+      const sec = makeMobSection('📖 ORDER BOOK', false);
+      sec.body.appendChild(obPanel);
+      analysisTab.appendChild(sec.wrap);
     }
 
-    const fgPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#fgRing'));
-    if(fgPanelEl) {
-      const sec = makeMobSection('😱 FEAR & GREED', false);
-      sec.body.appendChild(fgPanelEl);
-      scoreTab.appendChild(sec.wrap);
-    }
-
-    const wlPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#wlGrid'));
+    // Watchlist + Alerts in analysis tab for easy access
+    const wlPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#wlGrid'); });
     if(wlPanelEl) {
-      const sec = makeMobSection('⭐ WATCHLIST', true);
+      const sec = makeMobSection('⭐ WATCHLIST', false);
       sec.body.appendChild(wlPanelEl);
-      journalTab.appendChild(sec.wrap);
+      analysisTab.appendChild(sec.wrap);
     }
 
-    const alertPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#alertList'));
+    const alertPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#alertList'); });
     if(alertPanelEl) {
       const sec = makeMobSection('🔔 PRICE ALERTS', false);
       sec.body.appendChild(alertPanelEl);
-      journalTab.appendChild(sec.wrap);
+      analysisTab.appendChild(sec.wrap);
     }
 
-    const journalPanelEl = [...wrap.querySelectorAll('.panel')].find(p => p.querySelector('#journalList'));
+    const journalPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#journalList') || p.querySelector('#tj-tbody'); });
     if(journalPanelEl) {
-      const sec = makeMobSection('📓 TRADE JOURNAL', true);
+      const sec = makeMobSection('📓 TRADE JOURNAL', false);
       journalPanelEl.style.overflowX = 'auto';
       sec.body.appendChild(journalPanelEl);
-      journalTab.appendChild(sec.wrap);
+      analysisTab.appendChild(sec.wrap);
     }
 
+    // ══ MARKET tab: heatmap + movers + news + fear&greed + F&G ════════
+    // Fetch market data panels from page-market
+    const pageMarket = document.getElementById('page-market');
+    if(pageMarket) {
+      const marketSec = makeMobSection('🌐 MARKET DASHBOARD', true);
+      // Add a refresh button
+      const refreshBtn = document.createElement('button');
+      refreshBtn.textContent = '⟳ Refresh Market Data';
+      refreshBtn.className = 'mkt-refresh-btn';
+      refreshBtn.style.cssText = 'width:100%;margin-bottom:8px';
+      refreshBtn.onclick = function(){ fetchMarketDashboard(true); };
+      marketSec.body.appendChild(refreshBtn);
+      // Clone the market page content into mobile
+      const mktContent = pageMarket.querySelector('.wrap');
+      if(mktContent) {
+        const clone = mktContent.cloneNode(true);
+        clone.style.padding = '0';
+        marketSec.body.appendChild(clone);
+      }
+      marketTab.appendChild(marketSec.wrap);
+    }
+
+    // Fear & Greed
+    const fgPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#fgRing'); });
+    if(fgPanelEl) {
+      const sec = makeMobSection('😱 FEAR & GREED', false);
+      sec.body.appendChild(fgPanelEl);
+      marketTab.appendChild(sec.wrap);
+    }
+
+    // Scanner
+    const pageScanner = document.getElementById('page-scanner');
+    if(pageScanner) {
+      const sec = makeMobSection('📡 SCANNER', false);
+      const scanContent = pageScanner.querySelector('.wrap');
+      if(scanContent) {
+        const clone = scanContent.cloneNode(true);
+        clone.style.padding = '0';
+        sec.body.appendChild(clone);
+      }
+      marketTab.appendChild(sec.wrap);
+    }
+
+    // Forex & Stocks
+    const pageFx = document.getElementById('page-fxstocks');
+    if(pageFx) {
+      const sec = makeMobSection('💱 FOREX & STOCKS', false);
+      const fxContent = pageFx.querySelector('.wrap');
+      if(fxContent) {
+        const clone = fxContent.cloneNode(true);
+        clone.style.padding = '0';
+        sec.body.appendChild(clone);
+      }
+      marketTab.appendChild(sec.wrap);
+    }
+
+    // ══ PORTFOLIO tab: portfolio + AI + social + defi ════════════════
+    // Portfolio tracker panel
+    const portPanel = [...document.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#portTbody'); });
+    if(portPanel) {
+      const sec = makeMobSection('💼 PORTFOLIO', true);
+      sec.body.appendChild(portPanel);
+      portfolioTab.appendChild(sec.wrap);
+    }
+
+    // AI Assistant — full panel in portfolio tab
+    const pageAI = document.getElementById('page-ai');
+    if(pageAI) {
+      const sec = makeMobSection('🤖 AI ASSISTANT', false);
+      const aiContent = pageAI.querySelector('.wrap');
+      if(aiContent) {
+        const clone = aiContent.cloneNode(true);
+        clone.style.padding = '0';
+        sec.body.appendChild(clone);
+      }
+      portfolioTab.appendChild(sec.wrap);
+    }
+
+    // Social Sentiment
+    const socialPanel = document.getElementById('socialSentimentPanel')?.closest('.panel');
+    if(socialPanel) {
+      const sec = makeMobSection('💬 SOCIAL SENTIMENT', false);
+      sec.body.appendChild(socialPanel);
+      portfolioTab.appendChild(sec.wrap);
+    }
+
+    // DeFi
+    const defiPanel = document.getElementById('defiPanel')?.closest('.panel');
+    if(defiPanel) {
+      const sec = makeMobSection('🏦 DEFI ANALYTICS', false);
+      sec.body.appendChild(defiPanel);
+      portfolioTab.appendChild(sec.wrap);
+    }
+
+    // ══ MORE tab: On-chain, Settings, About ═══════════════════════════
+    // On-Chain & Macro
+    const pageOnchain = document.getElementById('page-onchain');
+    if(pageOnchain) {
+      const sec = makeMobSection('🔎 ON-CHAIN & MACRO', false);
+      const ocContent = pageOnchain.querySelector('.wrap');
+      if(ocContent) {
+        const clone = ocContent.cloneNode(true);
+        clone.style.padding = '0';
+        sec.body.appendChild(clone);
+      }
+      moreTab.appendChild(sec.wrap);
+    }
+
+    // Risk Manager
+    const riskPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#rmAccount'); });
+    if(riskPanelEl) {
+      const sec = makeMobSection('⚖️ RISK MANAGER', false);
+      sec.body.appendChild(riskPanelEl);
+      moreTab.appendChild(sec.wrap);
+    }
+
+    // Settings
     const settingsPanelEl = document.getElementById('settingsPanel');
     if(settingsPanelEl) {
       settingsPanelEl.style.display = 'block';
@@ -6940,6 +7125,7 @@ self.onmessage=function(e){
       moreTab.appendChild(sec.wrap);
     }
 
+    // Connection status
     const connGridEl = wrap.querySelector('.conn-grid');
     if(connGridEl) {
       const sec = makeMobSection('🔀 CONNECTION STATUS', false);
@@ -6949,13 +7135,13 @@ self.onmessage=function(e){
 
     const aboutDiv = document.createElement('div');
     aboutDiv.style.cssText = "font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);padding:16px;text-align:center;line-height:2.2";
-    aboutDiv.innerHTML = `Live Crypto Risk System v4<br>Indonesia Ready ✓<br><span style="color:var(--accent)">crypto-risk.vercel.app</span>`;
+    aboutDiv.innerHTML = 'Crypto Risk System v5<br>Indonesia Ready ✓<br><span style="color:var(--accent)">Press ? for keyboard shortcuts</span>';
     moreTab.appendChild(aboutDiv);
 
     tabContainer.appendChild(homeTab);
     tabContainer.appendChild(analysisTab);
-    tabContainer.appendChild(scoreTab);
-    tabContainer.appendChild(journalTab);
+    tabContainer.appendChild(marketTab);
+    tabContainer.appendChild(portfolioTab);
     tabContainer.appendChild(moreTab);
     wrap.appendChild(tabContainer);
 
@@ -7007,21 +7193,43 @@ self.onmessage=function(e){
   function mobNav(tab) {
     if (!IS_MOBILE()) return;
 
-    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.mobile-nav-btn').forEach(function(b){ b.classList.remove('active'); });
     const activeBtn = document.getElementById('mnav-' + tab);
     if(activeBtn) activeBtn.classList.add('active');
 
-    document.querySelectorAll('.mobile-page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.mobile-page').forEach(function(p){ p.classList.remove('active'); });
     const activePage = document.getElementById('mob-page-' + tab);
     if(activePage) activePage.classList.add('active');
 
     window.scrollTo(0, 0);
 
-    if(tab==='analysis' && window._lastChartData) {
-      setTimeout(()=>{
-        const d=window._lastChartData;
+    // Redraw chart when returning to analysis tab
+    if(tab === 'analysis' && window._lastChartData) {
+      setTimeout(function(){
+        const d = window._lastChartData;
         drawMiniChart(d.opens,d.closes,d.highs,d.lows,d.e8,d.e21,d.e55,d.e200,d.sym,d.tf);
-      },100);
+      }, 100);
+    }
+
+    // Load market data when visiting market tab
+    if(tab === 'market' && !window._mktLoaded) {
+      fetchMarketDashboard(false);
+    }
+
+    // Refresh portfolio prices on visit
+    if(tab === 'portfolio' && !window._portfolioLoaded) {
+      fetchBTCDominance();
+      window._portfolioLoaded = true;
+      refreshPortfolio();
+    }
+
+    // Also sync desktop page-tabs so switchTab state stays consistent
+    const tabMap = { home:'analysis', analysis:'analysis', market:'market', portfolio:'portfolio', more:'onchain' };
+    const desktopTab = tabMap[tab];
+    if(desktopTab) {
+      document.querySelectorAll('.page-tab').forEach(function(t){ t.classList.remove('active'); });
+      const dt = document.getElementById('tab-' + desktopTab);
+      if(dt) dt.classList.add('active');
     }
   }
 
@@ -8371,47 +8579,64 @@ self.onmessage=function(e){
     try {
       // ── Fetch ETH gas + SOL fees in parallel ──
       const [ethData, solData] = await Promise.allSettled([
-        // ETH gas — Etherscan oracle (free, no key) or owlracle fallback
+        // ETH gas — race 4 sources: Etherscan, Blocknative, public RPC eth_gasPrice, owlracle
         (async function() {
           let data = !bust && _mktGet('ethGas', TTL);
           if(!data) {
+            // Helper: normalize any source into {result:{SafeGasPrice,ProposeGasPrice,FastGasPrice}}
             const raw = await Promise.any([
-              smartFetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle'),
+              // Source 1: Etherscan (most reliable, free no key)
               fetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle', {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
-              fetch('https://owlracle.info/eth/gas?apikey=&blocks=10&percentile=35,60,90', {signal:AbortSignal.timeout(5000)})
-                .then(function(r){ return r.json(); })
-                .then(function(d) {
-                  if(d && d.speeds && d.speeds.length >= 3) {
-                    return { result: {
-                      SafeGasPrice:    String(Math.round(d.speeds[0].maxFeePerGas || 0)),
-                      ProposeGasPrice: String(Math.round(d.speeds[1].maxFeePerGas || 0)),
-                      FastGasPrice:    String(Math.round(d.speeds[2].maxFeePerGas || 0)),
-                    }};
-                  }
-                  return null;
-                }),
+              smartFetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle'),
+              // Source 2: ETH mainnet JSON-RPC eth_gasPrice + eth_feeHistory (always works)
+              (async function() {
+                const rpcUrl = 'https://cloudflare-eth.com';
+                const [gasPrice, feeHist] = await Promise.all([
+                  fetch(rpcUrl, {method:'POST',headers:{'Content-Type':'application/json'},body:'{"jsonrpc":"2.0","method":"eth_gasPrice","params":[],"id":1}',signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+                  fetch(rpcUrl, {method:'POST',headers:{'Content-Type':'application/json'},body:'{"jsonrpc":"2.0","method":"eth_feeHistory","params":["0xa","latest",[25,50,75]],"id":2}',signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+                ]);
+                const baseFee = feeHist?.result?.baseFeePerGas;
+                const baseGwei = baseFee && baseFee.length ? parseInt(baseFee[baseFee.length-1], 16) / 1e9 : 0;
+                const gpGwei = parseInt(gasPrice?.result || '0x0', 16) / 1e9;
+                if(!gpGwei && !baseGwei) throw new Error('no gas price');
+                const safe   = Math.max(1, Math.round((baseGwei || gpGwei) * 1.1));
+                const normal = Math.max(1, Math.round((baseGwei || gpGwei) * 1.3));
+                const fast   = Math.max(1, Math.round((baseGwei || gpGwei) * 1.6));
+                return { result: { SafeGasPrice: String(safe), ProposeGasPrice: String(normal), FastGasPrice: String(fast), source: 'ETH RPC' }};
+              })(),
+              // Source 3: gas.blocknative.com (free)
+              fetch('https://api.blocknative.com/gasprices/blockprices', {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
+                const bp = d?.blockPrices?.[0]?.estimatedPrices;
+                if(!bp || !bp.length) throw new Error('bad blocknative');
+                return { result: {
+                  SafeGasPrice:    String(Math.round(bp.find(p=>p.confidence<=80)?.maxFeePerGas || bp[bp.length-1].maxFeePerGas || 0)),
+                  ProposeGasPrice: String(Math.round(bp.find(p=>p.confidence>=90)?.maxFeePerGas || bp[1]?.maxFeePerGas || 0)),
+                  FastGasPrice:    String(Math.round(bp[0]?.maxFeePerGas || 0)),
+                }};
+              }),
             ]).catch(function(){ return null; });
             if(raw) { data = raw; _mktSet('ethGas', data); }
           }
           return data;
         })(),
 
-        // SOL fees — mempool.space-style via Solana RPC getRecentPrioritizationFees
+        // SOL fees — race multiple Solana RPC endpoints
         (async function() {
           let data = !bust && _mktGet('solGas', TTL);
           if(!data) {
-            // Race Solana mainnet RPC vs QuickNode public
             const rpcBody = JSON.stringify({jsonrpc:'2.0',id:1,method:'getRecentPrioritizationFees',params:[[]]});
-            const raw = await Promise.any([
-              fetch('https://api.mainnet-beta.solana.com', {
+            const solRPCs = [
+              'https://api.mainnet-beta.solana.com',
+              'https://solana-mainnet.rpc.extrnode.com',
+              'https://mainnet.helius-rpc.com/?api-key=demo',
+              'https://rpc.ankr.com/solana',
+            ];
+            const raw = await Promise.any(
+              solRPCs.map(url => fetch(url, {
                 method:'POST', headers:{'Content-Type':'application/json'},
-                body: rpcBody, signal: AbortSignal.timeout(6000)
-              }).then(r=>r.json()),
-              fetch('https://solana-mainnet.rpc.extrnode.com', {
-                method:'POST', headers:{'Content-Type':'application/json'},
-                body: rpcBody, signal: AbortSignal.timeout(6000)
-              }).then(r=>r.json()),
-            ]).catch(function(){ return null; });
+                body: rpcBody, signal: AbortSignal.timeout(5000)
+              }).then(r=>r.json()).then(d => { if(!d?.result?.length) throw new Error('empty'); return d; }))
+            ).catch(function(){ return null; });
 
             if(raw && raw.result && Array.isArray(raw.result) && raw.result.length) {
               const fees = raw.result.map(function(f){ return f.prioritizationFee || 0; });
@@ -12145,23 +12370,561 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     _renderScanTable(_scanResults);
   }
 
+
+
+  // ════════════════════════════════════════════════════════════════
+  //  BTC DOMINANCE + ALT SEASON INDEX
+  // ════════════════════════════════════════════════════════════════
+  async function fetchBTCDominance() {
+    const panel = document.getElementById('btcDomPanel');
+    if(!panel) return;
+    panel.innerHTML = _skel(3);
+    try {
+      const data = await smartFetch('https://api.coingecko.com/api/v3/global');
+      const g = data.data;
+      const btcDom = g.market_cap_percentage.btc || 0;
+      const ethDom = g.market_cap_percentage.eth || 0;
+      const altDom = 100 - btcDom - ethDom;
+      const totalMcap = g.total_market_cap.usd || 0;
+      const btcMcap   = g.total_market_cap.btc ? totalMcap * btcDom / 100 : 0;
+
+      // Alt season: if BTC dom < 40% = alt season, > 60% = BTC season
+      const altSeason = btcDom < 40 ? '🚀 ALT SEASON' : btcDom < 50 ? '⚖️ MIXED' : btcDom < 60 ? '₿ BTC LEADING' : '₿ BTC DOMINANCE';
+      const altColor  = btcDom < 40 ? 'var(--green)' : btcDom < 55 ? 'var(--warn)' : '#f7931a';
+      const fmtT = v => v >= 1e12 ? '$'+(v/1e12).toFixed(2)+'T' : '$'+(v/1e9).toFixed(0)+'B';
+
+      panel.innerHTML =
+        '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">' +
+          '<div style="flex:1;min-width:100px;background:rgba(247,147,26,.08);border:1px solid rgba(247,147,26,.2);border-radius:8px;padding:10px;text-align:center">' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">BTC DOMINANCE</div>' +
+            '<div style="font-family:Orbitron,monospace;font-size:1.2rem;font-weight:900;color:#f7931a">' + btcDom.toFixed(1) + '%</div>' +
+          '</div>' +
+          '<div style="flex:1;min-width:100px;background:rgba(98,126,234,.08);border:1px solid rgba(98,126,234,.2);border-radius:8px;padding:10px;text-align:center">' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">ETH DOM</div>' +
+            '<div style="font-family:Orbitron,monospace;font-size:1.2rem;font-weight:900;color:#627eea">' + ethDom.toFixed(1) + '%</div>' +
+          '</div>' +
+          '<div style="flex:1;min-width:100px;background:rgba(0,255,136,.05);border:1px solid rgba(0,255,136,.15);border-radius:8px;padding:10px;text-align:center">' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">ALTS DOM</div>' +
+            '<div style="font-family:Orbitron,monospace;font-size:1.2rem;font-weight:900;color:var(--green)">' + altDom.toFixed(1) + '%</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="padding:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+          '<div>' +
+            '<div style="font-family:Orbitron,monospace;font-size:.8rem;font-weight:700;color:' + altColor + '">' + altSeason + '</div>' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted);margin-top:2px">Total Market Cap: ' + fmtT(totalMcap) + '</div>' +
+          '</div>' +
+          '<div style="width:80px;height:80px;position:relative">' +
+            '<svg viewBox="0 0 36 36" style="transform:rotate(-90deg);width:80px;height:80px">' +
+              '<circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,.05)" stroke-width="3.8"/>' +
+              '<circle cx="18" cy="18" r="15.9" fill="none" stroke="#f7931a" stroke-width="3.8" stroke-dasharray="' + btcDom.toFixed(1) + ' ' + (100-btcDom).toFixed(1) + '" stroke-dashoffset="0"/>' +
+              '<circle cx="18" cy="18" r="15.9" fill="none" stroke="#627eea" stroke-width="3.8" stroke-dasharray="' + ethDom.toFixed(1) + ' ' + (100-ethDom).toFixed(1) + '" stroke-dashoffset="' + (-btcDom).toFixed(1) + '"/>' +
+            '</svg>' +
+            '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted)">DOM</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted)">Strategy hint: ' +
+          (btcDom < 42 ? '🚀 Alt season — consider altcoin positions' :
+           btcDom < 52 ? '⚖️ Mixed — balanced BTC/alt split' :
+           '₿ BTC season — reduce alts, accumulate BTC') + '</div>';
+    } catch(e) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">BTC dominance unavailable: ' + e.message + '</div>';
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  ECONOMIC CALENDAR
+  // ════════════════════════════════════════════════════════════════
+  async function fetchEconCalendar() {
+    const panel = document.getElementById('econCalPanel');
+    if(!panel) return;
+    panel.innerHTML = _skel(4);
+    try {
+      // Use FCS API free tier (no key needed for basic data) + hardcoded upcoming events
+      const now = new Date();
+      const wibNow = new Date(now.getTime() + (7 * 3600000 - now.getTimezoneOffset() * 60000));
+
+      // Known recurring high-impact events (approximate — update manually or integrate paid API)
+      const events = [
+        { name:'US CPI (Inflation)', impact:'HIGH', currency:'USD', note:'Affects Fed rate decisions → crypto sentiment', recur:'Monthly ~13th' },
+        { name:'Fed Interest Rate Decision', impact:'HIGH', currency:'USD', note:'Rate hikes = bearish crypto, cuts = bullish', recur:'8x per year' },
+        { name:'US NFP (Jobs Report)', impact:'HIGH', currency:'USD', note:'Strong jobs = hawkish Fed = bearish crypto', recur:'First Friday monthly' },
+        { name:'BI Rate Decision (Bank Indonesia)', impact:'HIGH', currency:'IDR', note:'Affects USD/IDR exchange rate directly', recur:'Monthly' },
+        { name:'US PCE (Core Inflation)', impact:'MEDIUM', currency:'USD', note:'Fed preferred inflation gauge', recur:'Monthly ~end' },
+        { name:'FOMC Meeting Minutes', impact:'MEDIUM', currency:'USD', note:'Detail on Fed thinking — market moving', recur:'3 weeks after meeting' },
+        { name:'US GDP Growth Rate', impact:'MEDIUM', currency:'USD', note:'Economy health — recession risk indicator', recur:'Quarterly' },
+        { name:'China CPI + Trade Data', impact:'MEDIUM', currency:'CNY', note:'Affects global risk sentiment', recur:'Monthly ~10th' },
+        { name:'ECB Rate Decision', impact:'MEDIUM', currency:'EUR', note:'Affects EUR/USD → DXY → crypto', recur:'Every 6 weeks' },
+        { name:'ETH Network Upgrade', impact:'HIGH', currency:'ETH', note:'Watch Ethereum blog for announcements', recur:'Irregular' },
+      ];
+
+      const impactColor = { HIGH:'var(--red)', MEDIUM:'var(--warn)', LOW:'var(--muted)' };
+      const currencyColor = { USD:'#85C1E9', IDR:'var(--green)', EUR:'#AED6F1', ETH:'#627eea', CNY:'#F1948A' };
+
+      panel.innerHTML =
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--warn);padding:8px;background:rgba(255,184,0,.06);border:1px solid rgba(255,184,0,.2);border-radius:6px;margin-bottom:10px">' +
+          '⚠️ Approximate schedule — always verify on investing.com/economic-calendar or forexfactory.com' +
+        '</div>' +
+        events.map(function(ev) {
+          return '<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">' +
+            '<div style="min-width:14px;height:14px;border-radius:50%;background:' + (impactColor[ev.impact]||'var(--muted)') + ';margin-top:3px;flex-shrink:0"></div>' +
+            '<div style="flex:1">' +
+              '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--text);font-weight:700">' + ev.name +
+                ' <span style="font-family:Share Tech Mono,monospace;font-size:.48rem;padding:1px 5px;border-radius:3px;background:' + (currencyColor[ev.currency]||'var(--muted)') + '22;color:' + (currencyColor[ev.currency]||'var(--muted)') + ';border:1px solid ' + (currencyColor[ev.currency]||'var(--muted)') + '44">' + ev.currency + '</span>' +
+              '</div>' +
+              '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);margin-top:3px">' + ev.note + '</div>' +
+              '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:' + (impactColor[ev.impact]||'var(--muted)') + ';margin-top:2px">' + ev.impact + ' IMPACT · ' + ev.recur + '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('') +
+        '<div style="margin-top:10px;display:flex;gap:8px">' +
+          '<a href="https://investing.com/economic-calendar/" target="_blank" rel="noopener" style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--accent);text-decoration:none;padding:5px 10px;border:1px solid rgba(0,229,255,.3);border-radius:5px">📅 investing.com</a>' +
+          '<a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener" style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--accent);text-decoration:none;padding:5px 10px;border:1px solid rgba(0,229,255,.3);border-radius:5px">📅 forexfactory.com</a>' +
+        '</div>';
+    } catch(e) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Calendar unavailable: ' + e.message + '</div>';
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  CORRELATION MATRIX
+  // ════════════════════════════════════════════════════════════════
+  async function fetchCorrelationMatrix() {
+    const panel = document.getElementById('corrMatrixPanel');
+    if(!panel) return;
+    panel.innerHTML = _skel(4);
+    try {
+      const ASSETS = ['BTC','ETH','SOL','BNB','XRP'];
+      const TTL = 30 * 60 * 1000;
+      const cacheKey = 'corrMatrix';
+      let cached = _mktGet(cacheKey, TTL);
+
+      if(!cached) {
+        // Fetch 30 days of daily closes for each asset
+        const closes = await Promise.all(ASSETS.map(async function(sym) {
+          try {
+            const d = await smartFetch('https://api.binance.com/api/v3/klines?symbol=' + sym + 'USDT&interval=1d&limit=31');
+            return Array.isArray(d) ? d.map(function(k){ return parseFloat(k[4]); }) : [];
+          } catch(e) { return []; }
+        }));
+
+        // Compute daily returns
+        const returns = closes.map(function(c) {
+          const r = [];
+          for(let i=1;i<c.length;i++) r.push((c[i]-c[i-1])/c[i-1]);
+          return r;
+        });
+
+        // Pearson correlation
+        function corr(a, b) {
+          const n = Math.min(a.length, b.length);
+          if(n < 5) return null;
+          const ax = a.slice(-n), bx = b.slice(-n);
+          const ma = ax.reduce(function(s,v){return s+v;},0)/n;
+          const mb = bx.reduce(function(s,v){return s+v;},0)/n;
+          let num=0, da=0, db=0;
+          for(let i=0;i<n;i++){
+            const da_=ax[i]-ma, db_=bx[i]-mb;
+            num+=da_*db_; da+=da_*da_; db+=db_*db_;
+          }
+          const denom = Math.sqrt(da*db);
+          return denom === 0 ? 0 : num/denom;
+        }
+
+        const matrix = ASSETS.map(function(_,i){
+          return ASSETS.map(function(_,j){
+            if(i===j) return 1;
+            return corr(returns[i], returns[j]);
+          });
+        });
+        cached = { matrix, assets: ASSETS };
+        _mktSet(cacheKey, cached);
+      }
+
+      const { matrix, assets } = cached;
+
+      const corrColor = function(v) {
+        if(v === null) return 'rgba(255,255,255,.05)';
+        if(v >= 0.7)  return 'rgba(255,45,85,.7)';
+        if(v >= 0.4)  return 'rgba(255,184,0,.5)';
+        if(v >= 0.1)  return 'rgba(0,229,255,.3)';
+        if(v >= -0.1) return 'rgba(255,255,255,.08)';
+        if(v >= -0.4) return 'rgba(0,255,136,.3)';
+        return 'rgba(0,255,136,.6)';
+      };
+
+      let html = '<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-family:Share Tech Mono,monospace;font-size:.58rem">';
+      html += '<tr><th style="padding:6px;color:var(--muted)"></th>' + assets.map(function(a){ return '<th style="padding:6px;color:var(--accent)">' + a + '</th>'; }).join('') + '</tr>';
+      matrix.forEach(function(row, i) {
+        html += '<tr><td style="padding:6px;color:var(--accent);font-weight:700">' + assets[i] + '</td>';
+        row.forEach(function(v) {
+          const disp = v === null ? '—' : v.toFixed(2);
+          html += '<td style="padding:6px;text-align:center;background:' + corrColor(v) + ';border-radius:4px;color:' + (v >= 0.4 || (v !== null && v <= -0.4) ? '#fff' : 'var(--text)') + '">' + disp + '</td>';
+        });
+        html += '</tr>';
+      });
+      html += '</table></div>';
+      html += '<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-family:Share Tech Mono,monospace;font-size:.5rem">' +
+        '<span style="color:var(--muted)">Legend:</span>' +
+        '<span style="color:var(--red)">🟥 &gt;0.7 Strong+</span>' +
+        '<span style="color:var(--warn)">🟨 0.4–0.7 Moderate+</span>' +
+        '<span style="color:var(--accent)">🟦 0.1–0.4 Weak+</span>' +
+        '<span style="color:var(--green)">🟩 &lt;0 Negative (diversifying)</span>' +
+      '</div>' +
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--muted);margin-top:6px">30-day rolling · daily closes · Binance</div>';
+
+      panel.innerHTML = html;
+    } catch(e) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Correlation matrix unavailable: ' + e.message + '</div>';
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  PORTFOLIO PERFORMANCE CHART
+  // ════════════════════════════════════════════════════════════════
+  function drawPortfolioPerformanceChart() {
+    const canvas = document.getElementById('portPerfChart');
+    const note   = document.getElementById('portPerfNote');
+    if(!canvas) return;
+    if(!portfolio || !portfolio.length) {
+      if(note) note.textContent = 'Add positions to see performance';
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const W   = canvas.parentElement?.offsetWidth || 400;
+    canvas.width  = W * dpr; canvas.height = 100 * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = '100px';
+    ctx.scale(dpr, dpr);
+
+    // Build equity curve from portfolio
+    const totalCost  = portfolio.reduce(function(s,p){ return s + p.buy * p.qty; }, 0);
+    const totalValue = portfolio.reduce(function(s,p){ return s + (p.current||p.buy) * p.qty; }, 0);
+    const pnl        = totalValue - totalCost;
+    const pnlPct     = totalCost > 0 ? (pnl / totalCost * 100) : 0;
+
+    // Simulate equity curve using journal trades if available
+    let points = [];
+    if(tradeJournal && tradeJournal.length > 1) {
+      const sorted = tradeJournal.slice().reverse(); // oldest first
+      let cumPnl = 0;
+      sorted.forEach(function(t) {
+        if(t.pnl != null) {
+          cumPnl += t.pnl;
+          points.push(cumPnl);
+        }
+      });
+    }
+
+    // Fallback: just show current P&L as a flat line with entry point
+    if(points.length < 2) {
+      points = [0, pnl * 0.3, pnl * 0.6, pnl * 0.8, pnl * 0.95, pnl];
+    }
+
+    const minV = Math.min(0, ...points);
+    const maxV = Math.max(0, ...points, 1);
+    const range = maxV - minV || 1;
+    const toX = function(i) { return 30 + i * ((W - 40) / (points.length - 1)); };
+    const toY = function(v) { return 85 - ((v - minV) / range) * 70; };
+
+    ctx.clearRect(0, 0, W, 100);
+
+    // Zero line
+    const zeroY = toY(0);
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(30, zeroY); ctx.lineTo(W-10, zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Gradient fill
+    const isUp = pnl >= 0;
+    const grad = ctx.createLinearGradient(0, 5, 0, 90);
+    grad.addColorStop(0, isUp ? 'rgba(0,255,136,.3)' : 'rgba(255,45,85,.3)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(toX(0), zeroY);
+    points.forEach(function(v,i){ ctx.lineTo(toX(i), toY(v)); });
+    ctx.lineTo(toX(points.length-1), zeroY);
+    ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    points.forEach(function(v,i){ i===0 ? ctx.moveTo(toX(i),toY(v)) : ctx.lineTo(toX(i),toY(v)); });
+    ctx.strokeStyle = isUp ? 'var(--green)' : 'var(--red)';
+    ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+
+    // Labels
+    ctx.font = '9px Share Tech Mono,monospace';
+    ctx.fillStyle = isUp ? 'var(--green)' : 'var(--red)';
+    ctx.textAlign = 'right';
+    const lastPnl = points[points.length-1];
+    const sign = lastPnl >= 0 ? '+' : '';
+    ctx.fillText(sign + '$' + Math.abs(lastPnl).toFixed(2), W-5, 12);
+    ctx.fillStyle = 'rgba(100,160,180,.5)';
+    ctx.fillText(sign + pnlPct.toFixed(2) + '%', W-5, 22);
+
+    if(note) note.textContent = portfolio.length + ' positions · ' + (isUp ? '+' : '') + pnlPct.toFixed(2) + '% total return';
+  }
+
+  // Auto-draw when portfolio updates
+  const _origUpdatePortfolioSummary = _updatePortfolioSummary;
+  function _updatePortfolioSummary() {
+    _origUpdatePortfolioSummary();
+    setTimeout(drawPortfolioPerformanceChart, 50);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  NOTIFICATION PERMISSION + ALERT BADGE
+  // ════════════════════════════════════════════════════════════════
+  function requestNotificationPermission() {
+    if(!('Notification' in window)) return;
+    Notification.requestPermission().then(function(perm) {
+      const btn = document.getElementById('notif-perm-btn');
+      if(perm === 'granted') {
+        if(btn) btn.style.display = 'none';
+        new Notification('🔔 Alerts enabled!', { body: 'You will now receive price alert notifications.' });
+      } else {
+        if(btn) { btn.textContent = '❌ Permission denied — enable in browser settings'; btn.style.color = 'var(--red)'; }
+      }
+    });
+  }
+
+  // Show notification permission button if not yet granted
+  (function() {
+    if(!('Notification' in window)) return;
+    if(Notification.permission === 'default') {
+      const btn = document.getElementById('notif-perm-btn');
+      if(btn) btn.style.display = 'inline-block';
+    }
+  })();
+
+  // Alert fire badge — show red dot on Analysis tab when alert fires
+  let _unreadAlerts = 0;
+  const _origCheckAlertsFn = checkAlerts;
+  function checkAlerts(price, sym) {
+    const prevTriggered = priceAlerts.filter(function(a){ return a.triggered; }).length;
+    _origCheckAlertsFn(price, sym);
+    const nowTriggered = priceAlerts.filter(function(a){ return a.triggered; }).length;
+    if(nowTriggered > prevTriggered) {
+      _unreadAlerts += (nowTriggered - prevTriggered);
+      const badge = document.getElementById('alert-fire-badge');
+      if(badge) { badge.textContent = _unreadAlerts; badge.style.display = 'inline-block'; }
+      // Also badge on mobile nav home
+      const mobBadge = document.getElementById('mnav-home-badge');
+      if(mobBadge) mobBadge.classList.add('show');
+    }
+  }
+
+  // Clear badge when user visits alerts panel
+  document.addEventListener('click', function(e) {
+    if(e.target.closest('#alertList') || e.target.closest('[onclick*="switchTab"]')) {
+      _unreadAlerts = 0;
+      const badge = document.getElementById('alert-fire-badge');
+      if(badge) badge.style.display = 'none';
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  AI JOURNAL ANALYSIS
+  // ════════════════════════════════════════════════════════════════
+  async function aiAnalyzeJournal() {
+    if(!tradeJournal || !tradeJournal.length) {
+      _appendAiMsg('assistant', '⚠️ No trades in journal yet. Log some trades first using the Trade Journal panel.');
+      switchTab('ai');
+      return;
+    }
+    switchTab('ai');
+
+    const wins   = tradeJournal.filter(function(t){ return t.status === 'WIN'; });
+    const losses = tradeJournal.filter(function(t){ return t.status === 'LOSS'; });
+    const open   = tradeJournal.filter(function(t){ return t.status === 'OPEN'; });
+    const winRate = tradeJournal.length > 0 ? (wins.length / (wins.length + losses.length) * 100).toFixed(1) : 0;
+    const avgWin  = wins.length ? (wins.reduce(function(s,t){ return s+(t.pnlPct||0); }, 0) / wins.length).toFixed(2) : 0;
+    const avgLoss = losses.length ? (losses.reduce(function(s,t){ return s+(t.pnlPct||0); }, 0) / losses.length).toFixed(2) : 0;
+    const avgRR   = tradeJournal.filter(function(t){ return t.rr; }).reduce(function(s,t,_,a){ return s+t.rr/a.length; }, 0).toFixed(2);
+
+    // Get pair breakdown
+    const pairStats = {};
+    tradeJournal.forEach(function(t) {
+      if(!pairStats[t.pair]) pairStats[t.pair] = { wins:0, losses:0, pnl:0 };
+      if(t.status === 'WIN')  pairStats[t.pair].wins++;
+      if(t.status === 'LOSS') pairStats[t.pair].losses++;
+      pairStats[t.pair].pnl += (t.pnl || 0);
+    });
+
+    const journalSummary = [
+      'TRADE JOURNAL ANALYSIS REQUEST',
+      '================================',
+      'Total trades: ' + tradeJournal.length + ' (' + wins.length + ' wins, ' + losses.length + ' losses, ' + open.length + ' open)',
+      'Win rate: ' + winRate + '%',
+      'Avg win: +' + avgWin + '% | Avg loss: ' + avgLoss + '%',
+      'Avg R:R: ' + avgRR,
+      '',
+      'By pair:',
+      Object.entries(pairStats).map(function(e){ return e[0] + ': ' + e[1].wins + 'W/' + e[1].losses + 'L, P&L: $' + e[1].pnl.toFixed(2); }).join('\n'),
+      '',
+      'Recent 5 trades:',
+      tradeJournal.slice(0,5).map(function(t){ return t.date + ' ' + t.pair + ' ' + t.dir + ' → ' + (t.status||'OPEN') + (t.pnlPct ? ' (' + (t.pnlPct>=0?'+':'') + t.pnlPct.toFixed(2) + '%)' : ''); }).join('\n'),
+      '',
+      'Please analyze my trading performance. Identify patterns, strengths, weaknesses, and give 3 specific actionable improvements.',
+    ].join('\n');
+
+    const input = document.getElementById('aiChatInput');
+    if(input) { input.value = journalSummary; }
+    setTimeout(sendAiMessage, 100);
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  AI MARKET SUMMARY (auto-generate on load)
+  // ════════════════════════════════════════════════════════════════
+  async function generateAIMarketSummary() {
+    const div = document.getElementById('ai-market-summary');
+    if(!div) return;
+
+    // Only auto-generate if Groq key is saved (it's free)
+    const groqKey = localStorage.getItem('ai_key_groq');
+    const orKey   = localStorage.getItem('ai_key_openrouter');
+    if(!groqKey && !orKey && !_cloudEnabled) return;
+
+    // Gather live market data
+    const btcPrice = document.getElementById('mkt-BTC-price')?.textContent || '—';
+    const btcChg   = document.getElementById('mkt-BTC-chg')?.textContent   || '—';
+    const fng      = document.getElementById('fg-label')?.textContent      || '—';
+
+    const prompt = 'Give me a 2-3 sentence market summary right now. BTC: ' + btcPrice + ' (' + btcChg + '), Fear & Greed: ' + fng + '. Be concise, mention if it is bullish or bearish for crypto today.';
+
+    div.style.display = 'block';
+    div.innerHTML = '<span style="color:var(--muted);font-size:.75rem">⟳ Generating market summary...</span>';
+
+    try {
+      let reply = null;
+      if(groqKey) {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+groqKey},
+          body:JSON.stringify({model:'llama-3.3-70b-versatile',messages:[{role:'user',content:prompt}],max_tokens:150}),
+          signal:AbortSignal.timeout(10000)
+        });
+        const data = await res.json();
+        reply = data.choices?.[0]?.message?.content;
+      } else if(orKey) {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+orKey},
+          body:JSON.stringify({model:'meta-llama/llama-3.3-70b-instruct:free',messages:[{role:'user',content:prompt}],max_tokens:150}),
+          signal:AbortSignal.timeout(10000)
+        });
+        const data = await res.json();
+        reply = data.choices?.[0]?.message?.content;
+      } else {
+        const res = await fetch(DATA_WORKER_URL + '/ai', {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-User-Secret':DATA_SECRET||''},
+          body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:150,messages:[{role:'user',content:prompt}]}),
+          signal:AbortSignal.timeout(10000)
+        });
+        const data = await res.json();
+        reply = data.content?.[0]?.text;
+      }
+      if(reply) {
+        div.innerHTML = '<span style="color:var(--accent);font-size:.62rem;letter-spacing:1px">🤖 AI MARKET SUMMARY</span><br>' +
+          '<span style="font-size:.8rem">' + reply.replace(/\n/g,'<br>') + '</span>';
+      } else {
+        div.style.display = 'none';
+      }
+    } catch(e) {
+      div.style.display = 'none';
+    }
+  }
+
+  // Run market summary 3 seconds after page loads (gives time for market data to load)
+  setTimeout(generateAIMarketSummary, 3000);
+
+  // ════════════════════════════════════════════════════════════════
+  //  OFFLINE MODE — cache last fetch + show stale banner
+  // ════════════════════════════════════════════════════════════════
+  let _lastOnlineTime = Date.now();
+
+  window.addEventListener('online', function() {
+    _lastOnlineTime = Date.now();
+    const banner = document.getElementById('offline-banner');
+    if(banner) banner.style.display = 'none';
+    setStatus('✅ Back online — refreshing data...', 'loading');
+    setTimeout(fetchData, 500);
+  });
+
+  window.addEventListener('offline', function() {
+    const banner = document.getElementById('offline-banner');
+    if(banner) banner.style.display = 'flex';
+    setStatus('⚠️ No internet — showing last cached data', 'loading');
+    // Try to load from localStorage cache
+    const lastSym = document.getElementById('symbolInput')?.value;
+    if(lastSym && window._lastAnalysisPrice) {
+      const sb = document.getElementById('statusBar');
+      if(sb) {
+        sb.textContent = '📡 OFFLINE — showing cached data for ' + lastSym + ' · last updated ' + new Date(_lastOnlineTime).toLocaleTimeString('id-ID');
+        sb.className = 'status-bar loading';
+      }
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  //  PATTERN ALERTS
+  // ════════════════════════════════════════════════════════════════
+  let _lastPatternAlert = {};
+
+  function _checkPatternAlerts(patterns, sym) {
+    if(!patterns || !patterns.length) return;
+    // Only alert for high-confidence patterns we haven't alerted for recently
+    const bullish = ['Hammer', 'Engulfing Bull', 'Morning Star', 'Piercing Line', 'Bullish Harami'];
+    const bearish = ['Shooting Star', 'Engulfing Bear', 'Evening Star', 'Dark Cloud Cover', 'Bearish Harami'];
+
+    patterns.forEach(function(p) {
+      const key = sym + '_' + p.name;
+      const lastAlert = _lastPatternAlert[key] || 0;
+      if(Date.now() - lastAlert < 4 * 3600000) return; // don't re-alert within 4 hours
+
+      const isBull = bullish.some(function(b){ return p.name && p.name.includes(b.split(' ')[0]); });
+      const isBear = bearish.some(function(b){ return p.name && p.name.includes(b.split(' ')[0]); });
+      if(!isBull && !isBear) return;
+
+      _lastPatternAlert[key] = Date.now();
+
+      const emoji = isBull ? '🟢' : '🔴';
+      const msg   = emoji + ' <b>Pattern Alert: ' + sym + '</b>\n' +
+                    '📊 ' + p.name + ' detected on ' + currentTF + '\n' +
+                    (isBull ? '📈 Potential BULLISH reversal/continuation' : '📉 Potential BEARISH reversal') + '\n' +
+                    '⏰ ' + new Date().toLocaleString('id-ID');
+
+      // Browser notification
+      if(Notification && Notification.permission === 'granted') {
+        new Notification(emoji + ' Pattern: ' + p.name + ' on ' + sym, {
+          body: (isBull ? '📈 Bullish' : '📉 Bearish') + ' signal detected on ' + currentTF
+        });
+      }
+
+      // Discord + Telegram
+      _sendDiscordAlert(sym, isBull ? 'pattern_bull' : 'pattern_bear', 0, window._lastAnalysisPrice || 0);
+    });
+  }
+
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
-  <button class="mobile-nav-btn active" id="mnav-home"   onclick="mobNav('home')"    aria-label="Home">
-    <span class="nav-icon">🏠</span><span>HOME</span>
-    <span class="nav-badge show" id="mnav-home-badge"></span>
+  <button class="mobile-nav-btn active" id="mnav-home"      onclick="mobNav('home')"      aria-label="Home">
+    <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
+    <span class="nav-badge" id="mnav-home-badge"></span>
   </button>
-  <button class="mobile-nav-btn" id="mnav-analysis" onclick="mobNav('analysis')" aria-label="Analysis">
-    <span class="nav-icon">📊</span><span>ANALYSIS</span>
+  <button class="mobile-nav-btn" id="mnav-analysis"   onclick="mobNav('analysis')"   aria-label="Analysis">
+    <span class="nav-icon">📊</span><span class="nav-label">Chart</span>
   </button>
-  <button class="mobile-nav-btn" id="mnav-score"    onclick="mobNav('score')"    aria-label="Score">
-    <span class="nav-icon">🎯</span><span>SCORE</span>
+  <button class="mobile-nav-btn" id="mnav-market"     onclick="mobNav('market')"     aria-label="Market">
+    <span class="nav-icon">🌐</span><span class="nav-label">Market</span>
   </button>
-  <button class="mobile-nav-btn" id="mnav-journal"  onclick="mobNav('journal')"  aria-label="Journal">
-    <span class="nav-icon">📓</span><span>JOURNAL</span>
+  <button class="mobile-nav-btn" id="mnav-portfolio"  onclick="mobNav('portfolio')"  aria-label="Portfolio">
+    <span class="nav-icon">💼</span><span class="nav-label">Portfolio</span>
   </button>
-  <button class="mobile-nav-btn" id="mnav-more"     onclick="mobNav('more')"     aria-label="More">
-    <span class="nav-icon">⚙️</span><span>MORE</span>
+  <button class="mobile-nav-btn" id="mnav-more"       onclick="mobNav('more')"       aria-label="More">
+    <span class="nav-icon">⋯</span><span class="nav-label">More</span>
   </button>
 </nav>
 
