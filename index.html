@@ -4054,20 +4054,28 @@ self.onmessage=function(e){
   function fmtP(n){
     if(n===null||n===undefined||isNaN(n)) return '—';
     const sp = _fmtCtx ? SPECIAL_PAIRS[_fmtCtx] : null;
+    // IDX stocks (BBCA, TLKM, ANTAM etc.) — prices in IDR (thousands)
+    if(sp?.isStock && sp?.isIDR) {
+      if(n>=100) return 'Rp '+n.toLocaleString('id-ID',{maximumFractionDigits:0});
+      return 'Rp '+n.toFixed(0);
+    }
+    // US stocks (AAPL, TSLA etc.) — USD with 2 decimals
+    if(sp?.isStock) {
+      return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    }
+    // Fiat forex pairs with IDR (USD/IDR, EUR/IDR etc.)
     if(sp?.isFiat) {
       if(n>=100) return n.toLocaleString('id-ID',{maximumFractionDigits:0});
       return n.toFixed(2);
     }
+    // Commodities (Gold, Silver, Oil)
     if(sp?.isCommodity) {
-      // Silver ~$30, Oil ~$75 — 2 decimal USD
+      if(n>=1000) return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
       return '$'+n.toFixed(2);
     }
+    // Forex cross pairs (EUR/USD, GBP/USD etc.) — 4-6 decimals
     if(sp && !sp.isFiat && !sp.isStock && !sp.isCommodity) {
-      return n.toFixed(4);
-    }
-    if(sp?.isStock) {
-      if(n>=100) return n.toLocaleString('id-ID',{maximumFractionDigits:0});
-      return n.toFixed(2);
+      return n >= 10 ? n.toFixed(4) : n.toFixed(6);
     }
     // Normal crypto
     if(n>=10000) return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4480,8 +4488,14 @@ self.onmessage=function(e){
     const cp = COMMODITY_PAIRS[sym];
     if(!cp) throw new Error('Not a commodity pair');
 
-    const interval = TF.yahoo[currentTF] || '1d';
-    const range    = TF.yahooRange[currentTF] || '2y';
+    // IDX stocks (.JK) and US stocks — Yahoo only supports daily data reliably
+    const isStock = cp.isIDXStock || cp.isUSStock;
+    const interval = isStock
+      ? '1d'  // force daily for all stocks
+      : (TF.yahoo[currentTF] || '1d');
+    const range = isStock
+      ? (currentTF === '1w' || currentTF === '1M' ? '5y' : '2y')
+      : (TF.yahooRange[currentTF] || '2y');
 
     const cached = _yahooCached(cp.yahoo, interval, range);
     if(cached) return { ...cached, pair:cp.display, source:'Cached' };
@@ -4668,25 +4682,31 @@ self.onmessage=function(e){
 
     // ── FOREX: dedicated FX API, skip crypto exchanges entirely ──────────────
     if(FOREX_PAIRS[sym]) {
-      setStatus(`⟳ Fetching ${FOREX_PAIRS[sym].display} — trying Stooq → Frankfurter → ER-API...`,'loading');
+      setStatus(`⟳ Fetching ${FOREX_PAIRS[sym].display}...`,'loading');
       activeProgress('exchange');
       try {
-        data = await tryForex(sym);
+        // 15s overall timeout — prevents infinite hang
+        data = await Promise.race([
+          tryForex(sym),
+          new Promise((_,rj) => setTimeout(() => rj(new Error('Timeout after 15s')), 15000))
+        ]);
+        if(!data || !data.closes || !data.closes.length) throw new Error('No candle data returned');
         _fxLastKnown[sym] = { price: data.price, closes: data.closes, highs: data.highs, lows: data.lows, opens: data.opens, volumes: data.volumes, pair: data.pair, source: data.source, ts: Date.now() };
         workingExchangeId = 'forex';
         stepProgress('proxy','done');
         stepProgress('exchange','done');
+        setStatus(`✓ ${data.source} — ${data.closes.length} daily candles`,'loading');
       } catch(e) {
-        // Fallback: use last known price if available (within 1 hour)
+        // Fallback: use last known price if available (within 4 hours)
         const cached = _fxLastKnown[sym];
-        if(cached && Date.now() - cached.ts < 60 * 60 * 1000) {
-          setStatus(`⚠️ ${sym}: live fetch failed — showing last known price (${Math.round((Date.now()-cached.ts)/60000)}m ago)`,'loading');
+        if(cached && Date.now() - cached.ts < 4 * 60 * 60 * 1000) {
+          setStatus(`⚠️ Using cached ${sym} data (${Math.round((Date.now()-cached.ts)/60000)}m old)`,'loading');
           data = { price:cached.price, high24:cached.price*1.005, low24:cached.price*0.995, open24:cached.price, vol24:0, opens:cached.opens, closes:cached.closes, highs:cached.highs, lows:cached.lows, volumes:cached.volumes, source:cached.source+' (cached)', pair:cached.pair };
           workingExchangeId = 'forex';
           stepProgress('proxy','done');
           stepProgress('exchange','done');
         } else {
-          setStatus(`✗ ${sym} unavailable — ${e.message}. Showing TradingView chart.`,'error');
+          setStatus(`✗ ${sym}: all sources failed (${e.message}) — showing TradingView chart`,'error');
           document.getElementById('fetchBtn').disabled=false;
           _showTradingViewFallback(sym);
           return;
@@ -4697,15 +4717,20 @@ self.onmessage=function(e){
     // ── COMMODITIES: Silver & Oil via Yahoo Finance futures ───────────────────
     if(!data && COMMODITY_PAIRS[sym]) {
       const cp = COMMODITY_PAIRS[sym];
-      setStatus(`⟳ Fetching ${cp.display} — trying Stooq → Yahoo Finance...`,'loading');
+      setStatus(`⟳ Fetching ${cp.display}...`,'loading');
       activeProgress('exchange');
       try {
-        data = await tryCommodity(sym);
+        data = await Promise.race([
+          tryCommodity(sym),
+          new Promise((_,rj) => setTimeout(() => rj(new Error('Timeout after 15s')), 15000))
+        ]);
+        if(!data || !data.closes || !data.closes.length) throw new Error('No candle data returned');
         workingExchangeId = 'yahoo';
         stepProgress('proxy','done');
         stepProgress('exchange','done');
+        setStatus(`✓ ${data.source} — ${data.closes.length} candles`,'loading');
       } catch(e) {
-        setStatus(`✗ ${cp.display} unavailable — ${e.message}. Showing TradingView chart.`,'error');
+        setStatus(`✗ ${cp.display}: all sources failed (${e.message}) — showing TradingView chart`,'error');
         document.getElementById('fetchBtn').disabled=false;
         _showTradingViewFallback(sym);
         return;
@@ -12590,9 +12615,16 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   //  BTC DOMINANCE + ALT SEASON INDEX
   // ════════════════════════════════════════════════════════════════
   async function fetchBTCDominance() {
-    const panel = document.getElementById('btcDomPanel');
+    // Use existing BTC dominance elements in market dashboard, or fallback panel
+    const panel = document.getElementById('btcDomPanel') ||
+                  document.getElementById('btcDomSignal');
     if(!panel) return;
-    panel.innerHTML = _skel(3);
+    if(panel.id !== 'btcDomPanel') {
+      // We're updating the existing market dashboard element
+      panel.innerHTML = '<span style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--muted)">⟳ Loading...</span>';
+    } else {
+      panel.innerHTML = _skel(3);
+    }
     try {
       const data = await smartFetch('https://api.coingecko.com/api/v3/global');
       const g = data.data;
@@ -12649,7 +12681,8 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   //  ECONOMIC CALENDAR
   // ════════════════════════════════════════════════════════════════
   async function fetchEconCalendar() {
-    const panel = document.getElementById('econCalPanel');
+    const panel = document.getElementById('econCalPanel') ||
+                  document.getElementById('calPanel');
     if(!panel) return;
     panel.innerHTML = _skel(4);
     try {
@@ -13331,8 +13364,8 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     if(result) result.style.display = 'none';
   }
 
-  // Init with 3 empty rows
-  dcaAddRow(); dcaAddRow(); dcaAddRow();
+  // Init with 3 empty rows after DOM is ready
+  setTimeout(function(){ dcaAddRow(); dcaAddRow(); dcaAddRow(); }, 100);
 
   // ════════════════════════════════════════════════════════════════
   //  TRADE STATISTICS DASHBOARD
@@ -13340,12 +13373,13 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   function renderTradeStats() {
     const panel = document.getElementById('tradeStatsPanel');
     if(!panel) return;
-    if(!tradeJournal || !tradeJournal.length) {
+    const _tj = (typeof tradeJournal !== 'undefined' ? tradeJournal : null) || [];
+    if(!_tj.length) {
       panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No trades in journal yet. Log some trades first.</div>';
       return;
     }
 
-    const closed = tradeJournal.filter(function(t){ return t.status === 'WIN' || t.status === 'LOSS'; });
+    const closed = _tj.filter(function(t){ return t.status === 'WIN' || t.status === 'LOSS'; });
     const wins   = closed.filter(function(t){ return t.status === 'WIN'; });
     const losses = closed.filter(function(t){ return t.status === 'LOSS'; });
     const winRate = closed.length > 0 ? (wins.length / closed.length * 100) : 0;
@@ -13397,7 +13431,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         statCard('AVG R:R', avgRR.toFixed(2) + ':1', avgRR >= 2 ? 'var(--green)' : avgRR >= 1 ? 'var(--warn)' : 'var(--red)') +
         statCard('TOTAL P&L', (totalPnl>=0?'+':'')+'$'+Math.abs(totalPnl).toFixed(2), totalPnl >= 0 ? 'var(--green)' : 'var(--red)') +
         statCard('EXPECTANCY', (expectancy>=0?'+':'')+expectancy.toFixed(2)+'%', expectancy >= 0 ? 'var(--green)' : 'var(--red)') +
-        statCard('OPEN', tradeJournal.filter(function(t){ return t.status==='OPEN'; }).length, 'var(--warn)') +
+        statCard('OPEN', _tj.filter(function(t){ return t.status==='OPEN'; }).length, 'var(--warn)') +
       '</div>' +
 
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
@@ -13476,11 +13510,15 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       'tab-scanner':L.scanner, 'tab-fxstocks':L.fxstocks, 'tab-ai':L.ai, 'tab-portfolio':L.portfolio };
     Object.entries(tabMap).forEach(function(e) {
       const el = document.getElementById(e[0]);
-      // Keep alert badge if present
       if(el) {
+        // Preserve any child elements (like alert badge) while changing label text
         const badge = el.querySelector('#alert-fire-badge');
-        el.textContent = e[1];
-        if(badge) el.appendChild(badge);
+        // Only update text nodes, not child elements
+        Array.from(el.childNodes).forEach(function(node) {
+          if(node.nodeType === 3) node.textContent = ''; // clear text nodes
+        });
+        el.insertAdjacentText('afterbegin', e[1]);
+        if(badge && !el.contains(badge)) el.appendChild(badge);
       }
     });
     // Update fetch button
