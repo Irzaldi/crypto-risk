@@ -1051,6 +1051,24 @@ function installPWA() {
         </div>
       </div>
 
+      <!-- Email via Resend -->
+      <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--green);font-weight:700;margin-bottom:8px">📧 Email Alerts (via Resend)</div>
+        <div style="margin-bottom:8px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);margin-bottom:4px">YOUR EMAIL ADDRESS</div>
+          <input id="cfg-email" class="setting-input" type="email" placeholder="you@gmail.com">
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:8px;line-height:1.7">
+          Requires <strong style="color:var(--green)">RESEND_API_KEY</strong> secret in your crypto-data worker.<br>
+          Free at <a href="https://resend.com" target="_blank" style="color:var(--accent)">resend.com</a> — 100 emails/day free.
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="settings-btn settings-save" onclick="saveEmailConfig()" style="border-color:var(--green);color:var(--green);background:rgba(0,255,136,.08)">💾 SAVE EMAIL</button>
+          <button class="settings-btn" style="background:rgba(0,255,136,.08);border-color:var(--green);color:var(--green)" onclick="testEmailAlert()">📤 SEND TEST</button>
+          <span id="email-status" style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);display:flex;align-items:center"></span>
+        </div>
+      </div>
+
       <!-- Telegram -->
       <div>
         <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--warn);font-weight:700;margin-bottom:8px">📱 Telegram Bot (optional)</div>
@@ -1859,6 +1877,17 @@ function installPWA() {
       </div>
       <canvas id="equityCurveCanvas" height="90" style="width:100%;display:block;border-radius:4px"></canvas>
     </div>
+  <!-- Alert History -->
+  <div class="panel" style="margin-bottom:14px;border-color:rgba(255,184,0,.15)">
+    <div class="ptitle" style="color:var(--warn)">🕐 Alert History
+      <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">last 20 triggered alerts · stored in cloud</span>
+      <button onclick="loadAlertHistory()" class="wl-add-btn" style="margin-left:auto;font-size:.52rem">⟳ Load</button>
+    </div>
+    <div id="alert-history-panel">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Click ⟳ Load to see fired alerts</div>
+    </div>
+  </div>
+
   </div><!-- end Trade Journal panel -->
 
   <!-- ── Risk/Reward Calculator ── -->
@@ -3323,6 +3352,22 @@ self.onmessage=function(e){
       if(data.settings && data.settings.tl_cfg) {
         CFG = Object.assign({}, DEFAULTS, data.settings.tl_cfg);
         applySettings();
+      }
+      // AI chat history restore
+      if(data.aiChatHistory && data.aiChatHistory.length) {
+        _aiChatHistory = data.aiChatHistory.map(function(m){ return { role: m.role, content: m.content }; });
+        const wrap = document.getElementById('aiChatMessages');
+        if(wrap && _aiChatHistory.length > 0) {
+          wrap.innerHTML = '';
+          _aiChatHistory.forEach(function(m){ _appendAiMsg(m.role, m.content); });
+        }
+      }
+      // Alert history
+      if(data.alertHistory) window._alertHistory = data.alertHistory;
+      // Portfolio history for real equity curve
+      if(data.portfolioHistory && data.portfolioHistory.length) {
+        window._portfolioHistory = data.portfolioHistory;
+        setTimeout(drawPortfolioPerformanceChart, 200);
       }
       // Custom pairs
       if(data.customPairs && data.customPairs.length) {
@@ -5813,13 +5858,15 @@ self.onmessage=function(e){
             icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📡</text></svg>'
           });
         }
-        // Sound + Telegram + Discord notifications
+        // Sound + Telegram + Discord + Email notifications
         _playAlertSound();
         _sendTelegramAlert(sym, a.dir, a.price, price);
         _sendDiscordAlert(sym, a.dir, a.price, price);
-        // Mark triggered in cloud
+        _sendEmailAlert(sym, a.dir, a.price, price);
+        // Mark triggered + log to history in cloud
         if(_cloudEnabled) {
-          _api('PUT', '/alerts', { id: a.id }).catch(function(e){ console.warn('[Cloud] alert trigger failed:', e.message); });
+          _api('PUT', '/alerts', { id: a.id }).catch(function(){});
+          _api('POST', '/alert-history', { sym, direction: a.dir, target: a.price, price_at: price }).catch(function(){});
         }
         setStatus('🔔 ALERT: ' + sym + ' ' + (a.dir==='above'?'crossed above':'dropped below') + ' ' + fmtP(a.price) + '!', 'loading');
       }
@@ -11115,6 +11162,10 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       _aiChatHistory.push({ role:'assistant', content: reply });
       if(_aiChatHistory.length > 20) _aiChatHistory = _aiChatHistory.slice(-20);
       if(badge) { badge.textContent = '✅ Connected · ' + (cfg?.label||'AI'); badge.style.color = 'var(--green)'; }
+      // Save to cloud
+      if(_cloudEnabled) {
+        _api('POST', '/ai-chat', { messages: _aiChatHistory.slice(-2) }).catch(function(){});
+      }
     } else {
       _appendAiMsg('assistant', reply || _aiErrorMessage());
       if(badge) { badge.textContent = '❌ Error — see chat'; badge.style.color = 'var(--red)'; }
@@ -11245,6 +11296,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       _updateSyncBadge('saving');
       _api('POST', '/portfolio', { sym, qty, buy_price: buy }).then(function() {
         _updateSyncBadge('synced');
+        _takePortfolioSnapshot();
       }).catch(function(e) { console.warn('[Cloud] portfolio save failed:', e.message); _updateSyncBadge('error'); });
     }
   }
@@ -12603,22 +12655,19 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     const pnl        = totalValue - totalCost;
     const pnlPct     = totalCost > 0 ? (pnl / totalCost * 100) : 0;
 
-    // Simulate equity curve using journal trades if available
+    // Use real portfolio snapshots from cloud if available
     let points = [];
-    if(tradeJournal && tradeJournal.length > 1) {
-      const sorted = tradeJournal.slice().reverse(); // oldest first
+    if(window._portfolioHistory && window._portfolioHistory.length > 1) {
+      points = window._portfolioHistory.map(function(s){ return s.pnl || 0; });
+    } else if(tradeJournal && tradeJournal.length > 1) {
+      const sorted = tradeJournal.slice().reverse();
       let cumPnl = 0;
       sorted.forEach(function(t) {
-        if(t.pnl != null) {
-          cumPnl += t.pnl;
-          points.push(cumPnl);
-        }
+        if(t.pnl != null) { cumPnl += t.pnl; points.push(cumPnl); }
       });
     }
-
-    // Fallback: just show current P&L as a flat line with entry point
     if(points.length < 2) {
-      points = [0, pnl * 0.3, pnl * 0.6, pnl * 0.8, pnl * 0.95, pnl];
+      points = [0, pnl * 0.25, pnl * 0.5, pnl * 0.75, pnl * 0.9, pnl];
     }
 
     const minV = Math.min(0, ...points);
@@ -12906,6 +12955,127 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       // Discord + Telegram
       _sendDiscordAlert(sym, isBull ? 'pattern_bull' : 'pattern_bear', 0, window._lastAnalysisPrice || 0);
     });
+  }
+
+
+  // ══════════════════════════════════════════════════════════════════
+  //  EMAIL ALERTS (via Resend API through data worker)
+  // ══════════════════════════════════════════════════════════════════
+  async function _sendEmailAlert(sym, dir, price, currentPrice) {
+    if(!_cloudEnabled) return;
+    const isAbove = dir === 'above';
+    const emoji   = isAbove ? '🚀' : '📉';
+    const subject = emoji + ' Price Alert: ' + sym + ' ' + (isAbove ? 'crossed above' : 'dropped below') + ' $' + price.toLocaleString();
+    const html = '<div style="font-family:monospace;background:#03070d;color:#ccdde8;padding:20px;border-radius:8px">' +
+      '<h2 style="color:#00e5ff">' + emoji + ' Price Alert Triggered</h2>' +
+      '<table style="border-collapse:collapse;width:100%">' +
+        '<tr><td style="color:#7a9ab8;padding:6px 0">Symbol</td><td style="color:#fff;font-weight:bold">' + sym + '</td></tr>' +
+        '<tr><td style="color:#7a9ab8;padding:6px 0">Target</td><td>' + (isAbove?'Above':'Below') + ' $' + price.toLocaleString() + '</td></tr>' +
+        '<tr><td style="color:#7a9ab8;padding:6px 0">Current Price</td><td style="color:' + (isAbove?'#00ff88':'#ff2d55') + ';font-weight:bold">$' + currentPrice.toLocaleString() + '</td></tr>' +
+        '<tr><td style="color:#7a9ab8;padding:6px 0">Time (WIB)</td><td>' + new Date().toLocaleString('id-ID') + '</td></tr>' +
+      '</table>' +
+      '<p style="color:#7a9ab8;font-size:12px;margin-top:20px">Sent by your Crypto Risk System</p>' +
+    '</div>';
+    _api('POST', '/email/send', { subject, html }).catch(function(e){ console.warn('[Email] send failed:', e.message); });
+  }
+
+  async function saveEmailConfig() {
+    const email  = document.getElementById('cfg-email')?.value?.trim();
+    const status = document.getElementById('email-status');
+    if(!email || !email.includes('@')) {
+      if(status) { status.textContent = 'Enter a valid email address'; status.style.color = 'var(--warn)'; } return;
+    }
+    if(!_cloudEnabled) { if(status) { status.textContent = '⚠️ Cloud not connected'; status.style.color = 'var(--warn)'; } return; }
+    try {
+      await _api('POST', '/email/config', { email, enabled: 1 });
+      if(status) { status.textContent = '✅ Saved — alerts will be sent to ' + email; status.style.color = 'var(--green)'; }
+      setTimeout(function(){ if(status) status.textContent = ''; }, 4000);
+    } catch(e) {
+      if(status) { status.textContent = '❌ ' + e.message; status.style.color = 'var(--red)'; }
+    }
+  }
+
+  async function testEmailAlert() {
+    const status = document.getElementById('email-status');
+    if(!_cloudEnabled) { if(status) { status.textContent = '⚠️ Cloud not connected'; status.style.color = 'var(--warn)'; } return; }
+    try {
+      if(status) { status.textContent = 'Sending test...'; status.style.color = 'var(--muted)'; }
+      const sym   = document.getElementById('symbolInput')?.value || 'BTC';
+      const price = document.getElementById('pcPrice')?.textContent || '—';
+      await _api('POST', '/email/send', {
+        subject: '✅ Test Alert — Crypto Risk System',
+        html: '<div style="font-family:monospace;padding:20px"><h2 style="color:#00e5ff">✅ Email alerts are working!</h2><p>Symbol: <b>' + sym + '</b> · Price: <b>' + price + '</b></p></div>'
+      });
+      if(status) { status.textContent = '✅ Test sent! Check your inbox'; status.style.color = 'var(--green)'; }
+    } catch(e) {
+      if(status) { status.textContent = '❌ ' + e.message; status.style.color = 'var(--red)'; }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  PORTFOLIO DAILY SNAPSHOT
+  // ══════════════════════════════════════════════════════════════════
+  async function _takePortfolioSnapshot() {
+    if(!_cloudEnabled || !portfolio.length) return;
+    const totalValue = portfolio.reduce(function(s,p){ return s + ((p.current||p.buy)*p.qty); }, 0);
+    const totalCost  = portfolio.reduce(function(s,p){ return s + (p.buy * p.qty); }, 0);
+    const pnl        = totalValue - totalCost;
+    const pnlPct     = totalCost > 0 ? (pnl / totalCost * 100) : 0;
+    // Only snapshot if we have current prices (not just avg buy prices)
+    const hasCurrent = portfolio.some(function(p){ return p.current && p.current !== p.buy; });
+    if(!hasCurrent) return;
+    _api('POST', '/portfolio/snapshot', {
+      total_value: totalValue, total_cost: totalCost, pnl, pnl_pct: pnlPct
+    }).catch(function(){});
+  }
+
+  // Take snapshot after every price refresh
+  const _origRefreshPortfolio = refreshPortfolio;
+  async function refreshPortfolio() {
+    await _origRefreshPortfolio();
+    setTimeout(_takePortfolioSnapshot, 500);
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  ALERT HISTORY PANEL
+  // ══════════════════════════════════════════════════════════════════
+  async function loadAlertHistory() {
+    const panel = document.getElementById('alert-history-panel');
+    if(!panel) return;
+    if(!_cloudEnabled) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Cloud not connected</div>';
+      return;
+    }
+    try {
+      const history = await _api('GET', '/alert-history?limit=20');
+      if(!history.length) {
+        panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No alert history yet</div>';
+        return;
+      }
+      panel.innerHTML = history.map(function(a) {
+        const isAbove = a.direction === 'above';
+        const date = new Date(a.fired_at).toLocaleString('id-ID');
+        const color = isAbove ? 'var(--green)' : 'var(--red)';
+        return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);font-family:Share Tech Mono,monospace;font-size:.58rem">' +
+          '<span style="color:' + color + '">' + (isAbove?'▲':'▼') + '</span>' +
+          '<span style="color:var(--accent);font-weight:700;min-width:50px">' + a.sym + '</span>' +
+          '<span style="color:var(--muted)">' + (isAbove?'crossed above':'dropped below') + ' $' + (a.target||0).toLocaleString() + '</span>' +
+          '<span style="margin-left:auto;color:var(--muted);font-size:.5rem">' + date + '</span>' +
+        '</div>';
+      }).join('') +
+      '<div style="margin-top:8px;text-align:right">' +
+        '<button onclick="clearAlertHistory()" style="font-family:Share Tech Mono,monospace;font-size:.5rem;padding:3px 8px;background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.3);color:var(--red);border-radius:4px;cursor:pointer">🗑 Clear History</button>' +
+      '</div>';
+    } catch(e) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">Failed to load: ' + e.message + '</div>';
+    }
+  }
+
+  async function clearAlertHistory() {
+    if(!_cloudEnabled) return;
+    await _api('DELETE', '/alert-history').catch(function(){});
+    window._alertHistory = [];
+    loadAlertHistory();
   }
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
