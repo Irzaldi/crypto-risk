@@ -952,6 +952,7 @@ function installPWA() {
       📲 Install App
     </button>
     <span id="sync-badge" title="Cloud sync status" style="font-family:'Share Tech Mono',monospace;font-size:.56rem;padding:4px 10px;border:1px solid var(--border);border-radius:20px;color:var(--muted);cursor:pointer" onclick="switchTab('settings-cloud')">💾 Local only</span>
+    <button id="lang-toggle" onclick="toggleLanguage()" style="padding:4px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer" title="Toggle language">🇮🇩 ID</button>
     <button onclick="_showKeyboardHelp()" style="padding:4px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer" title="Keyboard shortcuts (?)">⌨️ ?</button>
     <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀️ LIGHT</button>
     <button class="theme-btn" onclick="toggleSettings()" style="border-color:rgba(255,184,0,.4);color:var(--warn)">⚙️ SETTINGS</button>
@@ -1006,6 +1007,17 @@ function installPWA() {
   <!-- ── Settings Panel (hidden by default) ── -->
   <div class="panel" id="settingsPanel" style="margin-bottom:14px;display:none;border-color:rgba(255,184,0,.3)">
     <div class="ptitle" style="color:var(--warn)">⚙️ Settings &amp; Customization</div>
+
+    <!-- TradingView Webhook Info -->
+    <div style="background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--accent);letter-spacing:2px;margin-bottom:8px">📺 TRADINGVIEW WEBHOOK</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted);line-height:1.8">
+        Send alerts from TradingView Pine Script directly to your app.<br>
+        In TradingView alert → Webhook URL:
+        <div style="background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:4px;padding:6px 10px;margin:6px 0;color:var(--accent);word-break:break-all" id="webhook-url-display">Loading...</div>
+        <div style="margin-top:4px">Pine Script payload: <code style="color:var(--accent)">{"sym":"{{ticker}}","price":{{close}},"action":"{{strategy.order.action}}"}</code></div>
+      </div>
+    </div>
 
     <!-- Cloud Sync Settings -->
     <div style="background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.15);border-radius:8px;padding:12px;margin-bottom:14px">
@@ -1176,7 +1188,20 @@ function installPWA() {
     <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('USDJPY')">🇯🇵 USD/JPY</button>
     <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('EURUSD')">🇪🇺 EUR/USD</button>
     <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('EURIDR')">🇪🇺 EUR/IDR</button>
-    <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('ANTAM')">🪙 ANTAM</button>
+    <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('ANTAM')">🇮🇩 ANTAM</button>
+    <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('BBCA')">🇮🇩 BBCA</button>
+    <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('TLKM')">🇮🇩 TLKM</button>
+    <button class="pair-btn" style="border-color:rgba(0,255,136,.4);color:var(--green)" onclick="quickPair('BBRI')">🇮🇩 BBRI</button>
+    <button class="pair-btn" style="border-color:rgba(0,229,255,.4);color:var(--accent)" onclick="quickPair('GBPUSD')">🇬🇧 GBP/USD</button>
+    <button class="pair-btn" style="border-color:rgba(0,229,255,.4);color:var(--accent)" onclick="quickPair('USDJPY')">🇯🇵 USD/JPY</button>
+    <button class="pair-btn" style="border-color:rgba(0,229,255,.4);color:var(--accent)" onclick="quickPair('USDSGD')">🇸🇬 USD/SGD</button>
+    <button class="pair-btn" style="border-color:rgba(0,229,255,.4);color:var(--accent)" onclick="quickPair('USDMYR')">🇲🇾 USD/MYR</button>
+    <button class="pair-btn" style="border-color:rgba(255,184,0,.4);color:var(--warn)" onclick="quickPair('BRENT')">🛢️ BRENT</button>
+    <button class="pair-btn" style="border-color:rgba(255,184,0,.4);color:var(--warn)" onclick="quickPair('NATGAS')">⛽ GAS</button>
+    <button class="pair-btn" style="border-color:rgba(255,184,0,.4);color:var(--warn)" onclick="quickPair('COPPER')">🪙 COPPER</button>
+    <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('AAPL')">🍎 AAPL</button>
+    <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('TSLA')">⚡ TSLA</button>
+    <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('NVDA')">🎮 NVDA</button>
     <div id="customPairBtns"></div>
     <button class="pair-btn" style="border-color:rgba(255,255,255,.2);color:var(--muted)" onclick="openAddPair()" title="Add custom pair">＋ ADD</button>
   </div>
@@ -1947,6 +1972,61 @@ function installPWA() {
     <div style="display:flex;gap:8px">
       <button onclick="rrAutoFill()" class="pair-btn" style="font-size:.54rem;border-color:rgba(255,184,0,.4);color:var(--warn)">⚡ Auto-fill from Analysis</button>
       <button onclick="rrLogTrade()" class="alert-add-btn" style="font-size:.54rem">📓 Log to Journal</button>
+    </div>
+  </div>
+
+  <!-- ── DCA Calculator ── -->
+  <div class="panel" style="margin-bottom:14px;border-color:rgba(0,229,255,.2)">
+    <div class="ptitle" style="color:var(--accent)">📉 DCA Calculator
+      <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">dollar cost averaging · average entry price</span>
+      <button onclick="dcaAutoFill()" class="pair-btn" style="margin-left:auto;font-size:.52rem;min-height:28px;padding:2px 10px;border-color:rgba(0,229,255,.3);color:var(--accent)">⚡ Auto-fill</button>
+    </div>
+    <div id="dca-entries" style="margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:6px;font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);padding:0 2px">
+        <span>BUY PRICE ($)</span><span>AMOUNT ($)</span><span style="width:28px"></span>
+      </div>
+      <div id="dca-rows"></div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button onclick="dcaAddRow()" class="alert-add-btn" style="font-size:.54rem">+ ADD BUY</button>
+      <button onclick="dcaClear()" class="tf-btn" style="font-size:.54rem">↺ Clear</button>
+    </div>
+    <div id="dca-result" style="display:none;padding:12px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="text-align:center">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">AVG ENTRY</div>
+          <div id="dca-avg" style="font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700;color:var(--accent)">—</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">TOTAL INVESTED</div>
+          <div id="dca-total" style="font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700;color:var(--text)">—</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">TOTAL UNITS</div>
+          <div id="dca-units" style="font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700;color:var(--text)">—</div>
+        </div>
+      </div>
+      <div id="dca-pnl-row" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="text-align:center">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">CURRENT P&L</div>
+          <div id="dca-pnl" style="font-family:'Orbitron',monospace;font-size:.85rem;font-weight:700">—</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px">BREAK-EVEN MOVE</div>
+          <div id="dca-breakeven" style="font-family:'Orbitron',monospace;font-size:.85rem;font-weight:700;color:var(--warn)">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Trade Statistics Dashboard ── -->
+  <div class="panel" style="margin-bottom:14px;border-color:rgba(192,132,252,.2)">
+    <div class="ptitle" style="color:#c084fc">📊 Trade Statistics
+      <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">from your trade journal · performance breakdown</span>
+      <button onclick="renderTradeStats()" class="mkt-refresh-btn" style="margin-left:auto">⟳ REFRESH</button>
+    </div>
+    <div id="tradeStatsPanel">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted)">Click ⟳ to generate statistics from your journal</div>
     </div>
   </div>
 
@@ -4011,10 +4091,28 @@ self.onmessage=function(e){
   // Frankfurter.app — free, no key, good history, supports EUR base
   // ExchangeRate.host — free, supports IDR/JPY
   const FOREX_PAIRS = {
+    // Major pairs
     'EURUSD': { base:'EUR', quote:'USD', display:'EUR/USD', isFiat:false },
-    'USDIDR': { base:'USD', quote:'IDR', display:'USD/IDR', isFiat:true  },
+    'GBPUSD': { base:'GBP', quote:'USD', display:'GBP/USD', isFiat:false },
     'USDJPY': { base:'USD', quote:'JPY', display:'USD/JPY', isFiat:true  },
+    'USDCHF': { base:'USD', quote:'CHF', display:'USD/CHF', isFiat:false },
+    'AUDUSD': { base:'AUD', quote:'USD', display:'AUD/USD', isFiat:false },
+    'USDCAD': { base:'USD', quote:'CAD', display:'USD/CAD', isFiat:false },
+    'NZDUSD': { base:'NZD', quote:'USD', display:'NZD/USD', isFiat:false },
+    // IDR pairs (Indonesia)
+    'USDIDR': { base:'USD', quote:'IDR', display:'USD/IDR', isFiat:true  },
     'EURIDR': { base:'EUR', quote:'IDR', display:'EUR/IDR', isFiat:true  },
+    'JPYIDR': { base:'JPY', quote:'IDR', display:'JPY/IDR', isFiat:true  },
+    'SGDIDR': { base:'SGD', quote:'IDR', display:'SGD/IDR', isFiat:true  },
+    // Asian pairs
+    'USDSGD': { base:'USD', quote:'SGD', display:'USD/SGD', isFiat:false },
+    'USDMYR': { base:'USD', quote:'MYR', display:'USD/MYR', isFiat:false },
+    'USDTHB': { base:'USD', quote:'THB', display:'USD/THB', isFiat:false },
+    'USDCNY': { base:'USD', quote:'CNY', display:'USD/CNY', isFiat:false },
+    // Cross pairs
+    'EURGBP': { base:'EUR', quote:'GBP', display:'EUR/GBP', isFiat:false },
+    'EURJPY': { base:'EUR', quote:'JPY', display:'EUR/JPY', isFiat:true  },
+    'GBPJPY': { base:'GBP', quote:'JPY', display:'GBP/JPY', isFiat:true  },
   };
 
   // Last-known price cache for forex — shows stale data instead of hard-failing
@@ -4135,26 +4233,42 @@ self.onmessage=function(e){
       );
     }
 
-    // Source E: fawazahmed0 currency API (free, no key, CORS open — great fallback)
+    // Source E: fawazahmed0 currency API (free, no key, CORS open)
     {
-      const today = new Date().toISOString().slice(0,10);
       const baseLower = fp.base.toLowerCase();
       const quoteLower = fp.quote.toLowerCase();
       const urlFawaz = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseLower}.json`;
+      const buildSynth = function(rate) {
+        const synth = []; let r = rate * 0.95;
+        for(let i=200; i>=0; i--) {
+          const date = new Date(Date.now() - i*86400000).toISOString().slice(0,10);
+          r = r * (1 + (Math.random()-0.5)*0.004);
+          synth.push({ date, rate: r });
+        }
+        synth[synth.length-1].rate = rate;
+        return synth;
+      };
       sources.push(
-        fetch(urlFawaz, {signal:AbortSignal.timeout(7000)}).then(r=>r.json()).then(d => {
+        fetch(urlFawaz, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
           const rate = d[baseLower]?.[quoteLower];
           if(!rate) throw new Error('no rate');
-          // Build synthetic history around current rate
-          const synth = [];
-          let r = rate * 0.95;
-          for(let i=200; i>=0; i--) {
-            const date = new Date(Date.now() - i*86400000).toISOString().slice(0,10);
-            r = r * (1 + (Math.random()-0.5)*0.004);
-            synth.push({ date, rate: r });
-          }
-          synth[synth.length-1].rate = rate;
-          return { rates: synth, label: 'fawazahmed0 CDN' };
+          return { rates: buildSynth(rate), label: 'fawazahmed0 CDN' };
+        })
+      );
+      // Also try the date-specific fallback CDN
+      sources.push(
+        fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseLower}.min.json`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
+          const rate = d[baseLower]?.[quoteLower];
+          if(!rate) throw new Error('no rate');
+          return { rates: buildSynth(rate), label: 'fawazahmed0 min' };
+        })
+      );
+      // exchangerate.host — another free CORS-open API
+      sources.push(
+        fetch(`https://api.exchangerate.host/latest?base=${fp.base}&symbols=${fp.quote}`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
+          const rate = d?.rates?.[fp.quote];
+          if(!rate) throw new Error('no rate');
+          return { rates: buildSynth(rate), label: 'exchangerate.host' };
         })
       );
     }
@@ -4162,10 +4276,17 @@ self.onmessage=function(e){
     // Source F: Stooq forex CSV — fast, no CORS issues, great for USD/IDR, USD/JPY etc.
     {
       const stooqFxMap = {
-        'USDIDR':'usdidr','EURUSD':'eurusd','USDJPY':'usdjpy','EURIDR':'euridr',
-        'GBPUSD':'gbpusd','AUDUSD':'audusd','USDCAD':'usdcad','USDCHF':'usdchf',
-        'NZDUSD':'nzdusd','EURGBP':'eurgbp','USDSGD':'usdsgd','USDMYR':'usdmyr',
-        'USDCNY':'usdcny','USDKRW':'usdkrw','USDTHB':'usdthb',
+        // IDR pairs
+        'USDIDR':'usdidr','EURIDR':'euridr','JPYIDR':'jpyidr','SGDIDR':'sgdidr',
+        // Major USD pairs
+        'EURUSD':'eurusd','GBPUSD':'gbpusd','AUDUSD':'audusd','USDCAD':'usdcad',
+        'USDCHF':'usdchf','NZDUSD':'nzdusd','USDJPY':'usdjpy',
+        // Asian pairs
+        'USDSGD':'usdsgd','USDMYR':'usdmyr','USDTHB':'usdthb',
+        'USDCNY':'usdcny','USDKRW':'usdkrw',
+        // Cross pairs
+        'EURGBP':'eurgbp','EURJPY':'eurjpy','GBPJPY':'gbpjpy',
+        'EURCHF':'eurchf','AUDNZD':'audnzd','CADJPY':'cadjpy',
       };
       const stooqFx = stooqFxMap[sym];
       if(stooqFx) {
@@ -4408,15 +4529,43 @@ self.onmessage=function(e){
 
   // ── SPECIAL_PAIRS: used for fmtP detection (forex + ANTAM + commodities) ────
   const SPECIAL_PAIRS = {
-    'ANTAM':  { display:'ANTAM/IDR',  isStock:true },
+    // Commodities
     'XAUT':   { display:'Gold (XAU/USD)',    isCommodity:true },
     'XAGUSD': { display:'Silver (XAG/USD)', isCommodity:true },
     'USOIL':  { display:'WTI Crude Oil',    isCommodity:true },
-    // Keep for fmtP detection only:
+    'BRENT':  { display:'Brent Crude Oil',  isCommodity:true },
+    'NATGAS': { display:'Natural Gas',      isCommodity:true },
+    'COPPER': { display:'Copper',           isCommodity:true },
+    // IDX Stocks
+    'ANTAM':  { display:'ANTAM/IDR',   isStock:true, isIDR:true },
+    'BBCA':   { display:'BBCA/IDR',    isStock:true, isIDR:true },
+    'TLKM':   { display:'TLKM/IDR',    isStock:true, isIDR:true },
+    'BBRI':   { display:'BBRI/IDR',    isStock:true, isIDR:true },
+    'GOTO':   { display:'GOTO/IDR',    isStock:true, isIDR:true },
+    // US Stocks
+    'AAPL':   { display:'AAPL/USD',    isStock:true },
+    'TSLA':   { display:'TSLA/USD',    isStock:true },
+    'NVDA':   { display:'NVDA/USD',    isStock:true },
+    'MSFT':   { display:'MSFT/USD',    isStock:true },
+    // Forex (keep for fmtP detection)
     'USDIDR': { display:'USD/IDR',  isFiat:true },
-    'USDJPY': { display:'USD/JPY',  isFiat:true },
-    'EURUSD': { display:'EUR/USD',  isFiat:false },
+    'JPYIDR': { display:'JPY/IDR',  isFiat:true },
+    'SGDIDR': { display:'SGD/IDR',  isFiat:true },
     'EURIDR': { display:'EUR/IDR',  isFiat:true },
+    'USDJPY': { display:'USD/JPY',  isFiat:true },
+    'USDSGD': { display:'USD/SGD',  isFiat:false },
+    'USDMYR': { display:'USD/MYR',  isFiat:false },
+    'USDTHB': { display:'USD/THB',  isFiat:false },
+    'USDCNY': { display:'USD/CNY',  isFiat:false },
+    'EURUSD': { display:'EUR/USD',  isFiat:false },
+    'GBPUSD': { display:'GBP/USD',  isFiat:false },
+    'GBPJPY': { display:'GBP/JPY',  isFiat:true  },
+    'EURJPY': { display:'EUR/JPY',  isFiat:true  },
+    'EURGBP': { display:'EUR/GBP',  isFiat:false },
+    'AUDUSD': { display:'AUD/USD',  isFiat:false },
+    'USDCAD': { display:'USD/CAD',  isFiat:false },
+    'NZDUSD': { display:'NZD/USD',  isFiat:false },
+    'USDCHF': { display:'USD/CHF',  isFiat:false },
   };
 
   function resolveSymbol(sym, exchangeId) { return sym; } // no-op, kept for compat
@@ -4563,8 +4712,9 @@ self.onmessage=function(e){
       }
     }
 
-    // ── ANTAM: IDX stock ──────────────────────────────────────────────────────
-    if(sym === 'ANTAM') {
+    // ── ANTAM + all other stocks/commodities in COMMODITY_PAIRS ─────────────
+    if(sym === 'ANTAM' && !COMMODITY_PAIRS['ANTAM']) {
+      // Legacy ANTAM path if not in COMMODITY_PAIRS
       const yInt = ['15m','30m'].includes(currentTF) ? '1h' : TF.yahoo[currentTF]||'1d';
       setStatus(`⟳ Fetching ANTAM (IDX) — trying Yahoo Finance → Stooq...`,'loading');
       activeProgress('exchange');
@@ -6248,9 +6398,21 @@ self.onmessage=function(e){
 
   // Yahoo Finance tickers for commodities not on crypto exchanges
   const COMMODITY_PAIRS = {
-    'XAUT':   { yahoo:'GC=F',  stooq:'gc.f', display:'Gold (XAU/USD)',  unit:'USD/oz',  isCommodity:true },
-    'XAGUSD': { yahoo:'SI=F',  stooq:'xag.f',display:'Silver (XAG/USD)',unit:'USD/oz',  isCommodity:true },
-    'USOIL':  { yahoo:'CL=F',  stooq:'cl.f', display:'WTI Crude Oil',   unit:'USD/bbl', isCommodity:true },
+    'XAUT':   { yahoo:'GC=F',  stooq:'gc.f',  display:'Gold (XAU/USD)',      unit:'USD/oz',  isCommodity:true },
+    'XAGUSD': { yahoo:'SI=F',  stooq:'xag.f', display:'Silver (XAG/USD)',     unit:'USD/oz',  isCommodity:true },
+    'USOIL':  { yahoo:'CL=F',  stooq:'cl.f',  display:'WTI Crude Oil',        unit:'USD/bbl', isCommodity:true },
+    'BRENT':  { yahoo:'BZ=F',  stooq:'bz.f',  display:'Brent Crude Oil',      unit:'USD/bbl', isCommodity:true },
+    'NATGAS': { yahoo:'NG=F',  stooq:'ng.f',  display:'Natural Gas',          unit:'USD/MMBtu',isCommodity:true },
+    'COPPER': { yahoo:'HG=F',  stooq:'hg.f',  display:'Copper',               unit:'USD/lb',  isCommodity:true },
+    'ANTAM':  { yahoo:'ANTM.JK',stooq:'antm.jk',display:'ANTAM (IDX)',        unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'BBCA':   { yahoo:'BBCA.JK',stooq:'bbca.jk',display:'Bank BCA (IDX)',     unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'TLKM':   { yahoo:'TLKM.JK',stooq:'tlkm.jk',display:'Telkom Indonesia',   unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'BBRI':   { yahoo:'BBRI.JK',stooq:'bbri.jk',display:'Bank BRI (IDX)',     unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'GOTO':   { yahoo:'GOTO.JK',stooq:'goto.jk',display:'GoTo (IDX)',         unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'AAPL':   { yahoo:'AAPL',   stooq:'aapl.us', display:'Apple (NASDAQ)',     unit:'USD',     isCommodity:false, isUSStock:true  },
+    'TSLA':   { yahoo:'TSLA',   stooq:'tsla.us', display:'Tesla (NASDAQ)',     unit:'USD',     isCommodity:false, isUSStock:true  },
+    'NVDA':   { yahoo:'NVDA',   stooq:'nvda.us', display:'NVIDIA (NASDAQ)',    unit:'USD',     isCommodity:false, isUSStock:true  },
+    'MSFT':   { yahoo:'MSFT',   stooq:'msft.us', display:'Microsoft (NASDAQ)', unit:'USD',     isCommodity:false, isUSStock:true  },
   };
 
   const FOREX_NOTICE = {
@@ -13077,6 +13239,311 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     window._alertHistory = [];
     loadAlertHistory();
   }
+
+
+  // ════════════════════════════════════════════════════════════════
+  //  DCA CALCULATOR
+  // ════════════════════════════════════════════════════════════════
+  let _dcaRows = [];
+
+  function dcaAddRow(price, amount) {
+    const id = Date.now();
+    _dcaRows.push({ id, price: price||'', amount: amount||'' });
+    _dcaRender();
+  }
+
+  function dcaRemoveRow(id) {
+    _dcaRows = _dcaRows.filter(function(r){ return r.id !== id; });
+    _dcaRender();
+  }
+
+  function _dcaRender() {
+    const container = document.getElementById('dca-rows');
+    if(!container) return;
+    container.innerHTML = _dcaRows.map(function(row) {
+      return '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-bottom:5px" id="dca-row-' + row.id + '">' +
+        '<input type="number" class="alert-input" style="width:100%" placeholder="84000" value="' + (row.price||'') + '" step="any" oninput="_dcaUpdate(' + row.id + ',\'price\',this.value)">' +
+        '<input type="number" class="alert-input" style="width:100%" placeholder="100" value="' + (row.amount||'') + '" step="any" oninput="_dcaUpdate(' + row.id + ',\'amount\',this.value)">' +
+        '<button onclick="dcaRemoveRow(' + row.id + ')" style="width:28px;height:36px;background:rgba(255,45,85,.1);border:1px solid rgba(255,45,85,.3);color:var(--red);border-radius:4px;cursor:pointer;font-size:.7rem">✕</button>' +
+      '</div>';
+    }).join('');
+    _dcaCalc();
+  }
+
+  function _dcaUpdate(id, field, val) {
+    const row = _dcaRows.find(function(r){ return r.id === id; });
+    if(row) { row[field] = parseFloat(val) || ''; _dcaCalc(); }
+  }
+
+  function _dcaCalc() {
+    const result = document.getElementById('dca-result');
+    if(!result) return;
+    const validRows = _dcaRows.filter(function(r){ return r.price > 0 && r.amount > 0; });
+    if(!validRows.length) { result.style.display = 'none'; return; }
+
+    const totalInvested = validRows.reduce(function(s,r){ return s + r.amount; }, 0);
+    const totalUnits    = validRows.reduce(function(s,r){ return s + (r.amount / r.price); }, 0);
+    const avgEntry      = totalInvested / totalUnits;
+
+    const s = function(id, v) { const el = document.getElementById(id); if(el) el.textContent = v; };
+    const fmt = function(v) { return v >= 1000 ? '$' + v.toLocaleString(undefined,{maximumFractionDigits:2}) : v >= 1 ? '$' + v.toFixed(4) : '$' + v.toFixed(8); };
+
+    s('dca-avg',   fmt(avgEntry));
+    s('dca-total', '$' + totalInvested.toLocaleString(undefined,{maximumFractionDigits:2}));
+    s('dca-units', totalUnits >= 1 ? totalUnits.toFixed(4) : totalUnits.toFixed(8));
+    result.style.display = 'block';
+
+    // Live P&L if we have current price
+    const currentPrice = window._lastAnalysisPrice;
+    const pnlRow = document.getElementById('dca-pnl-row');
+    if(currentPrice && pnlRow) {
+      pnlRow.style.display = 'grid';
+      const pnl    = (currentPrice - avgEntry) * totalUnits;
+      const pnlPct = ((currentPrice - avgEntry) / avgEntry * 100);
+      const pColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+      const pnlEl  = document.getElementById('dca-pnl');
+      if(pnlEl) { pnlEl.textContent = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2) + ' (' + (pnlPct>=0?'+':'') + pnlPct.toFixed(2) + '%)'; pnlEl.style.color = pColor; }
+      const beMoveEl = document.getElementById('dca-breakeven');
+      if(beMoveEl) {
+        const beMove = ((avgEntry - currentPrice) / currentPrice * 100);
+        beMoveEl.textContent = (beMove >= 0 ? '+' : '') + beMove.toFixed(2) + '% to break even';
+        beMoveEl.style.color = currentPrice >= avgEntry ? 'var(--green)' : 'var(--warn)';
+      }
+    } else if(pnlRow) {
+      pnlRow.style.display = 'none';
+    }
+  }
+
+  function dcaAutoFill() {
+    _dcaRows = [];
+    const price = window._lastAnalysisPrice;
+    if(!price) { alert('Fetch a symbol first'); return; }
+    // Pre-fill 3 buy points: current, -5%, -10%
+    dcaAddRow(price.toFixed(price >= 1 ? 2 : 6), 100);
+    dcaAddRow((price * 0.95).toFixed(price >= 1 ? 2 : 6), 100);
+    dcaAddRow((price * 0.90).toFixed(price >= 1 ? 2 : 6), 100);
+  }
+
+  function dcaClear() {
+    _dcaRows = [];
+    _dcaRender();
+    const result = document.getElementById('dca-result');
+    if(result) result.style.display = 'none';
+  }
+
+  // Init with 3 empty rows
+  dcaAddRow(); dcaAddRow(); dcaAddRow();
+
+  // ════════════════════════════════════════════════════════════════
+  //  TRADE STATISTICS DASHBOARD
+  // ════════════════════════════════════════════════════════════════
+  function renderTradeStats() {
+    const panel = document.getElementById('tradeStatsPanel');
+    if(!panel) return;
+    if(!tradeJournal || !tradeJournal.length) {
+      panel.innerHTML = '<div style="font-family:Share Tech Mono,monospace;font-size:.6rem;color:var(--muted)">No trades in journal yet. Log some trades first.</div>';
+      return;
+    }
+
+    const closed = tradeJournal.filter(function(t){ return t.status === 'WIN' || t.status === 'LOSS'; });
+    const wins   = closed.filter(function(t){ return t.status === 'WIN'; });
+    const losses = closed.filter(function(t){ return t.status === 'LOSS'; });
+    const winRate = closed.length > 0 ? (wins.length / closed.length * 100) : 0;
+    const avgWinPct  = wins.length   ? wins.reduce(function(s,t){ return s+(t.pnlPct||0); }, 0)/wins.length : 0;
+    const avgLossPct = losses.length ? losses.reduce(function(s,t){ return s+(t.pnlPct||0); }, 0)/losses.length : 0;
+    const totalPnl   = closed.reduce(function(s,t){ return s+(t.pnl||0); }, 0);
+    const avgRR      = closed.filter(function(t){ return t.rr; }).length > 0
+      ? closed.filter(function(t){ return t.rr; }).reduce(function(s,t){ return s+t.rr; }, 0) / closed.filter(function(t){ return t.rr; }).length : 0;
+
+    // Best/worst trades
+    const sortedPnl = closed.filter(function(t){ return t.pnlPct != null; }).sort(function(a,b){ return b.pnlPct - a.pnlPct; });
+    const bestTrade  = sortedPnl[0];
+    const worstTrade = sortedPnl[sortedPnl.length-1];
+
+    // By pair breakdown
+    const pairMap = {};
+    closed.forEach(function(t) {
+      if(!pairMap[t.pair]) pairMap[t.pair] = { wins:0, losses:0, pnl:0, count:0 };
+      if(t.status === 'WIN')  pairMap[t.pair].wins++;
+      if(t.status === 'LOSS') pairMap[t.pair].losses++;
+      pairMap[t.pair].pnl   += (t.pnl || 0);
+      pairMap[t.pair].count++;
+    });
+    const topPairs = Object.entries(pairMap).sort(function(a,b){ return b[1].count - a[1].count; }).slice(0,5);
+
+    // By direction
+    const longTrades  = closed.filter(function(t){ return t.dir === 'LONG'; });
+    const shortTrades = closed.filter(function(t){ return t.dir === 'SHORT'; });
+    const longWR  = longTrades.length  ? (longTrades.filter(function(t){ return t.status==='WIN'; }).length/longTrades.length*100).toFixed(0)  : 'N/A';
+    const shortWR = shortTrades.length ? (shortTrades.filter(function(t){ return t.status==='WIN'; }).length/shortTrades.length*100).toFixed(0) : 'N/A';
+
+    // Expectancy = (WR * avgWin) + ((1-WR) * avgLoss)
+    const wr = winRate / 100;
+    const expectancy = (wr * avgWinPct) + ((1-wr) * avgLossPct);
+
+    const statCard = function(label, value, color) {
+      return '<div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px 10px;text-align:center">' +
+        '<div style="font-family:Share Tech Mono,monospace;font-size:.48rem;color:var(--muted);margin-bottom:3px">' + label + '</div>' +
+        '<div style="font-family:Orbitron,monospace;font-size:.75rem;font-weight:700;color:' + (color||'var(--text)') + '">' + value + '</div>' +
+      '</div>';
+    };
+
+    panel.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px;margin-bottom:12px">' +
+        statCard('TOTAL TRADES', tradeJournal.length, 'var(--accent)') +
+        statCard('WIN RATE', winRate.toFixed(1) + '%', winRate >= 50 ? 'var(--green)' : 'var(--red)') +
+        statCard('AVG WIN', '+' + avgWinPct.toFixed(1) + '%', 'var(--green)') +
+        statCard('AVG LOSS', avgLossPct.toFixed(1) + '%', 'var(--red)') +
+        statCard('AVG R:R', avgRR.toFixed(2) + ':1', avgRR >= 2 ? 'var(--green)' : avgRR >= 1 ? 'var(--warn)' : 'var(--red)') +
+        statCard('TOTAL P&L', (totalPnl>=0?'+':'')+'$'+Math.abs(totalPnl).toFixed(2), totalPnl >= 0 ? 'var(--green)' : 'var(--red)') +
+        statCard('EXPECTANCY', (expectancy>=0?'+':'')+expectancy.toFixed(2)+'%', expectancy >= 0 ? 'var(--green)' : 'var(--red)') +
+        statCard('OPEN', tradeJournal.filter(function(t){ return t.status==='OPEN'; }).length, 'var(--warn)') +
+      '</div>' +
+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
+        '<div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px">' +
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--green);margin-bottom:6px;letter-spacing:1px">▲ LONG TRADES</div>' +
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem">' + longTrades.length + ' trades · <span style="color:' + (parseInt(longWR)>=50?'var(--green)':'var(--red)') + '">' + longWR + '% WR</span></div>' +
+        '</div>' +
+        '<div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:6px;padding:8px">' +
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--red);margin-bottom:6px;letter-spacing:1px">▼ SHORT TRADES</div>' +
+          '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem">' + shortTrades.length + ' trades · <span style="color:' + (parseInt(shortWR)>=50?'var(--green)':'var(--red)') + '">' + shortWR + '% WR</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      (bestTrade || worstTrade ?
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">' +
+          (bestTrade ? '<div style="background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.2);border-radius:6px;padding:8px">' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--green);margin-bottom:4px">🏆 BEST TRADE</div>' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--accent)">' + bestTrade.pair + '</div>' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;font-weight:700;color:var(--green)">+' + bestTrade.pnlPct.toFixed(2) + '%</div>' +
+          '</div>' : '') +
+          (worstTrade ? '<div style="background:rgba(255,45,85,.06);border:1px solid rgba(255,45,85,.2);border-radius:6px;padding:8px">' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:var(--red);margin-bottom:4px">💀 WORST TRADE</div>' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.58rem;color:var(--accent)">' + worstTrade.pair + '</div>' +
+            '<div style="font-family:Share Tech Mono,monospace;font-size:.62rem;font-weight:700;color:var(--red)">' + worstTrade.pnlPct.toFixed(2) + '%</div>' +
+          '</div>' : '') +
+        '</div>' : '') +
+
+      '<div style="font-family:Share Tech Mono,monospace;font-size:.52rem;color:var(--muted);letter-spacing:1px;margin-bottom:6px">TOP PAIRS</div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px">' +
+      topPairs.map(function(e) {
+        const wr = e[1].count > 0 ? (e[1].wins / e[1].count * 100).toFixed(0) : 0;
+        const col = parseInt(wr) >= 50 ? 'var(--green)' : 'var(--red)';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;background:rgba(0,0,0,.2);border-radius:4px">' +
+          '<span style="font-family:Orbitron,monospace;font-size:.6rem;font-weight:700;color:var(--accent);min-width:50px">' + e[0] + '</span>' +
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:var(--muted)">' + e[1].count + ' trades</span>' +
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:' + col + ';margin-left:auto">' + wr + '% WR</span>' +
+          '<span style="font-family:Share Tech Mono,monospace;font-size:.54rem;color:' + (e[1].pnl>=0?'var(--green)':'var(--red)') + '">' + (e[1].pnl>=0?'+':'') + '$' + Math.abs(e[1].pnl).toFixed(2) + '</span>' +
+        '</div>';
+      }).join('') + '</div>';
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  LANGUAGE TOGGLE (English / Bahasa Indonesia)
+  // ════════════════════════════════════════════════════════════════
+  let _lang = localStorage.getItem('tl_lang') || 'en';
+
+  const LANG = {
+    en: {
+      analysis:'🔬 Analysis', market:'🌐 Market Dashboard', onchain:'🔎 On-Chain & Macro',
+      scanner:'📡 Scanner & Macro', fxstocks:'💱 Forex & Stocks', ai:'🤖 AI Assistant', portfolio:'💼 Portfolio',
+      fetch:'⚡ FETCH', signal:'Signal', score:'Trade Score', buy:'BUY', sell:'SELL', neutral:'NEUTRAL',
+      rsi:'RSI', macd:'MACD', atr:'ATR', indicators:'Indicators', journal:'Trade Journal',
+      watchlist:'Watchlist', alerts:'Price Alerts', settings:'Settings',
+    },
+    id: {
+      analysis:'🔬 Analisis', market:'🌐 Dasbor Pasar', onchain:'🔎 On-Chain & Makro',
+      scanner:'📡 Pemindai', fxstocks:'💱 Forex & Saham', ai:'🤖 Asisten AI', portfolio:'💼 Portofolio',
+      fetch:'⚡ AMBIL', signal:'Sinyal', score:'Skor Perdagangan', buy:'BELI', sell:'JUAL', neutral:'NETRAL',
+      rsi:'RSI', macd:'MACD', atr:'ATR', indicators:'Indikator', journal:'Jurnal Perdagangan',
+      watchlist:'Daftar Pantau', alerts:'Alarm Harga', settings:'Pengaturan',
+    },
+  };
+
+  function toggleLanguage() {
+    _lang = _lang === 'en' ? 'id' : 'en';
+    localStorage.setItem('tl_lang', _lang);
+    const btn = document.getElementById('lang-toggle');
+    if(btn) btn.textContent = _lang === 'id' ? '🇬🇧 EN' : '🇮🇩 ID';
+    _applyLanguage();
+  }
+
+  function _applyLanguage() {
+    const L = LANG[_lang];
+    // Update tab labels
+    const tabMap = { 'tab-analysis':L.analysis, 'tab-market':L.market, 'tab-onchain':L.onchain,
+      'tab-scanner':L.scanner, 'tab-fxstocks':L.fxstocks, 'tab-ai':L.ai, 'tab-portfolio':L.portfolio };
+    Object.entries(tabMap).forEach(function(e) {
+      const el = document.getElementById(e[0]);
+      // Keep alert badge if present
+      if(el) {
+        const badge = el.querySelector('#alert-fire-badge');
+        el.textContent = e[1];
+        if(badge) el.appendChild(badge);
+      }
+    });
+    // Update fetch button
+    const fetchBtn = document.getElementById('fetchBtn');
+    if(fetchBtn) fetchBtn.textContent = L.fetch;
+    // Update settings button
+    if(_lang === 'id') {
+      document.title = 'Sistem Risiko Kripto — Analisis Multi-Timeframe';
+    } else {
+      document.title = 'Live Crypto Risk System — Multi-Timeframe Analysis';
+    }
+  }
+
+  // Apply saved language on load
+  (function() {
+    const btn = document.getElementById('lang-toggle');
+    if(btn) btn.textContent = _lang === 'id' ? '🇬🇧 EN' : '🇮🇩 ID';
+    if(_lang === 'id') setTimeout(_applyLanguage, 500);
+  })();
+
+  // ════════════════════════════════════════════════════════════════
+  //  TRADINGVIEW WEBHOOK RECEIVER
+  // ════════════════════════════════════════════════════════════════
+  // The data worker already receives webhooks at POST /webhook
+  // This function processes incoming webhook data in the HTML
+  function _processWebhookAlert(data) {
+    // data = { sym, price, action } from TradingView
+    const sym    = (data.sym || '').toUpperCase().replace('USDT','');
+    const price  = parseFloat(data.price) || 0;
+    const action = (data.action || '').toLowerCase();
+
+    if(!sym || !price) return;
+
+    // Load the symbol in the analysis tab
+    const inp = document.getElementById('symbolInput');
+    if(inp) {
+      inp.value = sym;
+      fetchData();
+    }
+
+    // Show notification
+    if(Notification && Notification.permission === 'granted') {
+      new Notification('📺 TradingView Alert: ' + sym, {
+        body: (action.includes('buy') ? '📈 BUY signal' : action.includes('sell') ? '📉 SELL signal' : '🔔 Alert') + ' at $' + price.toLocaleString()
+      });
+    }
+
+    // Add to alert history
+    if(_cloudEnabled) {
+      _api('POST', '/alert-history', {
+        sym, direction: action.includes('buy') ? 'above' : 'below',
+        target: price, price_at: price
+      }).catch(function(){});
+    }
+
+    setStatus('📺 TradingView webhook: ' + sym + ' ' + action + ' at $' + price.toLocaleString(), 'loading');
+  }
+
+  // Show webhook URL in settings
+  (function() {
+    const el = document.getElementById('webhook-url-display');
+    if(el) el.textContent = DATA_WORKER_URL + '/webhook';
+  })();
 
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
