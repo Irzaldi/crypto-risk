@@ -3375,10 +3375,25 @@ self.onmessage=function(e){
       const worker = getAnalysisWorker();
       if(!worker) { reject(new Error('no worker')); return; }
       const id = ++_analysisIdCounter;
+
+      // 30 second hard timeout — prevents hanging forever
+      const _timeout = setTimeout(function() {
+        if(_analysisCallbacks[id]) {
+          delete _analysisCallbacks[id];
+          reject(new Error('Analysis worker timed out after 30s'));
+        }
+      }, 30000);
+
       _analysisCallbacks[id] = {
-        wave1: (data) => { try{ onWave1(data); }catch(err){ console.warn('wave1 error',err); } },
-        wave2: (data) => { try{ onWave2(data); resolve(); }catch(err){ reject(err); } },
-        reject
+        wave1: function(data) {
+          try { onWave1(data); } catch(err) { console.warn('wave1 error', err); }
+        },
+        wave2: function(data) {
+          clearTimeout(_timeout);
+          delete _analysisCallbacks[id];
+          try { onWave2(data); resolve(); } catch(err) { reject(err); }
+        },
+        reject: function(e) { clearTimeout(_timeout); reject(e); }
       };
       worker.postMessage({ type:'ANALYZE', id, payload });
     });
@@ -3695,12 +3710,33 @@ self.onmessage=function(e){
   }
 
   function calcEMA(a, p) {
-    if(a.length < p) return null;
+    if(!a || a.length < p) return null;
     const k = 2 / (p + 1);
-
     let e = a[0];
     for(let i = 1; i < a.length; i++) e = a[i] * k + e * (1 - k);
     return e;
+  }
+
+  // Batch EMA — compute multiple periods in one function call
+  function calcEMABatch(a, periods) {
+    if(!a || !a.length) return periods.map(function(){ return null; });
+    return periods.map(function(p) {
+      if(a.length < p) return null;
+      const k = 2/(p+1); let e = a[0];
+      for(let i=1; i<a.length; i++) e = a[i]*k + e*(1-k);
+      return e;
+    });
+  }
+
+  // Batch EMA for main thread (mirrors worker version)
+  function calcEMABatch(a, periods) {
+    if(!a || !a.length) return periods.map(() => null);
+    return periods.map(function(p) {
+      if(a.length < p) return null;
+      const k = 2/(p+1); let e = a[0];
+      for(let i=1;i<a.length;i++) e=a[i]*k+e*(1-k);
+      return e;
+    });
   }
   function calcRSI(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}let ag=g/p,al=l/p;for(let i=p+1;i<a.length;i++){const d=a[i]-a[i-1];ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;}return al===0?100:100-100/(1+ag/al);}
   function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?e12-e26:null;}
@@ -4324,11 +4360,20 @@ self.onmessage=function(e){
       const baseLower = fp.base.toLowerCase();
       const quoteLower = fp.quote.toLowerCase();
       const urlFawaz = `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${baseLower}.json`;
+      // Pair-specific daily volatility for realistic synthetic candles
+      const _pairVol = {
+        'USDIDR':0.003,'EURIDR':0.004,'JPYIDR':0.003,'SGDIDR':0.002,
+        'EURUSD':0.004,'GBPUSD':0.005,'USDJPY':0.004,'AUDUSD':0.005,
+        'USDCAD':0.004,'USDCHF':0.004,'NZDUSD':0.006,'USDSGD':0.003,
+        'USDMYR':0.003,'USDTHB':0.003,'EURJPY':0.006,'GBPJPY':0.007,
+      };
+      const _vol = _pairVol[sym] || 0.004;
       const buildSynth = function(rate) {
-        const synth = []; let r = rate * 0.95;
+        const synth = []; let r = rate * (1 - _vol * 50);
         for(let i=200; i>=0; i--) {
           const date = new Date(Date.now() - i*86400000).toISOString().slice(0,10);
-          r = r * (1 + (Math.random()-0.5)*0.004);
+          r = r * (1 + (Math.random()-0.5)*_vol*2);
+          if(r <= 0) r = rate * 0.5; // guard against negative rates
           synth.push({ date, rate: r });
         }
         synth[synth.length-1].rate = rate;
@@ -5031,6 +5076,14 @@ self.onmessage=function(e){
     document.getElementById('sourceLabel').textContent=data.source.toUpperCase()+' LIVE';
 
     const{price,high24,low24,open24,vol24,opens,closes,highs,lows,volumes,source,pair}=data;
+
+    // ── Draw chart immediately with raw candle data (no EMA overlay yet) ──
+    // This ensures chart shows even if worker is slow or fails
+    // Wave2 will redraw it with full EMA series overlay
+    try {
+      drawMiniChart(opens||closes, closes, highs, lows, null, null, null, null, sym, currentTF);
+      window._lastChartData = { opens:opens||closes, closes, highs, lows, volumes, e8:null, e21:null, e55:null, e200:null, sym, tf:currentTF };
+    } catch(e) { console.warn('Early chart draw failed:', e.message); }
     currentPrice=price;
 
     const sym2 = sym;
@@ -5204,9 +5257,9 @@ self.onmessage=function(e){
     document.getElementById('pcHigh').textContent=fmtP(high24);
     document.getElementById('pcLow').textContent=fmtP(low24);
 
-    // All indicators rendered by _applyWave1 after worker returns
-    stepProgress('indicators','done');
-    activeProgress('mtf');
+    // Indicators calculated by worker — keep active until _applyWave1 returns
+    // stepProgress('indicators','done') is called inside _applyWave1
+    activeProgress('indicators');
 
     const mtfResults = [];
     (async () => {
@@ -5430,7 +5483,8 @@ self.onmessage=function(e){
       // Wave 2 callback (slow: chart + backtest + volume profile + key levels)
       (w2) => _applyWave2(w2,_snapPrice,_snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,_snapSym,_snapTF)
     ).catch(err=>{
-      console.warn('Analysis worker failed, running on main thread:',err.message);
+      console.warn('Analysis worker failed/timed out, running on main thread:', err.message);
+      setStatus('⟳ Running analysis on main thread...', 'loading');
       _runAnalysisMainThread(_snapPair,_snapSource,_snapSym,_snapPrice,
         _snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,
         _snapIsBUY,_snapIsSELL,_snapBelowCount,_snapAboveCount,_snapTF,rm);
@@ -5444,6 +5498,8 @@ self.onmessage=function(e){
   // ── DOM apply after worker returns ────────────────────────────────────────
   // ── WAVE 1: indicators + score + prediction + patterns ───────────────────
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
+    stepProgress('indicators','done');
+    activeProgress('score');
     const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
 
