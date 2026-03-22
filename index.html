@@ -6659,13 +6659,38 @@ self.onmessage=function(e){
     const s = document.getElementById('settingsSaveStatus');
     s.textContent = '✓ Reset to defaults'; setTimeout(()=>s.textContent='', 2000);
   }
+  async function _loadEmailConfig() {
+    if(!_cloudEnabled) return;
+    try {
+      const [cfg, health] = await Promise.all([
+        _api('GET', '/email/config').catch(function(){ return null; }),
+        _api('GET', '/health').catch(function(){ return null; }),
+      ]);
+      const inp = document.getElementById('cfg-email');
+      if(inp && cfg?.email) inp.value = cfg.email;
+      const statusEl = document.getElementById('email-resend-status');
+      if(statusEl) {
+        if(health?.resend_key) {
+          statusEl.style.display = 'block';
+          statusEl.innerHTML = '✅ RESEND_API_KEY is configured';
+          statusEl.style.color = 'var(--green)';
+        } else {
+          statusEl.style.display = 'block';
+          statusEl.innerHTML = '❌ RESEND_API_KEY not set — <a href="https://dash.cloudflare.com" target="_blank" style="color:var(--accent)">add in Cloudflare Worker → Settings → Variables</a>';
+          statusEl.style.color = 'var(--red)';
+        }
+      }
+    } catch(e) {}
+  }
+
   function toggleSettings() {
     const p = document.getElementById('settingsPanel');
     const opening = p.style.display === 'none';
     p.style.display = opening ? 'block' : 'none';
     if(opening) {
-      // Load saved Discord + Telegram config into fields
+      // Load saved Discord + Telegram + Email config into fields
       setTimeout(_loadTelegramConfig, 200);
+      setTimeout(_loadEmailConfig, 300);
       // Populate secret field
       const secEl = document.getElementById('cfg-secret');
       if(secEl) secEl.value = localStorage.getItem('tl_data_secret') || '';
@@ -13506,18 +13531,65 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
 
   async function testEmailAlert() {
     const status = document.getElementById('email-status');
-    if(!_cloudEnabled) { if(status) { status.textContent = '⚠️ Cloud not connected'; status.style.color = 'var(--warn)'; } return; }
+    const emailInput = document.getElementById('cfg-email');
+    const emailVal = emailInput?.value?.trim();
+
+    if(!_cloudEnabled) {
+      if(status) { status.textContent = '⚠️ Cloud not connected — check Settings → Cloud Sync'; status.style.color = 'var(--warn)'; }
+      return;
+    }
+    if(!emailVal || !emailVal.includes('@')) {
+      if(status) { status.textContent = '⚠️ Enter your email address first'; status.style.color = 'var(--warn)'; }
+      if(emailInput) emailInput.focus();
+      return;
+    }
+
+    if(status) { status.textContent = '⟳ Checking worker config...'; status.style.color = 'var(--muted)'; }
+
+    // First check health to see if RESEND_API_KEY is set
     try {
-      if(status) { status.textContent = 'Sending test...'; status.style.color = 'var(--muted)'; }
+      const health = await _api('GET', '/health');
+      if(!health.resend_key) {
+        if(status) {
+          status.innerHTML = '❌ RESEND_API_KEY not set in worker.<br>' +
+            '<span style="color:var(--muted);font-size:.52rem">Go to Cloudflare → crypto-data worker → Settings → Variables → Add RESEND_API_KEY</span>';
+          status.style.color = 'var(--red)';
+        }
+        return;
+      }
+    } catch(e) { /* health check failed — try anyway */ }
+
+    // Save email first (auto-save before sending)
+    try {
+      await _api('POST', '/email/config', { email: emailVal, enabled: 1 });
+    } catch(e) { /* ignore save error — may already be saved */ }
+
+    if(status) { status.textContent = '⟳ Sending test email to ' + emailVal + '...'; status.style.color = 'var(--muted)'; }
+
+    try {
       const sym   = document.getElementById('symbolInput')?.value || 'BTC';
       const price = document.getElementById('pcPrice')?.textContent || '—';
       await _api('POST', '/email/send', {
         subject: '✅ Test Alert — Crypto Risk System',
-        html: '<div style="font-family:monospace;padding:20px"><h2 style="color:#00e5ff">✅ Email alerts are working!</h2><p>Symbol: <b>' + sym + '</b> · Price: <b>' + price + '</b></p></div>'
+        html: '<div style="font-family:monospace;background:#03070d;color:#cce;padding:24px;border-radius:8px">' +
+          '<h2 style="color:#00e5ff;margin-top:0">✅ Email alerts are working!</h2>' +
+          '<p>Your Crypto Risk System is configured to send alerts to this address.</p>' +
+          '<table style="border-collapse:collapse;margin-top:16px"><tr><td style="color:#7a9ab8;padding:4px 16px 4px 0">Symbol</td><td style="color:#fff"><b>' + sym + '</b></td></tr>' +
+          '<tr><td style="color:#7a9ab8;padding:4px 16px 4px 0">Price</td><td style="color:#00ff88"><b>' + price + '</b></td></tr>' +
+          '<tr><td style="color:#7a9ab8;padding:4px 16px 4px 0">Time</td><td>' + new Date().toLocaleString('id-ID') + '</td></tr></table>' +
+          '<p style="color:#7a9ab8;font-size:12px;margin-top:20px">⚠️ Using Resend onboarding@resend.dev sender — can only send to your Resend signup email.</p>' +
+          '</div>'
       });
-      if(status) { status.textContent = '✅ Test sent! Check your inbox'; status.style.color = 'var(--green)'; }
+      if(status) { status.textContent = '✅ Sent to ' + emailVal + '! Check inbox (also check spam)'; status.style.color = 'var(--green)'; }
     } catch(e) {
-      if(status) { status.textContent = '❌ ' + e.message; status.style.color = 'var(--red)'; }
+      let msg = e.message || 'Unknown error';
+      // Parse common Resend errors
+      if(msg.includes('403') || msg.includes('domain')) {
+        msg = 'Email rejected — onboarding@resend.dev can only send to your Resend signup email (' + emailVal + ' must match your resend.com account email)';
+      } else if(msg.includes('not configured')) {
+        msg = 'Email config not saved — click Save Email first';
+      }
+      if(status) { status.textContent = '❌ ' + msg; status.style.color = 'var(--red)'; }
     }
   }
 
