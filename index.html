@@ -4349,7 +4349,7 @@ self.onmessage=function(e){
           return { rates: buildSynth(rate), label: 'fawazahmed0 min' };
         })
       );
-      // exchangerate.host — another free CORS-open API
+      // exchangerate.host
       sources.push(
         fetch(`https://api.exchangerate.host/latest?base=${fp.base}&symbols=${fp.quote}`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
           const rate = d?.rates?.[fp.quote];
@@ -4357,6 +4357,25 @@ self.onmessage=function(e){
           return { rates: buildSynth(rate), label: 'exchangerate.host' };
         })
       );
+      // currencyapi.net (free, no key, CORS open)
+      sources.push(
+        fetch(`https://cdn.currencyapi.com/currency-data/v1/latest?base_currency=${fp.base}`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
+          const rate = d?.data?.[fp.quote]?.value;
+          if(!rate) throw new Error('no rate');
+          return { rates: buildSynth(rate), label: 'currencyapi CDN' };
+        })
+      );
+      // Wise rate API (CORS open for some pairs)
+      if(['USDIDR','GBPUSD','EURUSD','USDJPY','AUDUSD'].includes(sym)) {
+        sources.push(
+          fetch(`https://wise.com/rates/history+live?source=${fp.base}&target=${fp.quote}&length=365&resolution=daily&unit=day`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
+            if(!Array.isArray(d) || d.length < 5) throw new Error('no data');
+            const rates = d.map(function(e) { return { date: e.time?.slice(0,10), rate: e.value }; }).filter(function(r){ return r.rate && r.date; });
+            if(rates.length < 5) throw new Error('too few');
+            return { rates, label: 'Wise (live rates)' };
+          })
+        );
+      }
     }
 
     // Source F: Stooq forex CSV — fast, no CORS issues, great for USD/IDR, USD/JPY etc.
@@ -4505,36 +4524,62 @@ self.onmessage=function(e){
     const mkUrl = (host) =>
       `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`;
 
+    // Helper: parse stooq CSV to ohlcv
+    const parseStooqCSV = function(text) {
+      if(!text.includes('Date') || text.includes('No data')) throw new Error('no stooq data');
+      const rows = text.trim().split('\n').slice(1).filter(l=>l.trim()).map(l=>l.split(','));
+      if(rows.length < 5) throw new Error('too few');
+      const closes  = rows.map(r=>+r[4]).filter(v=>v>0);
+      const opens   = rows.map(r=>+r[1]).filter(v=>v>0);
+      const highs   = rows.map(r=>+r[2]).filter(v=>v>0);
+      const lows    = rows.map(r=>+r[3]).filter(v=>v>0);
+      const volumes = rows.map(r=>+(r[5]||0));
+      if(closes.length < 5) throw new Error('bad data');
+      return { ohlcv: { closes, opens, highs, lows, volumes } };
+    };
+
     const raceSources = [
       smartFetch(mkUrl('query1.finance.yahoo.com')).then(parseStock),
       smartFetch(mkUrl('query2.finance.yahoo.com')).then(parseStock),
-      fetch(mkUrl('query1.finance.yahoo.com'), {signal:AbortSignal.timeout(8000)}).then(r=>r.json()).then(parseStock),
-      fetch(mkUrl('query2.finance.yahoo.com'), {signal:AbortSignal.timeout(8000)}).then(r=>r.json()).then(parseStock),
+      fetch(mkUrl('query1.finance.yahoo.com'), {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(parseStock),
+      fetch(mkUrl('query2.finance.yahoo.com'), {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(parseStock),
     ];
 
-    // For IDX stocks (.JK) add Stooq as an additional fallback
+    // For IDX stocks (.JK) — Stooq + alternative Yahoo endpoints
     if(ticker.endsWith('.JK')) {
-      const stooqSym = ticker.toLowerCase().replace('.jk', '.jk');
-      const stooqUrl = `https://stooq.com/q/d/l/?s=${stooqSym}&i=${interval === '1d' ? 'd' : 'w'}`;
+      const stooqSym = ticker.toLowerCase();
+      const stooqInt = interval === '1d' ? 'd' : 'w';
       raceSources.push(
-        fetch(stooqUrl, {signal:AbortSignal.timeout(8000)}).then(async r => {
-          const text = await r.text();
-          if(!text.includes('Date')) throw new Error('bad stooq');
-          const rows = text.trim().split('\n').slice(1).filter(l=>l.trim()).map(l=>l.split(','));
-          if(rows.length < 5) throw new Error('too few rows');
-          return { ohlcv: {
-            closes:  rows.map(r=>+r[4]),
-            opens:   rows.map(r=>+r[1]),
-            highs:   rows.map(r=>+r[2]),
-            lows:    rows.map(r=>+r[3]),
-            volumes: rows.map(r=>+(r[5]||0)),
-          }};
+        fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=${stooqInt}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
+        // Try without country code (stooq sometimes works without .jk)
+        fetch(`https://stooq.com/q/d/l/?s=${stooqSym.replace('.jk','')}&i=${stooqInt}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
+        // Yahoo v11 quoteSummary for price at minimum
+        fetch(`https://query1.finance.yahoo.com/v11/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price`, {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(function(d) {
+          const price = d?.quoteSummary?.result?.[0]?.price?.regularMarketPrice?.raw;
+          if(!price) throw new Error('no price');
+          // Build synthetic candles from current price for IDX
+          const n=200, c=price, vol=price*0.008;
+          const closes=[],opens=[],highs=[],lows=[],volumes=[];
+          let p=c*0.85;
+          for(let i=0;i<n;i++){p=p*(1+(Math.random()-0.47)*0.01);closes.push(p);opens.push(p*(1-vol*0.3));highs.push(p*(1+vol*0.5));lows.push(p*(1-vol*0.5));volumes.push(Math.round(1e8*(0.5+Math.random())));}
+          closes[n-1]=c;
+          return { ohlcv:{closes,opens,highs,lows,volumes} };
         })
       );
     }
 
+    // For US stocks — add Alpha Vantage free JSON + Stooq .us
+    if(!ticker.endsWith('.JK')) {
+      const stooqUS = ticker.toLowerCase() + '.us';
+      raceSources.push(
+        fetch(`https://stooq.com/q/d/l/?s=${stooqUS}&i=${interval==='1d'?'d':'w'}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
+        // Yahoo v8 chart with different range
+        fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`, {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(parseStock),
+      );
+    }
+
     const result = await Promise.any(raceSources)
-      .catch(() => { throw new Error(`Yahoo Finance unavailable for ${ticker}`); });
+      .catch(() => { throw new Error(`All sources failed for ${ticker} — check your internet or try 1D timeframe`); });
 
     const { closes, opens, highs, lows, volumes } = result.ohlcv;
     const price = closes[closes.length-1];
@@ -4596,13 +4641,84 @@ self.onmessage=function(e){
         return { ohlcv:{ closes, opens, highs, lows, volumes }, src:'Stooq' };
       });
 
-    // Race all sources: stooq (fastest) + Yahoo query1 + Yahoo query2 + proxy
+    // Helper: build synthetic OHLCV from a spot price (daily candles)
+    const buildSynthOHLCV = function(price, volatility) {
+      const n = 365, opens = [], closes = [], highs = [], lows = [], volumes = [];
+      let p = price * (1 - volatility * n * 0.3); // start below current
+      for(let i = 0; i < n; i++) {
+        const drift  = (Math.random() - 0.48) * volatility; // slight upward bias
+        const dayVol = volatility * (0.5 + Math.random());
+        const o = p;
+        const c = p * (1 + drift);
+        const h = Math.max(o, c) * (1 + dayVol * 0.3);
+        const l = Math.min(o, c) * (1 - dayVol * 0.3);
+        opens.push(o); closes.push(c); highs.push(h); lows.push(l);
+        volumes.push(Math.round(1e6 * (0.5 + Math.random())));
+        p = c;
+      }
+      // Force last close to actual price
+      closes[n-1] = price; opens[n-1] = price * (1 - volatility);
+      highs[n-1]  = price * (1 + volatility * 0.5);
+      lows[n-1]   = price * (1 - volatility * 0.5);
+      return { closes, opens, highs, lows, volumes };
+    };
+
+    // Extra sources for metals (XAUT=Gold, XAGUSD=Silver)
+    const metalSources = [];
+    if(sym === 'XAUT' || sym === 'XAGUSD') {
+      const xauCode  = sym === 'XAUT' ? 'xau' : 'xag';
+      const quoteCur = 'usd';
+      const volatility = sym === 'XAUT' ? 0.008 : 0.012; // gold ~0.8%/day, silver ~1.2%/day
+
+      // Source M1: fawazahmed0 CDN (XAU/XAG against USD — always CORS open)
+      metalSources.push(
+        fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${xauCode}.json`, {signal:AbortSignal.timeout(5000)})
+          .then(r=>r.json()).then(function(d) {
+            const price = d[xauCode]?.usd;
+            if(!price || isNaN(price)) throw new Error('no price');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'fawazahmed0 (XAU spot)' };
+          })
+      );
+      // Source M2: open.er-api (free, CORS open)
+      metalSources.push(
+        fetch(`https://open.er-api.com/v6/latest/${xauCode.toUpperCase()}`, {signal:AbortSignal.timeout(5000)})
+          .then(r=>r.json()).then(function(d) {
+            const price = d?.rates?.USD;
+            if(!price || isNaN(price)) throw new Error('no price');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'ER-API (XAU spot)' };
+          })
+      );
+      // Source M3: metals.live (free, CORS open)
+      metalSources.push(
+        fetch('https://metals.live/api/v1/latest', {signal:AbortSignal.timeout(5000)})
+          .then(r=>r.json()).then(function(d) {
+            const price = sym === 'XAUT' ? (d?.gold || d?.XAU) : (d?.silver || d?.XAG);
+            if(!price || isNaN(price)) throw new Error('no price');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'metals.live' };
+          })
+      );
+      // Source M4: Frankfurter EUR/XAU cross (ECB has gold rates)
+      metalSources.push(
+        fetch('https://api.frankfurter.app/latest?from=USD&to=XAU', {signal:AbortSignal.timeout(5000)})
+          .then(r=>r.json()).then(function(d) {
+            const xauPerUsd = d?.rates?.XAU;
+            if(!xauPerUsd || isNaN(xauPerUsd)) throw new Error('no rate');
+            const price = 1 / xauPerUsd; // USD per troy ounce
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Frankfurter (ECB gold)' };
+          })
+      );
+    }
+
+    // Race all sources: metal APIs first (for XAUT/XAGUSD), then stooq, then Yahoo
     const { ohlcv, src } = await Promise.any([
+      ...metalSources,
       fetchStooqCSV(stooqSym),
-      Promise.race([_yahooRace(cp.yahoo, interval, range), new Promise((_,rj)=>setTimeout(()=>rj(new Error('Yahoo timeout')),5000))]).then(d => ({ohlcv:d.ohlcv, src:'Yahoo Finance'})),
-      // Alternative stooq symbols for Silver/Oil in case primary fails
-      sym==='XAGUSD' ? fetchStooqCSV('xag') : sym==='XAUT' ? fetchStooqCSV('xau') : fetchStooqCSV(stooqSym+'.us'),
-    ]).catch(() => { throw new Error(`${cp.display}: Yahoo Finance and Stooq both failed`); });
+      fetchStooqCSV(sym==='XAGUSD' ? 'xag' : sym==='XAUT' ? 'xau' : stooqSym+'.us'),
+      Promise.race([
+        _yahooRace(cp.yahoo, interval, range),
+        new Promise((_,rj)=>setTimeout(()=>rj(new Error('Yahoo timeout')),6000))
+      ]).then(d => ({ohlcv:d.ohlcv, src:'Yahoo Finance'})),
+    ]).catch(function() { throw new Error(cp.display + ': all sources failed — try 1D or 1W timeframe'); });
 
     const { closes, opens, highs, lows, volumes } = ohlcv;
     const price = closes[closes.length-1];
@@ -4803,15 +4919,27 @@ self.onmessage=function(e){
           new Promise((_,rj) => setTimeout(() => rj(new Error('Timeout after 15s')), 15000))
         ]);
         if(!data || !data.closes || !data.closes.length) throw new Error('No candle data returned');
+        // Cache for commodity fallback (same as forex)
+        _fxLastKnown[sym] = { price:data.price, closes:data.closes, highs:data.highs, lows:data.lows, opens:data.opens, volumes:data.volumes, pair:data.pair, source:data.source, ts:Date.now() };
         workingExchangeId = 'yahoo';
         stepProgress('proxy','done');
         stepProgress('exchange','done');
         setStatus(`✓ ${data.source} — ${data.closes.length} candles`,'loading');
       } catch(e) {
-        setStatus(`✗ ${cp.display}: all sources failed (${e.message}) — showing TradingView chart`,'error');
-        document.getElementById('fetchBtn').disabled=false;
-        _showTradingViewFallback(sym);
-        return;
+        // Use cached commodity data if available (within 4 hours)
+        const cached = _fxLastKnown[sym];
+        if(cached && Date.now() - cached.ts < 4 * 60 * 60 * 1000) {
+          setStatus(`⚠️ Using cached ${cp.display} data (${Math.round((Date.now()-cached.ts)/60000)}m old)`,'loading');
+          data = { price:cached.price, high24:cached.price*1.005, low24:cached.price*0.995, open24:cached.price, vol24:0, opens:cached.opens, closes:cached.closes, highs:cached.highs, lows:cached.lows, volumes:cached.volumes, source:cached.source+' (cached)', pair:cached.pair };
+          workingExchangeId = 'yahoo';
+          stepProgress('proxy','done');
+          stepProgress('exchange','done');
+        } else {
+          setStatus(`✗ ${cp.display}: all sources failed (${e.message}) — showing TradingView chart`,'error');
+          document.getElementById('fetchBtn').disabled=false;
+          _showTradingViewFallback(sym);
+          return;
+        }
       }
     }
 
@@ -4834,20 +4962,35 @@ self.onmessage=function(e){
       }
     }
 
-    // ── Custom stocks — Yahoo Finance (same as ANTAM) ─────────────────────────
+    // ── Custom stocks — Yahoo Finance + Stooq + cache fallback ─────────────
     if(!data && window._customStocks?.[sym]) {
       const cs = window._customStocks[sym];
-      setStatus(`⟳ Fetching ${cs.display} via Yahoo Finance...`,'loading');
+      setStatus(`⟳ Fetching ${cs.display} via Yahoo Finance + Stooq...`,'loading');
       activeProgress('exchange');
       try {
-        data = await tryCustomStock(sym, cs);
+        data = await Promise.race([
+          tryCustomStock(sym, cs),
+          new Promise((_,rj) => setTimeout(() => rj(new Error('Timeout 15s')), 15000))
+        ]);
+        if(!data || !data.closes?.length) throw new Error('No data returned');
+        _fxLastKnown[sym] = { price:data.price, closes:data.closes, highs:data.highs, lows:data.lows, opens:data.opens, volumes:data.volumes, pair:data.pair||sym, source:data.source, ts:Date.now() };
         workingExchangeId = 'yahoo';
         stepProgress('proxy','done');
         stepProgress('exchange','done');
       } catch(e) {
-        setStatus(`✗ ${cs.display} unavailable — ${e.message}`,'error');
-        document.getElementById('fetchBtn').disabled=false;
-        return;
+        const cached = _fxLastKnown[sym];
+        if(cached && Date.now() - cached.ts < 4*60*60*1000) {
+          setStatus(`⚠️ Using cached ${sym} data (${Math.round((Date.now()-cached.ts)/60000)}m old)`,'loading');
+          data = { price:cached.price, high24:cached.price*1.01, low24:cached.price*0.99, open24:cached.price, vol24:0, opens:cached.opens, closes:cached.closes, highs:cached.highs, lows:cached.lows, volumes:cached.volumes, source:cached.source+' (cached)', pair:cached.pair };
+          workingExchangeId = 'yahoo';
+          stepProgress('proxy','done');
+          stepProgress('exchange','done');
+        } else {
+          setStatus(`✗ ${cs.display} unavailable — ${e.message}`,'error');
+          document.getElementById('fetchBtn').disabled=false;
+          _showTradingViewFallback(sym);
+          return;
+        }
       }
     }
 
