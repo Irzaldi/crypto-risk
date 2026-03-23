@@ -3345,65 +3345,53 @@ self.onmessage=function(e){
   let _analysisCallbacks = {};
   let _analysisIdCounter = 0;
 
-  function getAnalysisWorker() {
-    if(_analysisWorker) return _analysisWorker;
-    try {
-      const src = document.getElementById('analysis-worker-src').textContent;
-      const blob = new Blob([src], { type:'application/javascript' });
-      _analysisWorker = new Worker(URL.createObjectURL(blob));
-      _analysisWorker.onmessage = function(e) {
-        const { type, id, payload, error } = e.data;
-        const cb = _analysisCallbacks[id];
-        if(!cb) return;
-        if(type === 'ERROR')  { delete _analysisCallbacks[id]; cb.reject(new Error(error)); }
-        else if(type === 'WAVE1') { cb.wave1(payload); }
-        else if(type === 'WAVE2') { delete _analysisCallbacks[id]; cb.wave2(payload); }
+  // ── Analysis dispatcher — tries Web Worker first, falls back to async main thread ──
+  function _tryWorker(payload, onWave1, onWave2) {
+    return new Promise(function(resolve, reject) {
+      // Attempt to create blob worker
+      let worker = null;
+      try {
+        const src = document.getElementById('analysis-worker-src').textContent;
+        const blob = new Blob([src], { type:'application/javascript' });
+        const url  = URL.createObjectURL(blob);
+        worker = new Worker(url);
+      } catch(e) {
+        reject(new Error('blob worker blocked: ' + e.message));
+        return;
+      }
+
+      const _timeout = setTimeout(function() {
+        worker.terminate();
+        reject(new Error('worker timeout'));
+      }, 15000);
+
+      worker.onmessage = function(e) {
+        const { type, payload: p, error } = e.data;
+        if(type === 'WAVE1') { try { onWave1(p); } catch(err) {} }
+        else if(type === 'WAVE2') {
+          clearTimeout(_timeout);
+          worker.terminate();
+          try { onWave2(p); resolve(); } catch(err) { reject(err); }
+        }
+        else if(type === 'ERROR') {
+          clearTimeout(_timeout);
+          worker.terminate();
+          reject(new Error(error || 'worker error'));
+        }
       };
-      _analysisWorker.onerror = function(err) {
-        console.warn('Analysis worker error:', err.message || 'unknown');
-        // Reject ALL pending callbacks so dispatchAnalysis doesn't hang
-        const pending = Object.keys(_analysisCallbacks);
-        pending.forEach(function(id) {
-          const cb = _analysisCallbacks[id];
-          if(cb && cb.reject) cb.reject(new Error('Worker crashed: ' + (err.message || 'unknown error')));
-          delete _analysisCallbacks[id];
-        });
-        _analysisWorker = null;
+      worker.onerror = function(err) {
+        clearTimeout(_timeout);
+        worker.terminate();
+        reject(new Error('worker crash: ' + (err.message||'unknown')));
       };
-    } catch(e) {
-      console.warn('Could not create analysis worker:', e.message);
-      _analysisWorker = null;
-    }
-    return _analysisWorker;
+      worker.postMessage({ type:'ANALYZE', id:1, payload });
+    });
   }
 
   function dispatchAnalysis(payload, onWave1, onWave2) {
-    return new Promise((resolve, reject) => {
-      const worker = getAnalysisWorker();
-      if(!worker) { reject(new Error('no worker')); return; }
-      const id = ++_analysisIdCounter;
-
-      // 30 second hard timeout — prevents hanging forever
-      const _timeout = setTimeout(function() {
-        if(_analysisCallbacks[id]) {
-          delete _analysisCallbacks[id];
-          reject(new Error('Analysis worker timed out after 30s'));
-        }
-      }, 30000);
-
-      _analysisCallbacks[id] = {
-        wave1: function(data) {
-          try { onWave1(data); } catch(err) { console.warn('wave1 error', err); }
-        },
-        wave2: function(data) {
-          clearTimeout(_timeout);
-          delete _analysisCallbacks[id];
-          try { onWave2(data); resolve(); } catch(err) { reject(err); }
-        },
-        reject: function(e) { clearTimeout(_timeout); reject(e); }
-      };
-      worker.postMessage({ type:'ANALYZE', id, payload });
-    });
+    return _tryWorker(payload, onWave1, onWave2);
+    // Note: fallback is handled by the .catch() in fetchData which has closure access
+    // to snap variables (_snapPair, _snapSource etc.)
   }
 
 
@@ -5520,14 +5508,16 @@ self.onmessage=function(e){
       // Wave 2 callback (slow: chart + backtest + volume profile + key levels)
       (w2) => _applyWave2(w2,_snapPrice,_snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,_snapSym,_snapTF)
     ).catch(err=>{
-      console.warn('Worker failed/timed out:', err.message, '— running on main thread');
-      setStatus('⟳ Running analysis on main thread...', 'loading');
-      // Use setTimeout to yield to browser so status bar updates before heavy computation
-      setTimeout(function() {
-        _runAnalysisMainThread(_snapPair,_snapSource,_snapSym,_snapPrice,
-          _snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,
-          _snapIsBUY,_snapIsSELL,_snapBelowCount,_snapAboveCount,_snapTF,rm);
-      }, 50);
+      console.info('Using main thread fallback:', err.message);
+      setStatus('⟳ Computing analysis...', 'loading');
+      // Two-frame delay: first frame paints status, second frame starts computation
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          _runAnalysisMainThread(_snapPair,_snapSource,_snapSym,_snapPrice,
+            _snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,
+            _snapIsBUY,_snapIsSELL,_snapBelowCount,_snapAboveCount,_snapTF,rm);
+        });
+      });
     });
 
     updateSessionPnL();
