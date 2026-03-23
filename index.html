@@ -5476,8 +5476,6 @@ self.onmessage=function(e){
     setChk(5,_ema50!==null?(_snapPrice>_ema50?'pass':'warn'):'warn',_ema50!==null?`Price ${_snapPrice>_ema50?'above':'below'} EMA50 @ ${fmtP(_ema50)}` :'EMA50 unavailable');
     setChk(6,_volR>100?'pass':_volR>80?'warn':'fail',`Volume at ${_volR.toFixed(0)}% of 20-candle avg ${_volR>100?'✓':'(weak)'}`);
     setChk(7,rm&&rm.riskPct<=2?'pass':rm&&rm.riskPct<=3?'warn':'fail',rm?`Risking ${rm.riskPct}% ${rm.riskPct<=1?'(Conservative ✓)':rm.riskPct<=2?'(Acceptable ✓)':'(Aggressive!)'}` :'—');
-    stepProgress('score','done');
-    activeProgress('predict');
 
     // ── alerts stay on main thread ──
     checkAlerts(_snapPrice, sym);
@@ -5536,7 +5534,9 @@ self.onmessage=function(e){
   // ── WAVE 1: indicators + score + prediction + patterns ───────────────────
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
     stepProgress('indicators','done');
-    activeProgress('score');
+    stepProgress('score','done');
+    stepProgress('predict','done');
+    setStatus('✓ Analysis complete','loading');
     const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
 
@@ -5750,6 +5750,8 @@ self.onmessage=function(e){
     // ── Chart ───────────────────────────────────────────────────────────────
     drawMiniChart(opens||closes,closes,highs,lows,chart.e8,chart.e21,chart.e55,chart.e200,sym,tf);
     window._lastChartData={opens:opens||closes,closes,highs,lows,volumes,e8:chart.e8,e21:chart.e21,e55:chart.e55,e200:chart.e200,sym,tf};
+    setStatus('✓ ' + sym + ' live data loaded','loading');
+    document.getElementById('fetchBtn').disabled=false;
 
     // ── Backtest ─────────────────────────────────────────────────────────────
     const btEl=document.getElementById('btPanel');
@@ -6135,6 +6137,7 @@ self.onmessage=function(e){
     // Apply in two waves same as worker path
     _applyWave1({ind,score:scoreData,prediction:predData,patterns:patsData,elapsed1:0},pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,tf,rm,ind.rsi,ind.macdV);
     _applyWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest:btData,volumeProfile:vpData,keyLevels:klData,advPatterns:advPatsData,elapsed2:0,totalElapsed:0},price,opens,closes,highs,lows,volumes,sym,tf);
+    document.getElementById('fetchBtn').disabled=false;
     saveSnapshot({pair,source,price,tf,rsi:ind.rsi?.toFixed(2),macd:ind.macdV?.toFixed(4),ema55:ind.ema55?.toFixed(4),ema200:ind.ema200?.toFixed(4),adx:ind.adxData?.adx?.toFixed(1),atr:ind.atr?.toFixed(4),volR:ind.volR?.toFixed(1),score:scoreData.overall,strategy:isBUY?'BUY':isSELL?'SELL':'NEUTRAL',prediction:predData.direction,confidence:predData.confidence+'%',entry:fmtP(predData.entry),sl:fmtP(predData.sl),tp1:fmtP(predData.tp1),tp2:fmtP(predData.tp2)});
   }
 
