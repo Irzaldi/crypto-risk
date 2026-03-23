@@ -5085,7 +5085,7 @@ self.onmessage=function(e){
     }
 
     stepProgress('candles','done');
-    setStatus('⟳ Processing candle data...','loading');
+    setStatus('⟳ Data loaded — starting analysis...','loading');
     activeProgress('indicators');
 
     document.getElementById('headerDot').className='live-dot';
@@ -5283,9 +5283,7 @@ self.onmessage=function(e){
     document.getElementById('pcHigh').textContent=fmtP(high24);
     document.getElementById('pcLow').textContent=fmtP(low24);
 
-    // Indicators calculated by worker — keep active until _applyWave1 returns
-    // stepProgress('indicators','done') is called inside _applyWave1
-    activeProgress('indicators');
+    // Indicators being calculated by worker — _applyWave1 will mark done
 
     const mtfResults = [];
     (async () => {
@@ -5468,6 +5466,7 @@ self.onmessage=function(e){
 
     // ── Quick indicators on main thread (instant, shown immediately) ──
     // (_rsi, _macdV, _ema20, _ema50, _volR already computed above before TL signal block)
+    setStatus('⟳ Running indicator calculations...','loading');
     activeProgress('score');
 
     function setChk(i,t,txt){const ic=document.getElementById('ci'+i),tx=document.getElementById('ct'+i);ic.className='chk-icon '+(t==='pass'?'ci-pass':t==='fail'?'ci-fail':'ci-warn');ic.textContent=t==='pass'?'✓':t==='fail'?'✗':'⚠';tx.textContent=txt;}
@@ -5537,7 +5536,6 @@ self.onmessage=function(e){
   // ── WAVE 1: indicators + score + prediction + patterns ───────────────────
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
     stepProgress('indicators','done');
-    activeProgress('score');
     const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
 
@@ -5731,7 +5729,7 @@ self.onmessage=function(e){
     window._lastPrediction = prediction;
 
     // ── Status: wave 1 timing ───────────────────────────────────────────────
-    setStatus(`✓ ${pair} — ${source} · ${fmtP(price)} | RSI: ${(rsi||_rsi)?.toFixed(1)||'—'} | Score: ${overall}/100 · ⚡ W1:${elapsed1}ms`,'success');
+    // status already set by predict done above — don't overwrite
   }
 
   // ── WAVE 2: chart + backtest + volume profile + key levels + S&R ──────────
