@@ -5174,7 +5174,7 @@ self.onmessage=function(e){
     function setCache(s, tf, d) { window._candleCache[getCacheKey(s, tf)] = { data:d, ts:Date.now() }; }
 
     async function fetchMTFCandles(s, tf) {
-      if(FOREX_PAIRS[s] || s==='ANTAM') return null;
+      if(FOREX_PAIRS[s] || COMMODITY_PAIRS[s] || s==='ANTAM' || window._customStocks?.[s]) return null;
       const cached = getCached(s, tf);
       if(cached) return cached;
       const exOrder = ['binance','okx','bybit','mexc','gateio','kucoin'];
@@ -5215,7 +5215,10 @@ self.onmessage=function(e){
       const batchUrls = mtfTFs.map(tf => mtfUrl(exId, sym2, tf)).filter(Boolean);
       mtfPromisesEarly = (async () => {
         try {
-          const batchResults = await workerBatch(batchUrls);
+          const batchResults = await Promise.race([
+            workerBatch(batchUrls),
+            new Promise((_,rj) => setTimeout(() => rj(new Error('MTF timeout')), 8000))
+          ]);
           return mtfTFs.map((tf, i) => {
             const raw = batchResults[i];
             if(!raw) return { id: mtfIds[i], parsed: null };
@@ -5534,9 +5537,7 @@ self.onmessage=function(e){
   // ── WAVE 1: indicators + score + prediction + patterns ───────────────────
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
     stepProgress('indicators','done');
-    stepProgress('score','done');
-    stepProgress('predict','done');
-    setStatus('✓ Analysis complete','loading');
+    activeProgress('score');
     const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
 
@@ -5673,6 +5674,8 @@ self.onmessage=function(e){
     ring.style.strokeDashoffset=339.29-(339.29*overall/100);
     const rc=overall>=70?'var(--green)':overall>=45?'var(--warn)':'var(--red)';
     ring.style.stroke=rc;
+    stepProgress('score','done');
+    activeProgress('predict');
     document.getElementById('scoreNum').textContent=overall;
     document.getElementById('scoreNum').style.color=rc;
     function setBk(id,v){const el=document.getElementById(id);el.textContent=v+'/100';el.style.color=v>=60?'var(--green)':v>=40?'var(--warn)':'var(--red)';}
@@ -5683,12 +5686,12 @@ self.onmessage=function(e){
     if(overall>=70){vb.style.cssText=base+';background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.3);color:var(--green)';vb.textContent='✅ HIGH CONFIDENCE — GOOD SETUP';}
     else if(overall>=45){vb.style.cssText=base+';background:rgba(255,184,0,.08);border:1px solid rgba(255,184,0,.25);color:var(--warn)';vb.textContent='⚠️ MODERATE — TRADE WITH CAUTION';}
     else{vb.style.cssText=base+';background:rgba(255,45,85,.08);border:1px solid rgba(255,45,85,.3);color:var(--red)';vb.textContent='🚫 LOW CONFIDENCE — AVOID THIS TRADE';}
-    stepProgress('predict','done');
-
     // ── Prediction panel ────────────────────────────────────────────────────
     const pd=document.getElementById('pred-direction');pd.textContent=prediction.direction;pd.style.color=prediction.dirColor;
     document.getElementById('pred-direction-detail').textContent=prediction.dirDetail;
     document.getElementById('pred-direction-detail').style.color=prediction.dirColor;
+    stepProgress('predict','done');
+    setStatus('✓ ' + sym + ' — analysis complete', 'loading');
     const pc=document.getElementById('pred-confidence');pc.textContent=prediction.confidence+'%';pc.style.color=prediction.confColor;
     document.getElementById('pred-confidence-detail').textContent=prediction.confLabel;
     document.getElementById('pred-confidence-detail').style.color=prediction.confColor;
@@ -5750,8 +5753,6 @@ self.onmessage=function(e){
     // ── Chart ───────────────────────────────────────────────────────────────
     drawMiniChart(opens||closes,closes,highs,lows,chart.e8,chart.e21,chart.e55,chart.e200,sym,tf);
     window._lastChartData={opens:opens||closes,closes,highs,lows,volumes,e8:chart.e8,e21:chart.e21,e55:chart.e55,e200:chart.e200,sym,tf};
-    setStatus('✓ ' + sym + ' live data loaded','loading');
-    document.getElementById('fetchBtn').disabled=false;
 
     // ── Backtest ─────────────────────────────────────────────────────────────
     const btEl=document.getElementById('btPanel');
