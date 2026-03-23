@@ -5520,11 +5520,14 @@ self.onmessage=function(e){
       // Wave 2 callback (slow: chart + backtest + volume profile + key levels)
       (w2) => _applyWave2(w2,_snapPrice,_snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,_snapSym,_snapTF)
     ).catch(err=>{
-      console.warn('Analysis worker failed/timed out, running on main thread:', err.message);
+      console.warn('Worker failed/timed out:', err.message, '— running on main thread');
       setStatus('⟳ Running analysis on main thread...', 'loading');
-      _runAnalysisMainThread(_snapPair,_snapSource,_snapSym,_snapPrice,
-        _snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,
-        _snapIsBUY,_snapIsSELL,_snapBelowCount,_snapAboveCount,_snapTF,rm);
+      // Use setTimeout to yield to browser so status bar updates before heavy computation
+      setTimeout(function() {
+        _runAnalysisMainThread(_snapPair,_snapSource,_snapSym,_snapPrice,
+          _snapOpens,_snapCloses,_snapHighs,_snapLows,_snapVolumes,
+          _snapIsBUY,_snapIsSELL,_snapBelowCount,_snapAboveCount,_snapTF,rm);
+      }, 50);
     });
 
     updateSessionPnL();
@@ -6098,6 +6101,14 @@ self.onmessage=function(e){
   }
 
   function _runAnalysisMainThread(pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,belowCount,aboveCount,tf,rm){
+    // Trim to 500 candles for performance
+    const _trim = a => a && a.length > 500 ? a.slice(-500) : a;
+    closes=_trim(closes); highs=_trim(highs); lows=_trim(lows);
+    volumes=_trim(volumes); opens=_trim(opens);
+    // Sanitize
+    const _san = a => a ? a.map(v=>{const n=+v;return isFinite(n)?n:0;}) : [];
+    closes=_san(closes); highs=_san(highs); lows=_san(lows);
+    volumes=_san(volumes); opens=_san(opens);
     const ind={rsi:calcRSI(closes),macdV:calcMACD(closes),ema8:calcEMA(closes,8),ema13:calcEMA(closes,13),ema20:calcEMA(closes,20),ema21:calcEMA(closes,21),ema50:calcEMA(closes,50),ema55:calcEMA(closes,55),ema200:calcEMA(closes,200),bbP:calcBB(closes),stoch:calcStochRSI(closes),willR:calcWilliamsR(highs,lows,closes),atr:calcATR(highs,lows,closes),adxData:calcADX(highs,lows,closes),obvData:calcOBV(closes,volumes),ichi:calcIchimoku(highs,lows,closes),st:calcSuperTrend(highs,lows,closes,CFG.stPeriod||10,CFG.stMult||3),piv:calcPivots(highs,lows,closes),div:calcDivergence(closes),vwap:calcVWAP(closes,highs,lows,volumes),mvwap:calcMVWAP(closes,highs,lows,volumes),cci:calcCCI(highs,lows,closes),mfi:calcMFI(highs,lows,closes,volumes),roc:calcROC(closes),ult:calcUltimateOscillator(highs,lows,closes),psar:calcParabolicSAR(highs,lows,closes),cmf:calcCMF(highs,lows,closes,volumes),kelt:calcKeltner(highs,lows,closes),volR:(()=>{const a=volumes.slice(-20).reduce((a,b)=>a+b,0)/20;return a>0?(volumes[volumes.length-1]/a)*100:100;})()};
     // Build score
     const {rsi,macdV,stoch,willR,bbP,div,ema8,ema13,ema21,ema55,ema200,adxData,ichi,st,piv,obvData,volR,cci,mfi,roc,ult,psar,cmf,kelt}=ind;
@@ -6133,10 +6144,13 @@ self.onmessage=function(e){
     const advPatsData=opens?computeAdvancedPatterns(opens,highs,lows,closes):null;
     const patsData=opens?computeCandlePatterns(opens,highs,lows,closes):null;
     const klData=computeKeyLevels(price,highs,lows,closes,ind.atr);
-    // Apply in two waves same as worker path
+    // Apply wave1 immediately (indicators + score + prediction)
     _applyWave1({ind,score:scoreData,prediction:predData,patterns:patsData,elapsed1:0},pair,source,sym,price,opens,closes,highs,lows,volumes,isBUY,isSELL,tf,rm,ind.rsi,ind.macdV);
-    _applyWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest:btData,volumeProfile:vpData,keyLevels:klData,advPatterns:advPatsData,elapsed2:0,totalElapsed:0},price,opens,closes,highs,lows,volumes,sym,tf);
-    document.getElementById('fetchBtn').disabled=false;
+    // Yield to browser so wave1 UI updates render, then apply wave2 (chart + backtest)
+    setTimeout(function() {
+      _applyWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest:btData,volumeProfile:vpData,keyLevels:klData,advPatterns:advPatsData,elapsed2:0,totalElapsed:0},price,opens,closes,highs,lows,volumes,sym,tf);
+      document.getElementById('fetchBtn').disabled=false;
+    }, 0);
     saveSnapshot({pair,source,price,tf,rsi:ind.rsi?.toFixed(2),macd:ind.macdV?.toFixed(4),ema55:ind.ema55?.toFixed(4),ema200:ind.ema200?.toFixed(4),adx:ind.adxData?.adx?.toFixed(1),atr:ind.atr?.toFixed(4),volR:ind.volR?.toFixed(1),score:scoreData.overall,strategy:isBUY?'BUY':isSELL?'SELL':'NEUTRAL',prediction:predData.direction,confidence:predData.confidence+'%',entry:fmtP(predData.entry),sl:fmtP(predData.sl),tp1:fmtP(predData.tp1),tp2:fmtP(predData.tp2)});
   }
 
