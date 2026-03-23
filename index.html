@@ -3360,7 +3360,14 @@ self.onmessage=function(e){
         else if(type === 'WAVE2') { delete _analysisCallbacks[id]; cb.wave2(payload); }
       };
       _analysisWorker.onerror = function(err) {
-        console.warn('Analysis worker error:', err.message);
+        console.warn('Analysis worker error:', err.message || 'unknown');
+        // Reject ALL pending callbacks so dispatchAnalysis doesn't hang
+        const pending = Object.keys(_analysisCallbacks);
+        pending.forEach(function(id) {
+          const cb = _analysisCallbacks[id];
+          if(cb && cb.reject) cb.reject(new Error('Worker crashed: ' + (err.message || 'unknown error')));
+          delete _analysisCallbacks[id];
+        });
         _analysisWorker = null;
       };
     } catch(e) {
@@ -4377,7 +4384,8 @@ self.onmessage=function(e){
           synth.push({ date, rate: r });
         }
         synth[synth.length-1].rate = rate;
-        return synth;
+        // Guard against negative/zero rates
+        return synth.map(function(s){ return { date:s.date, rate: Math.max(s.rate, rate * 0.001) }; });
       };
       sources.push(
         fetch(urlFawaz, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
@@ -4705,6 +4713,14 @@ self.onmessage=function(e){
       closes[n-1] = price; opens[n-1] = price * (1 - volatility);
       highs[n-1]  = price * (1 + volatility * 0.5);
       lows[n-1]   = price * (1 - volatility * 0.5);
+      // Guard: ensure no negatives or zeros (can happen with small starting price)
+      const minPrice = price * 0.01;
+      for(let i=0;i<n;i++){
+        closes[i]  = Math.max(closes[i],  minPrice);
+        opens[i]   = Math.max(opens[i],   minPrice);
+        highs[i]   = Math.max(highs[i],   closes[i]);
+        lows[i]    = Math.max(Math.min(lows[i], closes[i] * 0.99), minPrice);
+      }
       return { closes, opens, highs, lows, volumes };
     };
 
@@ -5076,6 +5092,13 @@ self.onmessage=function(e){
     document.getElementById('sourceLabel').textContent=data.source.toUpperCase()+' LIVE';
 
     const{price,high24,low24,open24,vol24,opens,closes,highs,lows,volumes,source,pair}=data;
+
+    // ── Validate data arrays before processing ──
+    if(!closes || closes.length < 2 || !isFinite(price) || price <= 0) {
+      setStatus('✗ Invalid candle data received — retrying...','error');
+      document.getElementById('fetchBtn').disabled=false;
+      return;
+    }
 
     // ── Draw chart immediately with raw candle data (no EMA overlay yet) ──
     // This ensures chart shows even if worker is slow or fails
@@ -5468,9 +5491,23 @@ self.onmessage=function(e){
     const _tVolumes = _trimArr(_snapVolumes);
     const _tOpens   = _trimArr(_snapOpens);
 
+    // ── Sanitize arrays before sending to worker (NaN/Infinity crash it) ──
+    const _sanitize = function(arr) {
+      if(!arr || !arr.length) return [];
+      return arr.map(function(v) {
+        const n = +v;
+        return isFinite(n) ? n : 0;
+      });
+    };
+    const _sCloses  = _sanitize(_tCloses);
+    const _sHighs   = _sanitize(_tHighs);
+    const _sLows    = _sanitize(_tLows);
+    const _sVolumes = _sanitize(_tVolumes);
+    const _sOpens   = _sanitize(_tOpens);
+
     // ── dispatch ALL heavy work to analysis worker ──────────────────────────
     const _workerPayload = {
-      closes:_tCloses,highs:_tHighs,lows:_tLows,volumes:_tVolumes,opens:_tOpens,price:_snapPrice,sym:_snapSym,tf:_snapTF,
+      closes:_sCloses,highs:_sHighs,lows:_sLows,volumes:_sVolumes,opens:_sOpens,price:_snapPrice,sym:_snapSym,tf:_snapTF,
       isBUY:_snapIsBUY,isSELL:_snapIsSELL,belowCount:_snapBelowCount,aboveCount:_snapAboveCount,
       mtfScore:window._mtfScore||50,rm,cfg:{stPeriod:CFG.stPeriod||10,stMult:CFG.stMult||3}
     };
