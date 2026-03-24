@@ -3346,52 +3346,121 @@ self.onmessage=function(e){
   let _analysisIdCounter = 0;
 
   // ── Analysis dispatcher — tries Web Worker first, falls back to async main thread ──
-  function _tryWorker(payload, onWave1, onWave2) {
-    return new Promise(function(resolve, reject) {
-      // Attempt to create blob worker
-      let worker = null;
-      try {
-        const src = document.getElementById('analysis-worker-src').textContent;
-        const blob = new Blob([src], { type:'application/javascript' });
-        const url  = URL.createObjectURL(blob);
-        worker = new Worker(url);
-      } catch(e) {
-        reject(new Error('blob worker blocked: ' + e.message));
-        return;
-      }
-
-      const _timeout = setTimeout(function() {
-        worker.terminate();
-        reject(new Error('worker timeout'));
-      }, 15000);
-
-      worker.onmessage = function(e) {
-        const { type, payload: p, error } = e.data;
-        if(type === 'WAVE1') { try { onWave1(p); } catch(err) {} }
-        else if(type === 'WAVE2') {
-          clearTimeout(_timeout);
-          worker.terminate();
-          try { onWave2(p); resolve(); } catch(err) { reject(err); }
-        }
-        else if(type === 'ERROR') {
-          clearTimeout(_timeout);
-          worker.terminate();
-          reject(new Error(error || 'worker error'));
-        }
-      };
-      worker.onerror = function(err) {
-        clearTimeout(_timeout);
-        worker.terminate();
-        reject(new Error('worker crash: ' + (err.message||'unknown')));
-      };
-      worker.postMessage({ type:'ANALYZE', id:1, payload });
-    });
-  }
-
   function dispatchAnalysis(payload, onWave1, onWave2) {
-    return _tryWorker(payload, onWave1, onWave2);
-    // Note: fallback is handled by the .catch() in fetchData which has closure access
-    // to snap variables (_snapPair, _snapSource etc.)
+    // Pure inline analysis — no blob workers, no CSP issues
+    // Uses requestAnimationFrame to split wave1/wave2 so UI can paint between them
+    return new Promise(function(resolve, reject) {
+      const {closes,highs,lows,volumes,opens,price,isBUY,isSELL,
+             belowCount,aboveCount,mtfScore,rm,cfg,sym,tf} = payload;
+
+      // Wave 1 after one frame (status bar gets to paint first)
+      requestAnimationFrame(function() {
+        try {
+          // Compute all indicators inline (same math as worker, duplicated in main thread)
+          const [ema8,ema13,ema20,ema21,ema50,ema55,ema200] = calcEMABatch(closes,[8,13,20,21,50,55,200]);
+          const rsi=calcRSI(closes),macdV=calcMACD(closes),bbP=calcBB(closes);
+          const stoch=calcStochRSI(closes),willR=calcWilliamsR(highs,lows,closes);
+          const atr=calcATR(highs,lows,closes),adxData=calcADX(highs,lows,closes);
+          const st=calcSuperTrend(highs,lows,closes,cfg.stPeriod||10,cfg.stMult||3);
+          const piv=calcPivots(highs,lows,closes),obvData=calcOBV(closes,volumes);
+          const vwap=calcVWAP(closes,highs,lows,volumes),mvwap=calcMVWAP(closes,highs,lows,volumes);
+          const avgV=volumes.length>=20?volumes.slice(-20).reduce((a,b)=>a+b,0)/20:volumes.reduce((a,b)=>a+b,0)/volumes.length;
+          const volR=avgV>0?(volumes[volumes.length-1]/avgV)*100:100;
+          const mfi=calcMFI(highs,lows,closes,volumes),cmf=calcCMF(highs,lows,closes,volumes);
+          const cci=calcCCI(highs,lows,closes),roc=calcROC(closes);
+          const ult=calcUltimateOscillator(highs,lows,closes),psar=calcParabolicSAR(highs,lows,closes);
+          const kelt=calcKeltner(highs,lows,closes),ichi=calcIchimoku(highs,lows,closes);
+          const div=calcDivergence(closes);
+          const ind={rsi,macdV,ema8,ema13,ema20,ema21,ema50,ema55,ema200,bbP,stoch,willR,atr,
+            adxData,obvData,ichi,st,piv,div,vwap,mvwap,cci,mfi,roc,ult,volR,psar,cmf,kelt};
+
+          // Score
+          const {rsi:r,macdV:mv,stoch:st2,willR:wr,bbP:bp,div:dv,ema8:e8,ema13:e13,ema21:e21,
+            ema55:e55,ema200:e2,adxData:ad,ichi:ic,st:sT,piv:pv,obvData:ob,volR:vr,
+            cci:cc,mfi:mf,roc:rc,ult:ul,psar:ps,cmf:cf,kelt:kt}=ind;
+          let mS=0,mX=0;
+          if(r!==null){mX+=20;mS+=r>=45&&r<=65?20:r>=35&&r<45?12:r<30?16:r>70?4:8;}
+          if(mv!==null){mX+=20;mS+=mv>0?20:4;}
+          if(st2!==null){mX+=15;mS+=st2>=30&&st2<=70?15:st2<20?12:st2>80?3:8;}
+          if(wr!==null){mX+=12;mS+=wr>=-50&&wr<=-20?12:wr<-80?10:wr>-20?2:6;}
+          if(bp!==null){mX+=12;mS+=bp>=0.35&&bp<=0.65?12:bp<0.2?10:bp>0.8?2:6;}
+          if(cc!==null){mX+=10;mS+=cc<-100?10:cc>100?1:cc<0?7:5;}
+          if(mf!==null){mX+=10;mS+=mf<20?10:mf>80?1:mf<50?6:8;}
+          if(rc!==null){mX+=8;mS+=rc>2?8:rc>0?5:rc>-2?3:1;}
+          if(ul!==null){mX+=8;mS+=ul<30?8:ul>70?1:ul>=50?5:3;}
+          if(dv){mX+=21;mS+=dv.rsi==='bullish'?14:dv.rsi==='bearish'?0:7;mS+=dv.macd==='bullish'?7:dv.macd==='bearish'?0:4;}
+          const momS=mX>0?Math.round((mS/mX)*100):0;
+          let tS=0,tX=0;
+          if(e8){tX+=8;tS+=price>e8?8:0;}if(e13){tX+=8;tS+=price>e13?8:0;}
+          if(e21){tX+=8;tS+=price>e21?8:0;}if(e55){tX+=12;tS+=price>e55?12:0;}
+          if(e2){tX+=14;tS+=price>e2?14:0;}
+          if(ad){tX+=15;const{adx,diPlus,diMinus}=ad;tS+=adx>40?diPlus>diMinus?15:3:adx>25?diPlus>diMinus?10:3:6;}
+          if(ic){tX+=12;const ct=Math.max(ic.senkouA,ic.senkouB);const is=[price>ct,ic.tenkan>ic.kijun,ic.senkouA>ic.senkouB].filter(Boolean).length;tS+=is===3?12:is===2?8:is===1?4:0;}
+          if(sT){tX+=15;tS+=sT.trend==='up'?15:0;}
+          if(pv){tX+=8;tS+=price>pv.pp?6:0;tS+=price>pv.s1&&price<pv.r1?2:0;}
+          const trendS=tX>0?Math.round((tS/tX)*100):0;
+          let vS=0;if(ob){vS=ob.rising?60:0;}vS+=vr>120?40:vr>100?30:vr>80?20:5;vS=Math.min(100,vS);
+          let stS=0;if(isBUY)stS=100;else if(belowCount===2)stS=70;else if(belowCount===1)stS=45;else if(aboveCount===1)stS=35;else if(aboveCount===2)stS=20;else stS=5;
+          let rS=0;if(rm){rS+=rm.rr>=3?60:rm.rr>=2?45:rm.rr>=1.5?25:5;rS+=rm.riskPct<=1?40:rm.riskPct<=2?30:rm.riskPct<=3?15:0;}rS=Math.min(100,rS);
+          const overall=Math.round(momS*0.20+trendS*0.25+vS*0.15+stS*0.20+(mtfScore||50)*0.10+rS*0.10);
+          const bc=[r!==null&&r>50,mv!==null&&mv>0,price>(e8||0),price>(e55||0),price>(e2||0),ob!==null&&ob.rising,ad!==null&&ad.diPlus>ad.diMinus,sT!==null&&sT.trend==='up',isBUY,dv&&dv.rsi==='bullish'].filter(Boolean).length;
+          const biasT=bc>=7?'🟢 STRONG BULL':bc>=5?'🟢 BULLISH':bc===4?'🟡 MIXED':bc<=2?'🔴 BEARISH':'🟡 NEUTRAL';
+          const biasC=bc>=5?'var(--green)':bc===4?'var(--warn)':'var(--red)';
+          const score={overall,momS,tS:trendS,vS,stS,rS,biasT,biasC};
+
+          // Prediction (simplified inline)
+          let bS=0,beS=0,tW=0;
+          const add=(b,br,w)=>{tW+=w;if(b)bS+=w;else if(br)beS+=w;else{bS+=w*.5;beS+=w*.5;}};
+          add(isBUY,isSELL,25);if(r!==null)add(r>50&&r<70,r<50||r>75,10);if(mv!==null)add(mv>0,mv<0,10);
+          if(e55&&e2)add(price>e2,price<e2,10);if(e8&&e55)add(price>e55,price<e55,8);
+          if(ad)add(ad.diPlus>ad.diMinus&&ad.adx>20,ad.diMinus>ad.diPlus&&ad.adx>20,8);
+          if(ic){const ct=Math.max(ic.senkouA,ic.senkouB);add(price>ct&&ic.tenkan>ic.kijun,price<ct&&ic.tenkan<ic.kijun,8);}
+          if(sT)add(sT.trend==='up',sT.trend==='down',8);if(ob)add(ob.rising,!ob.rising,6);
+          if(dv)add(dv.rsi==='bullish'||dv.macd==='bullish',dv.rsi==='bearish'||dv.macd==='bearish',6);
+          const tot=bS+beS,bP=tot>0?bS/tot:0.5,brP=1-bP;
+          let direction,dirColor,dirDetail;
+          if(bP>=0.65){direction='📈 BULLISH';dirColor='var(--green)';dirDetail='Most indicators point UP';}
+          else if(brP>=0.65){direction='📉 BEARISH';dirColor='var(--red)';dirDetail='Most indicators point DOWN';}
+          else if(bP>=0.55){direction='🟢 SLIGHT UP';dirColor='var(--green)';dirDetail='Mild bullish bias';}
+          else if(brP>=0.55){direction='🔴 SLIGHT DOWN';dirColor='var(--red)';dirDetail='Mild bearish bias';}
+          else{direction='〰️ STABLE';dirColor='var(--warn)';dirDetail='No strong directional bias';}
+          const conf=Math.round(Math.max(bP,brP)*100);
+          const atrV=atr||(price*0.02);
+          const piv2=piv||{pp:price,r1:price+atrV*2,r2:price+atrV*3.5,s1:price-atrV*2,s2:price-atrV*3.5};
+          const isBull=bP>0.5;
+          const entry=isBull?price:piv2.r1,sl=isBull?piv2.s1-atrV*0.3:piv2.r2;
+          const tp1=isBull?piv2.r1:piv2.s1,tp2=isBull?piv2.r2:piv2.s2;
+          const rr=Math.abs(tp1-entry)/Math.max(0.001,Math.abs(entry-sl));
+          const prediction={direction,dirColor,dirDetail,
+            confidence:conf,confLabel:conf>=75?'HIGH 🔥':conf>=60?'MODERATE':'LOW ⚠️',
+            confColor:conf>=75?'var(--green)':conf>=60?'var(--warn)':'var(--red)',
+            rangeHigh:price+atrV*2.5,rangeLow:price-atrV*2,
+            entry,sl,tp1,tp2,
+            entryDetail:isBull?'Market / dip to support':'Sell near resistance',
+            slDetail:(isBull?'Below S1':'Above R2')+' · '+(Math.abs(entry-sl)/price*100).toFixed(1)+'% risk',
+            tp1Detail:(isBull?'Pivot R1':'Pivot S1')+' · '+(Math.abs(tp1-entry)/price*100).toFixed(1)+'%',
+            tp2Detail:(isBull?'Pivot R2':'Pivot S2')+' · '+(Math.abs(tp2-entry)/price*100).toFixed(1)+'%',
+            isBull,signals:[]};
+
+          const patterns = opens&&opens.length ? computeCandlePatterns(opens,highs,lows,closes) : null;
+          try { onWave1({ind,score,prediction,patterns,elapsed1:0}); } catch(e) { console.warn('wave1 err:',e); }
+
+          // Wave 2 after another frame so wave1 results paint
+          requestAnimationFrame(function() {
+            try {
+              const e8s=calcEMASeries(closes,8),e21s=calcEMASeries(closes,21);
+              const e55s=calcEMASeries(closes,55),e200s=calcEMASeries(closes,200);
+              const backtest=computeBacktest(closes,highs,lows,e8s,e21s,e55s);
+              const volumeProfile=computeVolumeProfile(closes,highs,lows,volumes);
+              const keyLevels=computeKeyLevels(price,highs,lows,closes,atr);
+              const advPatterns=opens&&opens.length?computeAdvancedPatterns(opens,highs,lows,closes):null;
+              try { onWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest,volumeProfile,keyLevels,advPatterns,elapsed2:0,totalElapsed:0}); } catch(e) { console.warn('wave2 err:',e); }
+              resolve();
+            } catch(e2) { reject(e2); }
+          });
+        } catch(e) { reject(e); }
+      });
+    });
   }
 
 
@@ -7388,6 +7457,11 @@ self.onmessage=function(e){
     updateSessionPnL();
   }
 
+  // Market data cache — declared here so functions called during init can use it
+  const _mktCache = {};
+  function _mktGet(k,ms){const h=_mktCache[k];return(h&&Date.now()-h.ts<ms)?h.data:null;}
+  function _mktSet(k,d){_mktCache[k]={data:d,ts:Date.now()};}
+
   updateSessionPnL();
   updateLabels();
   document.getElementById('rmAccount').addEventListener('input',calcRisk);
@@ -8165,9 +8239,7 @@ self.onmessage=function(e){
   let _moversData = { gainers:[], losers:[] };
   let _moversTF = '1h'; // '1h' | '24h' | '7d'
 
-  const _mktCache = {};
-  function _mktGet(k,ms){const h=_mktCache[k];return(h&&Date.now()-h.ts<ms)?h.data:null;}
-  function _mktSet(k,d){_mktCache[k]={data:d,ts:Date.now()};}
+  // _mktCache moved to top of script (was used before declaration)
   function _skel(n){n=n||5;var s='';for(var i=0;i<n;i++)s+='<div style="height:26px;background:rgba(255,255,255,.04);border-radius:4px;margin-bottom:7px;animation:mktShimmer 1.5s ease-in-out infinite '+(i*0.1)+'s"></div>';return s;}
 
   function fmtBig(n) {
