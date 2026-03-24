@@ -3661,14 +3661,12 @@ self.onmessage=function(e){
   }
 
   const PROXIES = [
-    { id:'allorigins',   wrap: url=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,        parse: async r=>{const t=await r.text();return JSON.parse(t);} },
-    { id:'corsproxy',    wrap: url=>`https://corsproxy.io/?url=${encodeURIComponent(url)}`,                 parse: async r=>{const t=await r.text();return JSON.parse(t);} },
-    { id:'codetabs',     wrap: url=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,   parse: async r=>r.json() },
-    { id:'thingproxy',   wrap: url=>`https://thingproxy.freeboard.io/fetch/${url}`,                         parse: async r=>r.json() },
-    { id:'jsonproxy',    wrap: url=>`https://jsonp.afeld.me/?url=${encodeURIComponent(url)}`,               parse: async r=>r.json() },
-    { id:'corsanywhere', wrap: url=>`https://cors-anywhere.herokuapp.com/${url}`,                           parse: async r=>r.json() },
-    { id:'proxyman',     wrap: url=>`https://proxy.cors.sh/${url}`,                                         parse: async r=>r.json() },
-    { id:'openproxy',    wrap: url=>`https://api.cors.lol/?url=${encodeURIComponent(url)}`,                 parse: async r=>{const t=await r.text();return JSON.parse(t);} },
+    // Most reliable first
+    { id:'allorigins',   wrap: url=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,        parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
+    { id:'corsproxy',    wrap: url=>`https://corsproxy.io/?url=${encodeURIComponent(url)}`,                 parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
+    { id:'openproxy',    wrap: url=>`https://api.cors.lol/?url=${encodeURIComponent(url)}`,                 parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
+    { id:'proxyman',     wrap: url=>`https://proxy.cors.sh/${url}`,                                         parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
+    { id:'codetabs',     wrap: url=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,   parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
   ];
   const _proxyDeadUntil = {};
   let _workingProxy = (() => {
@@ -3679,7 +3677,7 @@ self.onmessage=function(e){
   })();
 
   async function proxyGet(proxy, url) {
-    const res = await fetch(proxy.wrap(url), { signal: AbortSignal.timeout(2000) });
+    const res = await fetch(proxy.wrap(url), { signal: AbortSignal.timeout(6000) });
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     return proxy.parse(res);
   }
@@ -3744,31 +3742,48 @@ self.onmessage=function(e){
   }
 
   async function smartFetch(url) {
-    // Try KV server cache first (2s timeout — fast miss)
+    // 1. KV server cache (instant — shared across devices)
     if(_cloudEnabled) {
       try {
         const cached = await _kvGet(url);
         if(cached) return cached;
-      } catch(e) { /* cache miss — proceed */ }
+      } catch(e) {}
     }
 
     let data;
+
+    // 2. Direct fetch — many APIs allow CORS so try direct first (faster, no proxy needed)
+    const directOk = url.includes('binance.com') || url.includes('alternative.me') ||
+      url.includes('coingecko.com') || url.includes('bybit.com') || url.includes('okx.com') ||
+      url.includes('mexc.com') || url.includes('gateio.ws') || url.includes('kucoin.com') ||
+      url.includes('frankfurter.app') || url.includes('open.er-api.com') ||
+      url.includes('jsdelivr.net') || url.includes('exchangerate') || url.includes('metals.live') ||
+      url.includes('stooq.com') || url.includes('fawazahmed') || url.includes('wise.com');
+    if(directOk) {
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+        if(r.ok) {
+          data = await r.json();
+          if(_cloudEnabled && data) _kvSet(url, data, _kvTTL(url));
+          return data;
+        }
+      } catch(e) { /* fall through to proxy */ }
+    }
+
+    // 3. Cloudflare proxy worker
     if(WORKER_URL && !_workerFailed) {
       try {
         data = await workerFetch(url);
-        PROXIES.forEach(p => { const el=document.getElementById('px-'+p.id); if(el) el.className='pill'; });
         const firstPill = document.getElementById('px-allorigins');
         if(firstPill) { firstPill.className='pill ok'; firstPill.innerHTML='<div class="pill-dot"></div>⚡ Worker'; }
       } catch(e) {
-        console.warn('Worker failed:', e.message, '— falling back to CORS proxies');
         _workerFailed = true;
-        data = await corsRaceFetch(url);
       }
-    } else {
-      data = await corsRaceFetch(url);
     }
 
-    // Store in KV for other devices (fire and forget)
+    // 4. CORS proxy fallback
+    if(!data) data = await corsRaceFetch(url);
+
     if(_cloudEnabled && data) _kvSet(url, data, _kvTTL(url));
     return data;
   }
