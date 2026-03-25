@@ -3742,17 +3742,7 @@ self.onmessage=function(e){
   }
 
   async function smartFetch(url) {
-    // 1. KV server cache (instant — shared across devices)
-    if(_cloudEnabled) {
-      try {
-        const cached = await _kvGet(url);
-        if(cached) return cached;
-      } catch(e) {}
-    }
-
-    let data;
-
-    // 2. Direct fetch — many APIs allow CORS so try direct first (faster, no proxy needed)
+    // 1. Direct fetch — for APIs with open CORS (fastest, no proxy overhead)
     const directOk = url.includes('alternative.me') ||
       url.includes('coingecko.com') || url.includes('bybit.com') || url.includes('okx.com') ||
       url.includes('mexc.com') || url.includes('gateio.ws') || url.includes('kucoin.com') ||
@@ -3761,31 +3751,25 @@ self.onmessage=function(e){
       url.includes('stooq.com') || url.includes('fawazahmed') || url.includes('wise.com');
     if(directOk) {
       try {
-        const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
-        if(r.ok) {
-          data = await r.json();
-          if(_cloudEnabled && data) _kvSet(url, data, _kvTTL(url));
-          return data;
-        }
+        const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
+        if(r.ok) return r.json();
       } catch(e) { /* fall through to proxy */ }
     }
 
-    // 3. Cloudflare proxy worker
+    // 2. Cloudflare proxy worker (proxy the request through our worker)
     if(WORKER_URL && !_workerFailed) {
       try {
-        data = await workerFetch(url);
-        const firstPill = document.getElementById('px-allorigins');
-        if(firstPill) { firstPill.className='pill ok'; firstPill.innerHTML='<div class="pill-dot"></div>⚡ Worker'; }
-      } catch(e) {
-        _workerFailed = true;
-      }
+        const data = await workerFetch(url);
+        if(data) {
+          const firstPill = document.getElementById('px-allorigins');
+          if(firstPill) { firstPill.className='pill ok'; firstPill.innerHTML='<div class="pill-dot"></div>⚡ Worker'; }
+          return data;
+        }
+      } catch(e) { _workerFailed = true; }
     }
 
-    // 4. CORS proxy fallback
-    if(!data) data = await corsRaceFetch(url);
-
-    if(_cloudEnabled && data) _kvSet(url, data, _kvTTL(url));
-    return data;
+    // 3. CORS proxy fallback
+    return corsRaceFetch(url);
   }
 
   function calcEMA(a, p) {
@@ -4616,16 +4600,10 @@ self.onmessage=function(e){
       `https://${host}/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`;
     const parseUrl = (url) =>
       smartFetch(url).then(d => { const o = _parseYahooChart(d); if(!o) throw new Error('empty'); return { ohlcv:o, url }; });
-    const directUrl = (url) =>
-      fetch(url, {signal: AbortSignal.timeout(5000)})
-        .then(r => r.json())
-        .then(d => { const o = _parseYahooChart(d); if(!o) throw new Error('empty'); return { ohlcv:o, url }; });
-    // Race proxy + direct fetch on both query1 and query2 simultaneously
+    // Yahoo blocks direct CORS — always use proxy (smartFetch routes through worker/corsProxy)
     return Promise.any([
       parseUrl(mkUrl('query1.finance.yahoo.com')),
       parseUrl(mkUrl('query2.finance.yahoo.com')),
-      directUrl(mkUrl('query1.finance.yahoo.com')),
-      directUrl(mkUrl('query2.finance.yahoo.com')),
     ]);
   }
 
@@ -4677,8 +4655,7 @@ self.onmessage=function(e){
     const raceSources = [
       smartFetch(mkUrl('query1.finance.yahoo.com')).then(parseStock),
       smartFetch(mkUrl('query2.finance.yahoo.com')).then(parseStock),
-      fetch(mkUrl('query1.finance.yahoo.com'), {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(parseStock),
-      fetch(mkUrl('query2.finance.yahoo.com'), {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(parseStock),
+      // No direct Yahoo fetch — blocked by CORS
     ];
 
     // For IDX stocks (.JK) — Stooq + alternative Yahoo endpoints
@@ -4690,7 +4667,7 @@ self.onmessage=function(e){
         // Try without country code (stooq sometimes works without .jk)
         fetch(`https://stooq.com/q/d/l/?s=${stooqSym.replace('.jk','')}&i=${stooqInt}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
         // Yahoo v11 quoteSummary for price at minimum
-        fetch(`https://query1.finance.yahoo.com/v11/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price`, {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(function(d) {
+        smartFetch(`https://query1.finance.yahoo.com/v11/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price`).then(function(d) {
           const price = d?.quoteSummary?.result?.[0]?.price?.regularMarketPrice?.raw;
           if(!price) throw new Error('no price');
           // Build synthetic candles from current price for IDX
@@ -4710,7 +4687,7 @@ self.onmessage=function(e){
       raceSources.push(
         fetch(`https://stooq.com/q/d/l/?s=${stooqUS}&i=${interval==='1d'?'d':'w'}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
         // Yahoo v8 chart with different range
-        fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`, {signal:AbortSignal.timeout(6000)}).then(r=>r.json()).then(parseStock),
+        smartFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`).then(parseStock),
       );
     }
 
@@ -7302,7 +7279,7 @@ self.onmessage=function(e){
   async function fetchMarketOverview() {
     for(const sym of MKT_SYMS) {
       try {
-        const d = await smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`);
+        const d = await smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${sym}USDT`);
         if(d.code) continue;
         const price = +d.lastPrice, pct = +d.priceChangePercent;
         const pc = document.getElementById(`mkt-${sym}-price`);
@@ -7316,18 +7293,40 @@ self.onmessage=function(e){
   }
 
   async function updateTicker() {
-    for(const sym of TICK_SYMS) {
-      try {
-        const d = await smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`);
-        if(d.code) continue;
-        const price = +d.lastPrice, pct = +d.priceChangePercent;
+    // Try OKX batch first (no geo-block in Indonesia), fall back to Bybit per-symbol
+    try {
+      const syms = TICK_SYMS.map(s => s + '-USDT').join(',');
+      const batch = await smartFetch(`https://www.okx.com/api/v5/market/tickers?instType=SPOT`);
+      const map = {};
+      if(batch?.data) batch.data.forEach(function(t){ map[t.instId] = t; });
+      for(const sym of TICK_SYMS) {
+        const t = map[sym+'-USDT'];
+        if(!t) continue;
+        const price = +t.last, open = +t.open24h;
+        const pct = open > 0 ? ((price-open)/open)*100 : 0;
         const item = document.getElementById(`tick-${sym}`);
         if(!item) continue;
         const [, pEl, cEl] = item.children;
         pEl.textContent = fmtP(price);
         cEl.textContent = (pct>=0?'+':'')+pct.toFixed(2)+'%';
         cEl.style.color = pct>=0?'var(--green)':'var(--red)';
-      } catch(e){}
+      }
+    } catch(e) {
+      // Fallback: Bybit per symbol
+      for(const sym of TICK_SYMS) {
+        try {
+          const d = await smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${sym}USDT`);
+          const t = d?.result?.list?.[0];
+          if(!t) continue;
+          const price = +t.lastPrice, pct = +t.price24hPcnt * 100;
+          const item = document.getElementById(`tick-${sym}`);
+          if(!item) continue;
+          const [, pEl, cEl] = item.children;
+          pEl.textContent = fmtP(price);
+          cEl.textContent = (pct>=0?'+':'')+pct.toFixed(2)+'%';
+          cEl.style.color = pct>=0?'var(--green)':'var(--red)';
+        } catch(e2){}
+      }
     }
   }
 
@@ -7420,7 +7419,7 @@ self.onmessage=function(e){
 
       // ── Normal crypto ──────────────────────────────────────────────────────
       } else {
-        const d = await smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}USDT`);
+        const d = await smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${sym}USDT`);
         if(d.code) throw new Error('bad ticker');
         const kRaw = await smartFetch(`https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=1h&limit=200`);
         const cls = kRaw.map(k=>+k[4]);
@@ -12959,8 +12958,8 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         const stooqTicker = sym === 'ANTAM' ? 'antm.jk' : sym.toLowerCase();
         const r = await Promise.any([
           Promise.any([
-            fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
-            fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()),
+            smartFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`),
+            smartFetch(`https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`),
           ]).then(d => { const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice; if(!p||isNaN(p)) throw new Error('no price'); return {price:p, src:'Yahoo Finance'}; }),
           fetch(`https://stooq.com/q/d/l/?s=${stooqTicker}&i=d`, {signal:AbortSignal.timeout(5000)}).then(async r => {
             const text = await r.text();
