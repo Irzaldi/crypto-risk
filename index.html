@@ -3665,7 +3665,7 @@ self.onmessage=function(e){
     { id:'allorigins',   wrap: url=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,        parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
     { id:'corsproxy',    wrap: url=>`https://corsproxy.io/?url=${encodeURIComponent(url)}`,                 parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
     { id:'openproxy',    wrap: url=>`https://api.cors.lol/?url=${encodeURIComponent(url)}`,                 parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
-    { id:'proxyman',     wrap: url=>`https://proxy.cors.sh/${url}`,                                         parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
+    { id:'proxyman',     wrap: url=>`https://corsproxy.io/?url=${encodeURIComponent(url)}`,               parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
     { id:'codetabs',     wrap: url=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,   parse: async r=>{const t=await r.text();try{return JSON.parse(t);}catch(e){throw new Error('bad json');}} },
   ];
   const _proxyDeadUntil = {};
@@ -13579,11 +13579,12 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   }
 
   // Auto-draw when portfolio updates
+  // Extend _updatePortfolioSummary to also redraw chart (use assignment, not declaration, to avoid hoisting TDZ)
   const _origUpdatePortfolioSummary = _updatePortfolioSummary;
-  function _updatePortfolioSummary() {
+  _updatePortfolioSummary = function() {
     _origUpdatePortfolioSummary();
     setTimeout(drawPortfolioPerformanceChart, 50);
-  }
+  };
 
   // ════════════════════════════════════════════════════════════════
   //  NOTIFICATION PERMISSION + ALERT BADGE
@@ -13613,7 +13614,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   // Alert fire badge — show red dot on Analysis tab when alert fires
   let _unreadAlerts = 0;
   const _origCheckAlertsFn = checkAlerts;
-  function checkAlerts(price, sym) {
+  checkAlerts = function(price, sym) {
     const prevTriggered = priceAlerts.filter(function(a){ return a.triggered; }).length;
     _origCheckAlertsFn(price, sym);
     const nowTriggered = priceAlerts.filter(function(a){ return a.triggered; }).length;
@@ -13621,11 +13622,10 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       _unreadAlerts += (nowTriggered - prevTriggered);
       const badge = document.getElementById('alert-fire-badge');
       if(badge) { badge.textContent = _unreadAlerts; badge.style.display = 'inline-block'; }
-      // Also badge on mobile nav home
       const mobBadge = document.getElementById('mnav-home-badge');
       if(mobBadge) mobBadge.classList.add('show');
     }
-  }
+  };
 
   // Clear badge when user visits alerts panel
   document.addEventListener('click', function(e) {
@@ -13941,10 +13941,10 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
 
   // Take snapshot after every price refresh
   const _origRefreshPortfolio = refreshPortfolio;
-  async function refreshPortfolio() {
+  refreshPortfolio = async function() {
     await _origRefreshPortfolio();
     setTimeout(_takePortfolioSnapshot, 500);
-  }
+  };
 
   // ══════════════════════════════════════════════════════════════════
   //  ALERT HISTORY PANEL
