@@ -3753,7 +3753,7 @@ self.onmessage=function(e){
     let data;
 
     // 2. Direct fetch — many APIs allow CORS so try direct first (faster, no proxy needed)
-    const directOk = url.includes('binance.com') || url.includes('alternative.me') ||
+    const directOk = url.includes('alternative.me') ||
       url.includes('coingecko.com') || url.includes('bybit.com') || url.includes('okx.com') ||
       url.includes('mexc.com') || url.includes('gateio.ws') || url.includes('kucoin.com') ||
       url.includes('frankfurter.app') || url.includes('open.er-api.com') ||
@@ -4106,8 +4106,19 @@ self.onmessage=function(e){
 
   async function tryBinance(sym) {
     const p=sym+'USDT',tf=TF.binance[currentTF]||'1h';
-    const [t,k]=await Promise.all([smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${p}`),smartFetch(`https://api.binance.com/api/v3/klines?symbol=${p}&interval=${tf}&limit=1000`)]);
-    if(t.code)throw new Error(t.msg);
+    // Try alternative Binance domains — api.binance.com may be geo-blocked
+    const BDOMAINS = ['api.binance.com','api1.binance.com','api2.binance.com','api3.binance.com'];
+    let t=null, k=null;
+    for(const domain of BDOMAINS) {
+      try {
+        [t,k]=await Promise.all([
+          smartFetch(`https://${domain}/api/v3/ticker/24hr?symbol=${p}`),
+          smartFetch(`https://${domain}/api/v3/klines?symbol=${p}&interval=${tf}&limit=1000`)
+        ]);
+        if(!t?.code) break; // success
+      } catch(e) { t=null; k=null; }
+    }
+    if(!t||t.code) throw new Error(t?.msg||'Binance unavailable');
     return{price:+t.lastPrice,high24:+t.highPrice,low24:+t.lowPrice,open24:+t.openPrice,vol24:+t.quoteVolume,opens:k.map(x=>+x[1]),closes:k.map(x=>+x[4]),highs:k.map(x=>+x[2]),lows:k.map(x=>+x[3]),volumes:k.map(x=>+x[5]),source:'Binance',pair:p};
   }
   async function tryOKX(sym) {
@@ -4165,7 +4176,7 @@ self.onmessage=function(e){
 
   function mtfUrl(exId, sym, tf) {
     switch(exId) {
-      case 'binance': return `https://api.binance.com/api/v3/klines?symbol=${sym}USDT&interval=${TF.binance[tf]||'1h'}&limit=1000`;
+      case 'binance': return `https://api3.binance.com/api/v3/klines?symbol=${sym}USDT&interval=${TF.binance[tf]||'1h'}&limit=1000`;
       case 'okx':     return `https://www.okx.com/api/v5/market/candles?instId=${sym}-USDT&bar=${TF.okx[tf]||'1H'}&limit=1000`;
       case 'bybit':   return `https://api.bybit.com/v5/market/kline?category=spot&symbol=${sym}USDT&interval=${TF.bybit[tf]||'60'}&limit=1000`;
       case 'mexc':    return `https://api.mexc.com/api/v3/klines?symbol=${sym}USDT&interval=${TF.mexc[tf]||'1h'}&limit=1000`;
@@ -4191,13 +4202,13 @@ self.onmessage=function(e){
   }
 
   const EXCHANGES=[
-    {id:'binance', fn: tryBinance},
-    {id:'okx',     fn: tryOKX},
-    {id:'bybit',   fn: tryBybit},
-    {id:'mexc',    fn: tryMEXC},
-    {id:'gateio',  fn: tryGateio},
-    {id:'kucoin',  fn: tryKuCoin},
-    {id:'indodax', fn: tryIndodax},
+    {id:'okx',     fn: tryOKX},      // Primary — works in Indonesia, no geo-block
+    {id:'bybit',   fn: tryBybit},    // Primary — works in Indonesia
+    {id:'gateio',  fn: tryGateio},   // Good fallback
+    {id:'mexc',    fn: tryMEXC},     // Fallback
+    {id:'kucoin',  fn: tryKuCoin},   // Fallback
+    {id:'binance', fn: tryBinance},  // Last — geo-blocked in Indonesia (451)
+    {id:'indodax', fn: tryIndodax},  // Indonesian exchange
   ];
 
   function setStatus(m,t=''){const el=document.getElementById('statusBar');el.textContent=m;el.className='status-bar '+t;}
@@ -8293,7 +8304,7 @@ self.onmessage=function(e){
       let data=!bust&&_mktGet('globalMetrics',10*60*1000);
       if(!data){data=await smartFetch('https://api.coingecko.com/api/v3/global');_mktSet('globalMetrics',data);}
       // Cache BTC price globally for whale value estimates
-      if(data?.data?.market_cap_percentage?.btc) { try { const _bp = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT',{signal:AbortSignal.timeout(3000)}); if(_bp.ok){const _bj=await _bp.json(); window._lastBtcPrice=parseFloat(_bj.price);} } catch(_){} }
+      if(data?.data?.market_cap_percentage?.btc) { try { const _bp = await fetch('https://api.bybit.com/v5/market/tickers?category=spot&symbol=BTCUSDT',{signal:AbortSignal.timeout(3000)}); if(_bp.ok){const _bj=await _bp.json(); window._lastBtcPrice=parseFloat(_bj?.result?.list?.[0]?.lastPrice||_bj?.price||0);} } catch(_){} }
       if(!data || !data.data) return;
       const d = data.data;
       const cap = d.total_market_cap?.usd;
@@ -8332,7 +8343,9 @@ self.onmessage=function(e){
     try {
       let data = !bust && _mktGet('fundingRates', 30*60*1000);
       if(!data) {
-        data = await smartFetch('https://fapi.binance.com/fapi/v1/premiumIndex');
+        // Try OKX first (works in Indonesia), fall back to Binance futures
+        try { data = await smartFetch('https://www.okx.com/api/v5/public/funding-rate?instType=SWAP'); }
+        catch(e) { data = await smartFetch('https://fapi.binance.com/fapi/v1/premiumIndex'); }
         _mktSet('fundingRates', data);
       }
       if(!Array.isArray(data)) throw new Error('bad data');
@@ -8397,7 +8410,8 @@ self.onmessage=function(e){
     try {
       let results=!bust&&_mktGet('openInterest',5*60*1000);
       if(!results){
-        const urls=coins.map(function(s){return 'https://fapi.binance.com/fapi/v1/openInterest?symbol='+s;});
+        // OKX OI — works in Indonesia
+        const urls=coins.map(function(s){return 'https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-history?instId='+s.replace('USDT','')+'-USDT-SWAP&period=1H&limit=1';});
         try{results=await workerBatch(urls);}catch(e){results=await Promise.all(urls.map(function(u){return smartFetch(u).catch(function(){return null;});}));}
         _mktSet('openInterest',results);
       }
@@ -8936,7 +8950,7 @@ self.onmessage=function(e){
         if(!gotData) {
           try {
             const spotResults = await Promise.allSettled(SYMS.slice(0,4).map(function(s) {
-              return smartFetch('https://api.binance.com/api/v3/aggTrades?symbol='+s+'&limit=500');
+              return smartFetch('https://api.bybit.com/v5/market/recent-trade?category=spot&symbol='+s+'&limit=200').catch(()=>smartFetch('https://api.binance.com/api/v3/aggTrades?symbol='+s+'&limit=500'));
             }));
             SYMS.slice(0,4).forEach(function(sym, i) {
               const r = spotResults[i];
@@ -11040,8 +11054,8 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
       pct = d.opens.length ? (d.price - d.opens[d.opens.length-1]) / d.opens[d.opens.length-1] * 100 : 0;
     } else {
       const [ticker, klines] = await Promise.all([
-        smartFetch('https://api.binance.com/api/v3/ticker/24hr?symbol='+sym+'USDT'),
-        smartFetch('https://api.binance.com/api/v3/klines?symbol='+sym+'USDT&interval=1h&limit=500'),
+        smartFetch('https://api.bybit.com/v5/market/tickers?category=spot&symbol='+sym+'USDT').catch(()=>smartFetch('https://api.binance.com/api/v3/ticker/24hr?symbol='+sym+'USDT')),
+        smartFetch('https://api.bybit.com/v5/market/kline?category=spot&symbol='+sym+'USDT&interval=60&limit=500').catch(()=>smartFetch('https://api.binance.com/api/v3/klines?symbol='+sym+'USDT&interval=1h&limit=500')),
       ]);
       if(ticker.code) throw new Error('bad ticker');
       closes  = klines.map(function(k){ return +k[4]; });
@@ -12170,7 +12184,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     if(!portfolio.length) return;
     await Promise.allSettled(portfolio.map(async p => {
       try {
-        const d = await smartFetch(`https://api.binance.com/api/v3/ticker/price?symbol=${p.sym}USDT`);
+        const d = await smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${p.sym}USDT`).catch(()=>smartFetch(`https://api.binance.com/api/v3/ticker/price?symbol=${p.sym}USDT`));
         if(d.price) p.current = parseFloat(d.price);
       } catch(e) {}
     }));
@@ -12718,7 +12732,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     }
     const ticker = sym + 'USDT';
     try {
-      const data = await smartFetch(`https://api.binance.com/api/v3/depth?symbol=${ticker}&limit=15`);
+      const data = await smartFetch(`https://api.bybit.com/v5/market/orderbook?category=spot&symbol=${ticker}&limit=15`).catch(()=>smartFetch(`https://api.binance.com/api/v3/depth?symbol=${ticker}&limit=15`));
       if(!data.bids || !data.asks) return;
 
       const maxVol = Math.max(
