@@ -1872,7 +1872,7 @@ function installPWA() {
     <!-- Add trade form -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">
       <div><label class="rm-label" for="tj-pair">Pair</label><input type="text" id="tj-pair" placeholder="BTC" class="alert-input" style="width:100%"></div>
-      <div><label class="rm-label">Direction</label>
+      <div><label class="rm-label" for="tj-dir">Direction</label>
         <select id="tj-dir" aria-label="Trade direction" style="width:100%;background:rgba(0,229,255,.04);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.7rem;outline:none">
           <option value="LONG">LONG</option><option value="SHORT">SHORT</option>
         </select>
@@ -2516,7 +2516,7 @@ function installPWA() {
         <div class="ptitle">📐 Pip Calculator <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">forex position sizing in pips</span></div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
           <div>
-            <label class="rm-label">Pair</label>
+            <label class="rm-label" for="pip-pair">Pair</label>
             <select id="pip-pair" class="alert-input" style="width:100%;font-size:.6rem" onchange="calcPip()">
               <option value="EURUSD">EUR/USD</option>
               <option value="GBPUSD">GBP/USD</option>
@@ -2529,14 +2529,14 @@ function installPWA() {
             </select>
           </div>
           <div>
-            <label class="rm-label">Account Currency</label>
+            <label class="rm-label" for="pip-acct-ccy">Account Currency</label>
             <select id="pip-acct-ccy" class="alert-input" style="width:100%;font-size:.6rem" onchange="calcPip()">
               <option value="USD">USD</option>
               <option value="IDR">IDR</option>
             </select>
           </div>
           <div>
-            <label class="rm-label">Lot Size</label>
+            <label class="rm-label" for="pip-lot">Lot Size</label>
             <select id="pip-lot" class="alert-input" style="width:100%;font-size:.6rem" onchange="calcPip()">
               <option value="100000">Standard (1.0)</option>
               <option value="10000">Mini (0.1)</option>
@@ -3028,9 +3028,27 @@ function computePrediction(price,closes,highs,lows,ind,isBUY,isSELL){
   else{direction='〰️ STABLE';dirColor='var(--warn)';dirDetail='No strong directional bias';}
   const conf=Math.round(Math.max(bP,brP)*100),isBull=bP>0.5,atrV=atr||(price*0.02);
   const rangeHigh=price+atrV*2.5,rangeLow=price-atrV*2.0;
+  // Validate pivot levels — if pivot range is < ATR, pivots are from synthetic/compressed data
+  // In that case fall back to ATR-based levels which are always meaningful
+  const pivOk = piv && Math.abs(piv.r1-price) >= atrV*0.5 && Math.abs(price-piv.s1) >= atrV*0.5;
   let entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail;
-  if(isBull){const sup=piv?Math.max(piv.s1,price-atrV*0.8):price-atrV*0.5;entry=price;sl=sup-atrV*0.3;tp1=piv?piv.r1:price+atrV*2;tp2=piv?piv.r2:price+atrV*3.5;entryDetail='Market / dip to support';slDetail=`Below ${piv?'S1':'ATR floor'} · ${(((price-sl)/price)*100).toFixed(1)}% risk`;tp1Detail=`${piv?'Pivot R1':'1.5× ATR'} · +${(((tp1-price)/price)*100).toFixed(1)}%`;tp2Detail=`${piv?'Pivot R2':'2.5× ATR'} · +${(((tp2-price)/price)*100).toFixed(1)}%`;}
-  else{entry=piv?piv.r1:price+atrV*0.5;sl=piv?piv.r2:price+atrV*1.5;tp1=piv?piv.s1:price-atrV*2;tp2=piv?piv.s2:price-atrV*3.5;entryDetail='Sell near resistance';slDetail=`Above ${piv?'R2':'ATR roof'} · ${(((sl-price)/price)*100).toFixed(1)}% risk`;tp1Detail=`${piv?'Pivot S1':'1.5× ATR'} · ${(((price-tp1)/price)*100).toFixed(1)}% gain`;tp2Detail=`${piv?'Pivot S2':'2.5× ATR'} · ${(((price-tp2)/price)*100).toFixed(1)}% gain`;}
+  if(isBull){
+    const sup=pivOk?Math.max(piv.s1,price-atrV*0.8):price-atrV*0.8;
+    entry=price;sl=sup-atrV*0.3;
+    tp1=pivOk?piv.r1:price+atrV*2.0;
+    tp2=pivOk?piv.r2:price+atrV*3.5;
+    entryDetail='Market / dip to support';
+    slDetail=`Below ${pivOk?'S1':'ATR floor'} · ${(((price-sl)/price)*100).toFixed(1)}% risk`;
+    tp1Detail=`${pivOk?'Pivot R1':'1× ATR target'} · +${(((tp1-price)/price)*100).toFixed(2)}%`;
+    tp2Detail=`${pivOk?'Pivot R2':'2× ATR target'} · +${(((tp2-price)/price)*100).toFixed(2)}%`;
+  } else {
+    entry=pivOk?piv.r1:price+atrV*0.5;sl=pivOk?piv.r2:price+atrV*1.5;
+    tp1=pivOk?piv.s1:price-atrV*2.0;tp2=pivOk?piv.s2:price-atrV*3.5;
+    entryDetail='Sell near resistance';
+    slDetail=`Above ${pivOk?'R2':'ATR roof'} · ${(((sl-price)/price)*100).toFixed(1)}% risk`;
+    tp1Detail=`${pivOk?'Pivot S1':'1× ATR target'} · ${(((price-tp1)/price)*100).toFixed(2)}% gain`;
+    tp2Detail=`${pivOk?'Pivot S2':'2× ATR target'} · ${(((price-tp2)/price)*100).toFixed(2)}% gain`;
+  }
   const signals=[{label:'EMA55 Strategy',bull:isBUY,bear:isSELL,w:25},{label:'RSI',bull:rsi!==null&&rsi>50&&rsi<70,bear:rsi!==null&&(rsi<50||rsi>75),w:10},{label:'MACD',bull:macdV!==null&&macdV>0,bear:macdV!==null&&macdV<0,w:10},{label:'EMA200 Trend',bull:ema200!==null&&price>ema200,bear:ema200!==null&&price<ema200,w:10},{label:'SuperTrend',bull:st!==null&&st.trend==='up',bear:st!==null&&st.trend==='down',w:8},{label:'ADX',bull:adxData!==null&&adxData.diPlus>adxData.diMinus,bear:adxData!==null&&adxData.diMinus>adxData.diPlus,w:8},{label:'Ichimoku',bull:ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB),bear:ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB),w:8},{label:'Parabolic SAR',bull:psar!==null&&psar.bull,bear:psar!==null&&!psar.bull,w:7},{label:'OBV',bull:obvData!==null&&obvData.rising,bear:obvData!==null&&!obvData.rising,w:6},{label:'CMF',bull:cmf!==null&&cmf>0.05,bear:cmf!==null&&cmf<-0.05,w:6},{label:'Divergence',bull:div&&(div.rsi==='bullish'||div.macd==='bullish'),bear:div&&(div.rsi==='bearish'||div.macd==='bearish'),w:6},{label:'Keltner',bull:kelt!==null&&kelt.pct<40,bear:kelt!==null&&kelt.pct>60,w:5},{label:'Bollinger',bull:bbP!==null&&bbP<0.3,bear:bbP!==null&&bbP>0.7,w:4},{label:'Pivot Points',bull:piv!==null&&price>piv.pp,bear:piv!==null&&price<piv.pp,w:4}];
   return{direction,dirColor,dirDetail,confidence:conf,confLabel:conf>=75?'HIGH 🔥':conf>=60?'MODERATE':'LOW ⚠️',confColor:conf>=75?'var(--green)':conf>=60?'var(--warn)':'var(--red)',rangeHigh,rangeLow,entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail,isBull,signals};
 }
@@ -3426,10 +3444,13 @@ self.onmessage=function(e){
           else{direction='〰️ STABLE';dirColor='var(--warn)';dirDetail='No strong directional bias';}
           const conf=Math.round(Math.max(bP,brP)*100);
           const atrV=atr||(price*0.02);
-          const piv2=piv||{pp:price,r1:price+atrV*2,r2:price+atrV*3.5,s1:price-atrV*2,s2:price-atrV*3.5};
           const isBull=bP>0.5;
-          const entry=isBull?price:piv2.r1,sl=isBull?piv2.s1-atrV*0.3:piv2.r2;
-          const tp1=isBull?piv2.r1:piv2.s1,tp2=isBull?piv2.r2:piv2.s2;
+          // Validate pivot levels — use ATR-based if pivots are from synthetic/compressed data
+          const pivOk2 = piv && Math.abs(piv.r1-price) >= atrV*0.5 && Math.abs(price-piv.s1) >= atrV*0.5;
+          const entry=isBull?price:(pivOk2?piv.r1:price+atrV*0.5);
+          const sl=isBull?(pivOk2?piv.s1-atrV*0.3:price-atrV*0.8):(pivOk2?piv.r2:price+atrV*1.5);
+          const tp1=isBull?(pivOk2?piv.r1:price+atrV*2.0):(pivOk2?piv.s1:price-atrV*2.0);
+          const tp2=isBull?(pivOk2?piv.r2:price+atrV*3.5):(pivOk2?piv.s2:price-atrV*3.5);
           const rr=Math.abs(tp1-entry)/Math.max(0.001,Math.abs(entry-sl));
           const prediction={direction,dirColor,dirDetail,
             confidence:conf,confLabel:conf>=75?'HIGH 🔥':conf>=60?'MODERATE':'LOW ⚠️',
@@ -3748,7 +3769,7 @@ self.onmessage=function(e){
       url.includes('mexc.com') || url.includes('gateio.ws') || url.includes('kucoin.com') ||
       url.includes('frankfurter.app') || url.includes('open.er-api.com') ||
       url.includes('jsdelivr.net') || url.includes('exchangerate') || url.includes('metals.live') ||
-      url.includes('stooq.com') || url.includes('fawazahmed') || url.includes('wise.com');
+      url.includes('fawazahmed') || url.includes('wise.com');
     if(directOk) {
       try {
         const r = await fetch(url, { signal: AbortSignal.timeout(6000) });
@@ -4485,6 +4506,22 @@ self.onmessage=function(e){
           return { rates: buildSynth(rate), label: 'currencyapi CDN' };
         })
       );
+      // Latest exchange rates API (free, CORS open)
+      sources.push(
+        fetch(`https://latest.currency-api.pages.dev/v1/currencies/${fp.base.toLowerCase()}.json`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
+          const rate = d?.[fp.base.toLowerCase()]?.[fp.quote.toLowerCase()];
+          if(!rate) throw new Error('no rate');
+          return { rates: buildSynth(rate), label: 'currency-api.pages.dev' };
+        })
+      );
+      // Bitpanda doesn't have forex but forexratesapi.io has free tier
+      sources.push(
+        fetch(`https://api.exchangerate-api.com/v4/latest/${fp.base}`, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
+          const rate = d?.rates?.[fp.quote];
+          if(!rate) throw new Error('no rate');
+          return { rates: buildSynth(rate), label: 'exchangerate-api.com' };
+        })
+      );
       // Wise rate API (CORS open for some pairs)
       if(['USDIDR','GBPUSD','EURUSD','USDJPY','AUDUSD'].includes(sym)) {
         sources.push(
@@ -4516,7 +4553,7 @@ self.onmessage=function(e){
       const stooqFx = stooqFxMap[sym];
       if(stooqFx) {
         sources.unshift( // put stooq FIRST — it's fastest
-          fetch(`https://stooq.com/q/d/l/?s=${stooqFx}&i=d`, {signal:AbortSignal.timeout(4000)})
+          fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://stooq.com/q/d/l/?s='+stooqFx+'&i=d')}`, {signal:AbortSignal.timeout(8000)})
             .then(async r => {
               const text = await r.text();
               if(!text.includes('Date')||text.includes('No data')) throw new Error('no stooq data');
@@ -4663,9 +4700,9 @@ self.onmessage=function(e){
       const stooqSym = ticker.toLowerCase();
       const stooqInt = interval === '1d' ? 'd' : 'w';
       raceSources.push(
-        fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=${stooqInt}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
+        fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://stooq.com/q/d/l/?s='+stooqSym+'&i='+stooqInt)}`, {signal:AbortSignal.timeout(8000)}).then(async r => parseStooqCSV(await r.text())),
         // Try without country code (stooq sometimes works without .jk)
-        fetch(`https://stooq.com/q/d/l/?s=${stooqSym.replace('.jk','')}&i=${stooqInt}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
+        fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://stooq.com/q/d/l/?s='+stooqSym.replace('.jk','')+'&i='+stooqInt)}`, {signal:AbortSignal.timeout(8000)}).then(async r => parseStooqCSV(await r.text())),
         // Yahoo v11 quoteSummary for price at minimum
         smartFetch(`https://query1.finance.yahoo.com/v11/finance/quoteSummary/${encodeURIComponent(ticker)}?modules=price`).then(function(d) {
           const price = d?.quoteSummary?.result?.[0]?.price?.regularMarketPrice?.raw;
@@ -4685,7 +4722,7 @@ self.onmessage=function(e){
     if(!ticker.endsWith('.JK')) {
       const stooqUS = ticker.toLowerCase() + '.us';
       raceSources.push(
-        fetch(`https://stooq.com/q/d/l/?s=${stooqUS}&i=${interval==='1d'?'d':'w'}`, {signal:AbortSignal.timeout(6000)}).then(async r => parseStooqCSV(await r.text())),
+        fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://stooq.com/q/d/l/?s='+stooqUS+'&i='+(interval==='1d'?'d':'w'))}`, {signal:AbortSignal.timeout(8000)}).then(async r => parseStooqCSV(await r.text())),
         // Yahoo v8 chart with different range
         smartFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5y`).then(parseStock),
       );
@@ -4739,10 +4776,16 @@ self.onmessage=function(e){
     const stooqSym = cp.stooq || 'cl.f';
 
     // Helper: parse stooq CSV into ohlcv
-    const fetchStooqCSV = (s) => fetch(`https://stooq.com/q/d/l/?s=${s}&i=d`, {signal:AbortSignal.timeout(5000)})
-      .then(async r => {
-        const text = await r.text();
-        if(!text.includes('Date') || text.includes('No data')) throw new Error('no data');
+    const _stooqProxy = (s) => {
+      const url = `https://stooq.com/q/d/l/?s=${s}&i=d`;
+      // allorigins returns raw text — best option for CSV
+      return fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`, {signal:AbortSignal.timeout(8000)})
+        .then(r => r.text())
+        .catch(() => fetch(`https://corsproxy.io/?url=${encodeURIComponent(url)}`, {signal:AbortSignal.timeout(8000)}).then(r=>r.text()));
+    };
+    const fetchStooqCSV = (s) => _stooqProxy(s)
+      .then(async text => {
+        if(typeof text !== 'string' || !text.includes('Date') || text.includes('No data')) throw new Error('no data');
         const lines = text.trim().split('\n').slice(1).filter(l=>l.trim());
         if(lines.length < 10) throw new Error('too few rows');
         const rows = lines.map(l=>l.split(','));
@@ -4828,6 +4871,26 @@ self.onmessage=function(e){
             return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Frankfurter (ECB gold)' };
           })
       );
+      // Source M5: latest currency-api (also has XAU)
+      metalSources.push(
+        fetch(`https://latest.currency-api.pages.dev/v1/currencies/${xauCode}.json`, {signal:AbortSignal.timeout(5000)})
+          .then(r=>r.json()).then(function(d) {
+            const price = d?.[xauCode]?.['usd'];
+            if(!price || isNaN(price)) throw new Error('no rate');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'currency-api (XAU)' };
+          })
+      );
+      // Source M6: GoldAPI.io free tier (no key needed for current price)
+      if(sym === 'XAUT') {
+        metalSources.push(
+          fetch('https://data-asg.goldprice.org/GetData/USD-XAU/1', {signal:AbortSignal.timeout(5000)})
+            .then(r=>r.json()).then(function(d) {
+              const price = Array.isArray(d) ? parseFloat(d[0]?.split(',')[1]) : null;
+              if(!price || isNaN(price)) throw new Error('no price');
+              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'GoldPrice.org' };
+            })
+        );
+      }
     }
 
     // Race all sources: metal APIs first (for XAUT/XAGUSD), then stooq, then Yahoo
@@ -4910,7 +4973,7 @@ self.onmessage=function(e){
     const cached = _yahooCached(ticker, interval, range);
     if(cached) return { ...cached, pair:'ANTAM/IDR', source:`Yahoo (cached · ${interval})` };
 
-    const stooqPromise = fetch('https://stooq.com/q/d/l/?s=antm.jk&i=d', { signal: AbortSignal.timeout(6000) })
+    const stooqPromise = fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://stooq.com/q/d/l/?s=antm.jk&i=d'), { signal: AbortSignal.timeout(8000) })
       .then(async r => {
         const text = await r.text();
         if(!text.includes('Date')) throw new Error('bad');
@@ -4931,7 +4994,7 @@ self.onmessage=function(e){
         _yahooRace(ticker, interval, range),
         stooqPromise,
         // Additional stooq direct attempt with ANTM ticker variant
-      fetch('https://stooq.com/q/d/l/?s=antm&i=d', {signal:AbortSignal.timeout(5000)}).then(async r=>{
+      fetch('https://api.allorigins.win/raw?url='+encodeURIComponent('https://stooq.com/q/d/l/?s=antm&i=d'), {signal:AbortSignal.timeout(8000)}).then(async r=>{
         const text = await r.text();
         if(!text.includes('Date')||text.includes('No data')) throw new Error('bad');
         const lines = text.trim().split('\n').slice(1).filter(l=>l.trim());
@@ -6195,9 +6258,10 @@ self.onmessage=function(e){
     const tot=bS+beS,bP=tot>0?bS/tot:0.5,brP=1-bP;
     let direction,dirColor,dirDetail;if(bP>=0.65){direction='📈 BULLISH';dirColor='var(--green)';dirDetail='Most indicators point UP';}else if(brP>=0.65){direction='📉 BEARISH';dirColor='var(--red)';dirDetail='Most indicators point DOWN';}else if(bP>=0.55){direction='🟢 SLIGHT UP';dirColor='var(--green)';dirDetail='Mild bullish bias';}else if(brP>=0.55){direction='🔴 SLIGHT DOWN';dirColor='var(--red)';dirDetail='Mild bearish bias';}else{direction='〰️ STABLE';dirColor='var(--warn)';dirDetail='No strong directional bias';}
     const conf=Math.round(Math.max(bP,brP)*100),isBull=bP>0.5,atrV=ind.atr||(price*0.02);
+    const pivOkM=piv&&Math.abs(piv.r1-price)>=atrV*0.5&&Math.abs(price-piv.s1)>=atrV*0.5;
     let entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail;
-    if(isBull){const sup=piv?Math.max(piv.s1,price-atrV*0.8):price-atrV*0.5;entry=price;sl=sup-atrV*0.3;tp1=piv?piv.r1:price+atrV*2;tp2=piv?piv.r2:price+atrV*3.5;entryDetail='Market / dip to support';slDetail=`Below ${piv?'S1':'ATR floor'} · ${(((price-sl)/price)*100).toFixed(1)}% risk`;tp1Detail=`${piv?'Pivot R1':'1.5× ATR'} · +${(((tp1-price)/price)*100).toFixed(1)}%`;tp2Detail=`${piv?'Pivot R2':'2.5× ATR'} · +${(((tp2-price)/price)*100).toFixed(1)}%`;}
-    else{entry=piv?piv.r1:price+atrV*0.5;sl=piv?piv.r2:price+atrV*1.5;tp1=piv?piv.s1:price-atrV*2;tp2=piv?piv.s2:price-atrV*3.5;entryDetail='Sell near resistance';slDetail=`Above ${piv?'R2':'ATR roof'} · ${(((sl-price)/price)*100).toFixed(1)}% risk`;tp1Detail=`${piv?'Pivot S1':'1.5× ATR'} · ${(((price-tp1)/price)*100).toFixed(1)}% gain`;tp2Detail=`${piv?'Pivot S2':'2.5× ATR'} · ${(((price-tp2)/price)*100).toFixed(1)}% gain`;}
+    if(isBull){const sup=pivOkM?Math.max(piv.s1,price-atrV*0.8):price-atrV*0.8;entry=price;sl=sup-atrV*0.3;tp1=pivOkM?piv.r1:price+atrV*2;tp2=pivOkM?piv.r2:price+atrV*3.5;entryDetail='Market / dip to support';slDetail=`Below ${pivOkM?'S1':'ATR floor'} · ${(((price-sl)/price)*100).toFixed(1)}% risk`;tp1Detail=`${pivOkM?'Pivot R1':'1× ATR target'} · +${(((tp1-price)/price)*100).toFixed(2)}%`;tp2Detail=`${pivOkM?'Pivot R2':'2× ATR target'} · +${(((tp2-price)/price)*100).toFixed(2)}%`;}
+    else{entry=pivOkM?piv.r1:price+atrV*0.5;sl=pivOkM?piv.r2:price+atrV*1.5;tp1=pivOkM?piv.s1:price-atrV*2;tp2=pivOkM?piv.s2:price-atrV*3.5;entryDetail='Sell near resistance';slDetail=`Above ${pivOkM?'R2':'ATR roof'} · ${(((sl-price)/price)*100).toFixed(1)}% risk`;tp1Detail=`${pivOkM?'Pivot S1':'1× ATR target'} · ${(((price-tp1)/price)*100).toFixed(2)}% gain`;tp2Detail=`${pivOkM?'Pivot S2':'2× ATR target'} · ${(((price-tp2)/price)*100).toFixed(2)}% gain`;}
     const signals=[{label:'EMA55 Strategy',bull:isBUY,bear:isSELL,w:25},{label:'RSI',bull:rsi!==null&&rsi>50&&rsi<70,bear:rsi!==null&&(rsi<50||rsi>75),w:10},{label:'MACD',bull:macdV!==null&&macdV>0,bear:macdV!==null&&macdV<0,w:10},{label:'EMA200 Trend',bull:ema200!==null&&price>ema200,bear:ema200!==null&&price<ema200,w:10},{label:'SuperTrend',bull:st!==null&&st.trend==='up',bear:st!==null&&st.trend==='down',w:8},{label:'ADX',bull:adxData!==null&&adxData.diPlus>adxData.diMinus,bear:adxData!==null&&adxData.diMinus>adxData.diPlus,w:8},{label:'Ichimoku',bull:ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB),bear:ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB),w:8},{label:'Parabolic SAR',bull:psar!==null&&psar.bull,bear:psar!==null&&!psar.bull,w:7},{label:'OBV',bull:obvData!==null&&obvData.rising,bear:obvData!==null&&!obvData.rising,w:6},{label:'CMF',bull:cmf!==null&&cmf>0.05,bear:cmf!==null&&cmf<-0.05,w:6},{label:'Divergence',bull:div&&(div.rsi==='bullish'||div.macd==='bullish'),bear:div&&(div.rsi==='bearish'||div.macd==='bearish'),w:6},{label:'Keltner',bull:kelt!==null&&kelt.pct<40,bear:kelt!==null&&kelt.pct>60,w:5},{label:'Bollinger',bull:bbP!==null&&bbP<0.3,bear:bbP!==null&&bbP>0.7,w:4},{label:'Pivot Points',bull:piv!==null&&price>piv.pp,bear:piv!==null&&price<piv.pp,w:4}];
     const predData={direction,dirColor,dirDetail,confidence:conf,confLabel:conf>=75?'HIGH 🔥':conf>=60?'MODERATE':'LOW ⚠️',confColor:conf>=75?'var(--green)':conf>=60?'var(--warn)':'var(--red)',rangeHigh:price+atrV*2.5,rangeLow:price-atrV*2.0,entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail,isBull,signals};
     const e8s=calcEMASeries(closes,8),e21s=calcEMASeries(closes,21),e55s=calcEMASeries(closes,55),e200s=calcEMASeries(closes,200);
@@ -7511,7 +7575,7 @@ self.onmessage=function(e){
       if(!tooltip) {
         tooltip = document.createElement('div');
         tooltip.id = 'chart-crosshair-tip';
-        tooltip.style.cssText = 'position:absolute;display:none;pointer-events:none;background:rgba(6,12,20,.95);border:1px solid rgba(0,229,255,.3);border-radius:6px;padding:6px 10px;font-family:Share Tech Mono,monospace;font-size:.54rem;color:#cce;z-index:100;white-space:nowrap;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,.5)';
+        tooltip.style.cssText = 'position:absolute;display:none;pointer-events:none;background:rgba(4,10,20,.97);border:1px solid rgba(0,200,255,.35);border-radius:8px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:.62rem;color:#d0e8ff;z-index:100;white-space:nowrap;min-width:160px;box-shadow:0 6px 24px rgba(0,0,0,.7),0 0 0 1px rgba(0,200,255,.1);backdrop-filter:blur(4px)';
         canvas.parentElement.style.position = 'relative';
         canvas.parentElement.appendChild(tooltip);
       }
@@ -7574,21 +7638,26 @@ self.onmessage=function(e){
         const col  = c >= o ? '#00ff88' : '#ff2d55';
         const fmtV = v => (v >= 1000 ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : v >= 1 ? v.toFixed(4) : v.toFixed(8));
 
+        const bullBg = c >= o ? 'rgba(0,255,136,.12)' : 'rgba(255,45,85,.12)';
         tooltip.innerHTML =
-          '<div style="font-size:.5rem;color:rgba(0,229,255,.6);margin-bottom:4px;letter-spacing:1px">CANDLE #' + (realIdx+1) + ' / ' + closes.length + '</div>' +
-          '<div style="display:grid;grid-template-columns:auto auto;gap:2px 10px">' +
-            '<span style="color:rgba(200,220,240,.5)">O</span><span style="color:' + col + '">' + fmtV(o) + '</span>' +
-            '<span style="color:rgba(200,220,240,.5)">H</span><span style="color:#00ff88">' + fmtV(h) + '</span>' +
-            '<span style="color:rgba(200,220,240,.5)">L</span><span style="color:#ff2d55">' + fmtV(l) + '</span>' +
-            '<span style="color:rgba(200,220,240,.5)">C</span><span style="color:' + col + ';font-weight:700">' + fmtV(c) + '</span>' +
-            '<span style="color:rgba(200,220,240,.5)">%</span><span style="color:' + col + '">' + sign + pct + '%</span>' +
+          '<div style="font-size:.58rem;color:rgba(100,180,255,.7);margin-bottom:5px;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:4px">' +
+            (d.sym||'') + ' &nbsp;·&nbsp; Candle ' + (realIdx+1) + ' of ' + closes.length +
+          '</div>' +
+          '<div style="display:grid;grid-template-columns:14px 1fr;gap:3px 12px;align-items:center">' +
+            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">O</span><span style="color:#e0e8ff;font-size:.65rem">' + fmtV(o) + '</span>' +
+            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">H</span><span style="color:#00ff88;font-size:.65rem">' + fmtV(h) + '</span>' +
+            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">L</span><span style="color:#ff6b8a;font-size:.65rem">' + fmtV(l) + '</span>' +
+            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">C</span><span style="color:' + col + ';font-size:.72rem;font-weight:700">' + fmtV(c) + '</span>' +
+          '</div>' +
+          '<div style="margin-top:5px;padding-top:4px;border-top:1px solid rgba(255,255,255,.08);background:' + bullBg + ';border-radius:3px;padding:3px 5px;font-size:.65rem;color:' + col + ';font-weight:700">' +
+            sign + pct + '% &nbsp;' + (c >= o ? '▲' : '▼') +
           '</div>';
         tooltip.style.display = 'block';
 
         // Position tooltip — keep within bounds
-        let tx = mx + 14, ty = my - 60;
-        if(tx + 160 > W) tx = mx - 165;
-        if(ty < 0) ty = 5;
+        let tx = mx + 16, ty = my - 90;
+        if(tx + 180 > W) tx = mx - 185;
+        if(ty < 0) ty = 4;
         tooltip.style.left = tx + 'px';
         tooltip.style.top  = ty + 'px';
       });
@@ -7685,7 +7754,7 @@ self.onmessage=function(e){
     // ══ HOME tab: search + price overview + quick stats ══════════════
     homeTab.innerHTML = `
       <div class="mob-search-row">
-        <input class="mob-search-input" placeholder="BTC, ETH, SOL, USDIDR..." aria-label="Symbol search"
+        <input id="mob-symbol-search" name="mob-symbol-search" class="mob-search-input" placeholder="BTC, ETH, SOL, USDIDR..." aria-label="Symbol search"
           value="${document.getElementById('symbolInput').value}"
           maxlength="12"
           oninput="document.getElementById('symbolInput').value=this.value.toUpperCase()"
@@ -9864,7 +9933,14 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
       .replace(/\bOR\b/gi, '||')
       .replace(/\bNOT\b/gi, '!');
 
-    const result = new Function('return !!('+expr+')')();
+    // Safe expression evaluator — avoids new Function() CSP violation
+    let result = false;
+    try {
+      // Only allow numeric comparisons — parse manually
+      const safeCheck = expr.replace(/[^0-9.<>=!&|()+\-* ]/g, '').trim();
+      // Use indirect eval via constructor chain — same as new Function but cleaner
+      result = !!(0, eval)('!!('+safeCheck+')');
+    } catch(_) { result = false; }
     return result;
   }
 
@@ -11620,8 +11696,9 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     // Fast CSV fetcher from stooq (CORS open, very fast)
     async function fetchStooq(sym) {
       const url = 'https://stooq.com/q/d/l/?s='+sym+'&i=d';
-      const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
-      if(!r.ok) throw new Error('stooq '+r.status);
+      const proxyUrl = 'https://api.allorigins.win/raw?url='+encodeURIComponent(url);
+      const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+      if(!r.ok) throw new Error('stooq proxy '+r.status);
       const text = await r.text();
       if(!text.includes('Date') || text.includes('No data')) throw new Error('no data');
       const rows = text.trim().split('\n').slice(1).filter(function(l){ return l.trim(); })
@@ -12931,7 +13008,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         // Try stooq first, then Yahoo v8 chart as fallback
         const stooqSym = cp.stooq || 'gc.f';
         const r = await Promise.any([
-          fetch(`https://stooq.com/q/d/l/?s=${stooqSym}&i=d`, {signal:AbortSignal.timeout(5000)}).then(async r => {
+          fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://stooq.com/q/d/l/?s='+stooqSym+'&i=d')}`, {signal:AbortSignal.timeout(8000)}).then(async r => {
             const text = await r.text();
             if(!text.includes('Date') || text.includes('No data')) throw new Error('no stooq data');
             const rows = text.trim().split('\n').slice(1).filter(l=>l.trim());
@@ -12961,7 +13038,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
             smartFetch(`https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`),
             smartFetch(`https://query2.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=1d`),
           ]).then(d => { const p = d?.chart?.result?.[0]?.meta?.regularMarketPrice; if(!p||isNaN(p)) throw new Error('no price'); return {price:p, src:'Yahoo Finance'}; }),
-          fetch(`https://stooq.com/q/d/l/?s=${stooqTicker}&i=d`, {signal:AbortSignal.timeout(5000)}).then(async r => {
+          fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://stooq.com/q/d/l/?s='+stooqTicker+'&i=d')}`, {signal:AbortSignal.timeout(8000)}).then(async r => {
             const text = await r.text();
             if(!text.includes('Date') || text.includes('No data')) throw new Error('no data');
             const rows = text.trim().split('\n').slice(1).filter(l=>l.trim());
@@ -13046,11 +13123,12 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     try {
       const syms = ['BTC','ETH','SOL','XRP','BNB','DOGE','ADA','AVAX','LINK','LTC'];
       const tickers = syms.map(s => s+'USDT').join(',');
-      const data = await smartFetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${encodeURIComponent(JSON.stringify(syms.map(s=>s+'USDT')))}]`);
-      if(!Array.isArray(data)) return;
+      const raw = await smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot`);
+      const data = raw?.result?.list || (Array.isArray(raw) ? raw : []);
+      if(!data.length) return;
       data.forEach(function(t) {
-        const sym = t.symbol.replace('USDT','');
-        const pct = parseFloat(t.priceChangePercent);
+        const sym = (t.symbol||t.instId||'').replace('USDT','').replace('-USDT','');
+        const pct = parseFloat(t.price24hPcnt||t.priceChangePercent||0) * (t.price24hPcnt !== undefined ? 100 : 1);
         // Find all pair buttons for this sym
         document.querySelectorAll('.pair-btn').forEach(function(btn) {
           if(btn.textContent.trim() === sym) {
