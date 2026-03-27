@@ -4464,16 +4464,23 @@ self.onmessage=function(e){
       };
       const _vol = _pairVol[sym] || 0.004;
       const buildSynth = function(rate) {
-        const synth = []; let r = rate * (1 - _vol * 50);
-        for(let i=200; i>=0; i--) {
-          const date = new Date(Date.now() - i*86400000).toISOString().slice(0,10);
-          r = r * (1 + (Math.random()-0.5)*_vol*2);
-          if(r <= 0) r = rate * 0.5; // guard against negative rates
-          synth.push({ date, rate: r });
+        // Brownian motion backwards from current rate, bounded to ±10%
+        const n = 200;
+        const path = [rate];
+        for(let i = 1; i < n; i++) {
+          const ret = (Math.random() - 0.5) * _vol * 2;
+          const prev = path[path.length - 1];
+          const next = Math.max(prev * (1 + ret), rate * 0.001);
+          // Clamp to ±10% of current rate
+          const bounded = Math.min(Math.max(next, rate * 0.90), rate * 1.10);
+          path.push(bounded);
         }
-        synth[synth.length-1].rate = rate;
-        // Guard against negative/zero rates
-        return synth.map(function(s){ return { date:s.date, rate: Math.max(s.rate, rate * 0.001) }; });
+        path.reverse();
+        path[path.length - 1] = rate; // ensure exact current rate at end
+        const synth = path.map(function(r, i) {
+          return { date: new Date(Date.now() - (n-1-i)*86400000).toISOString().slice(0,10), rate: r };
+        });
+        return synth;
       };
       sources.push(
         fetch(urlFawaz, {signal:AbortSignal.timeout(5000)}).then(r=>r.json()).then(function(d) {
@@ -4799,30 +4806,35 @@ self.onmessage=function(e){
 
     // Helper: build synthetic OHLCV from a spot price (daily candles)
     const buildSynthOHLCV = function(price, volatility) {
-      const n = 365, opens = [], closes = [], highs = [], lows = [], volumes = [];
-      let p = price * (1 - volatility * n * 0.3); // start below current
-      for(let i = 0; i < n; i++) {
-        const drift  = (Math.random() - 0.48) * volatility; // slight upward bias
-        const dayVol = volatility * (0.5 + Math.random());
-        const o = p;
-        const c = p * (1 + drift);
-        const h = Math.max(o, c) * (1 + dayVol * 0.3);
-        const l = Math.min(o, c) * (1 - dayVol * 0.3);
-        opens.push(o); closes.push(c); highs.push(h); lows.push(l);
-        volumes.push(Math.round(1e6 * (0.5 + Math.random())));
-        p = c;
+      const n = 200;
+      // Generate realistic price path using geometric Brownian motion
+      // Work BACKWARDS from current price so the last value always equals price
+      const path = [price];
+      for(let i = 1; i < n; i++) {
+        // Random return — bounded so we don't drift too far
+        const ret = (Math.random() - 0.5) * volatility * 2;
+        const prev = path[path.length - 1];
+        const next = prev * (1 + ret);
+        // Clamp to ±15% of current price to keep chart readable
+        const bounded = Math.min(Math.max(next, price * 0.85), price * 1.15);
+        path.push(bounded);
       }
-      // Force last close to actual price
-      closes[n-1] = price; opens[n-1] = price * (1 - volatility);
-      highs[n-1]  = price * (1 + volatility * 0.5);
-      lows[n-1]   = price * (1 - volatility * 0.5);
-      // Guard: ensure no negatives or zeros (can happen with small starting price)
-      const minPrice = price * 0.01;
-      for(let i=0;i<n;i++){
-        closes[i]  = Math.max(closes[i],  minPrice);
-        opens[i]   = Math.max(opens[i],   minPrice);
-        highs[i]   = Math.max(highs[i],   closes[i]);
-        lows[i]    = Math.max(Math.min(lows[i], closes[i] * 0.99), minPrice);
+      // Reverse so path goes old→new (ends at current price)
+      path.reverse();
+      path[path.length - 1] = price; // ensure exact current price at end
+
+      const opens = [], closes = [], highs = [], lows = [], volumes = [];
+      for(let i = 0; i < n; i++) {
+        const c = path[i];
+        const o = i > 0 ? path[i-1] : c * (1 - volatility * 0.5);
+        const range = Math.abs(c - o) + price * volatility * 0.3;
+        const h = Math.max(o, c) + range * (0.2 + Math.random() * 0.3);
+        const l = Math.min(o, c) - range * (0.2 + Math.random() * 0.3);
+        opens.push(o);
+        closes.push(c);
+        highs.push(Math.max(h, c, o));
+        lows.push(Math.max(Math.min(l, c, o), price * 0.001));
+        volumes.push(Math.round(1e6 * (0.5 + Math.random())));
       }
       return { closes, opens, highs, lows, volumes };
     };
