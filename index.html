@@ -7587,7 +7587,7 @@ self.onmessage=function(e){
       if(!tooltip) {
         tooltip = document.createElement('div');
         tooltip.id = 'chart-crosshair-tip';
-        tooltip.style.cssText = 'position:absolute;display:none;pointer-events:none;background:rgba(4,10,20,.97);border:1px solid rgba(0,200,255,.35);border-radius:8px;padding:8px 12px;font-family:Share Tech Mono,monospace;font-size:.62rem;color:#d0e8ff;z-index:100;white-space:nowrap;min-width:160px;box-shadow:0 6px 24px rgba(0,0,0,.7),0 0 0 1px rgba(0,200,255,.1);backdrop-filter:blur(4px)';
+        tooltip.style.cssText = 'position:absolute;display:none;pointer-events:none;background:rgba(3,8,18,.98);border:1.5px solid rgba(0,200,255,.4);border-radius:10px;padding:10px 14px;font-family:Share Tech Mono,monospace;color:#d0e8ff;z-index:200;white-space:nowrap;min-width:175px;box-shadow:0 8px 32px rgba(0,0,0,.85),0 0 0 1px rgba(0,200,255,.15);backdrop-filter:blur(8px)';
         canvas.parentElement.style.position = 'relative';
         canvas.parentElement.appendChild(tooltip);
       }
@@ -7650,26 +7650,43 @@ self.onmessage=function(e){
         const col  = c >= o ? '#00ff88' : '#ff2d55';
         const fmtV = v => (v >= 1000 ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : v >= 1 ? v.toFixed(4) : v.toFixed(8));
 
-        const bullBg = c >= o ? 'rgba(0,255,136,.12)' : 'rgba(255,45,85,.12)';
+        // Use fmtP for asset-aware price formatting (shows $ for crypto, Rp for IDX, etc.)
+        const fmt = typeof fmtP === 'function' ? fmtP : fmtV;
+        const isUp = c >= o;
+        const bullBorder = isUp ? 'rgba(0,255,136,.5)' : 'rgba(255,45,85,.5)';
+
         tooltip.innerHTML =
-          '<div style="font-size:.58rem;color:rgba(100,180,255,.7);margin-bottom:5px;letter-spacing:.5px;border-bottom:1px solid rgba(255,255,255,.08);padding-bottom:4px">' +
-            (d.sym||'') + ' &nbsp;·&nbsp; Candle ' + (realIdx+1) + ' of ' + closes.length +
+          // Header: symbol + candle number
+          '<div style="font-size:.68rem;font-weight:600;color:#fff;letter-spacing:.5px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(255,255,255,.12)">' +
+            '<span style="color:rgba(0,220,255,.9)">' + (d.sym||'CHART') + '</span>' +
+            '<span style="color:rgba(180,200,220,.4);font-size:.56rem;margin-left:8px">candle ' + (realIdx+1) + '/' + closes.length + '</span>' +
           '</div>' +
-          '<div style="display:grid;grid-template-columns:14px 1fr;gap:3px 12px;align-items:center">' +
-            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">O</span><span style="color:#e0e8ff;font-size:.65rem">' + fmtV(o) + '</span>' +
-            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">H</span><span style="color:#00ff88;font-size:.65rem">' + fmtV(h) + '</span>' +
-            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">L</span><span style="color:#ff6b8a;font-size:.65rem">' + fmtV(l) + '</span>' +
-            '<span style="color:rgba(160,190,220,.6);font-size:.6rem">C</span><span style="color:' + col + ';font-size:.72rem;font-weight:700">' + fmtV(c) + '</span>' +
+          // OHLC grid — larger labels, brighter values
+          '<div style="display:grid;grid-template-columns:18px 1fr;gap:4px 8px;align-items:center;line-height:1.6">' +
+            '<span style="color:rgba(180,200,220,.5);font-size:.62rem;font-weight:600">O</span>' +
+            '<span style="color:#c8d8f0;font-size:.75rem">' + fmt(o) + '</span>' +
+            '<span style="color:rgba(180,200,220,.5);font-size:.62rem;font-weight:600">H</span>' +
+            '<span style="color:#00e87a;font-size:.75rem;font-weight:600">' + fmt(h) + '</span>' +
+            '<span style="color:rgba(180,200,220,.5);font-size:.62rem;font-weight:600">L</span>' +
+            '<span style="color:#ff5577;font-size:.75rem;font-weight:600">' + fmt(l) + '</span>' +
+            '<span style="color:rgba(180,200,220,.5);font-size:.62rem;font-weight:600">C</span>' +
+            '<span style="color:' + (isUp?'#00ff88':'#ff3355') + ';font-size:.85rem;font-weight:700;letter-spacing:.3px">' + fmt(c) + '</span>' +
           '</div>' +
-          '<div style="margin-top:5px;padding-top:4px;border-top:1px solid rgba(255,255,255,.08);background:' + bullBg + ';border-radius:3px;padding:3px 5px;font-size:.65rem;color:' + col + ';font-weight:700">' +
-            sign + pct + '% &nbsp;' + (c >= o ? '▲' : '▼') +
+          // Change bar
+          '<div style="margin-top:6px;padding:4px 8px;border-radius:5px;border:1px solid ' + bullBorder + ';background:' + (isUp?'rgba(0,255,136,.07)':'rgba(255,45,85,.07)') + ';display:flex;align-items:center;justify-content:space-between">' +
+            '<span style="color:' + (isUp?'#00ff88':'#ff3355') + ';font-size:.75rem;font-weight:700">' + (isUp?'▲ +':'▼ ') + pct + '%</span>' +
+            '<span style="color:rgba(180,200,220,.45);font-size:.6rem">' + (isUp ? 'bullish' : 'bearish') + '</span>' +
           '</div>';
+
         tooltip.style.display = 'block';
 
-        // Position tooltip — keep within bounds
-        let tx = mx + 16, ty = my - 90;
-        if(tx + 180 > W) tx = mx - 185;
-        if(ty < 0) ty = 4;
+        // Smart positioning — stays inside chart bounds
+        const tipW = 175, tipH = 130;
+        let tx = mx + 18, ty = my - tipH - 10;
+        if(tx + tipW > W) tx = mx - tipW - 12;
+        if(tx < 0) tx = 4;
+        if(ty < 0) ty = my + 14;
+        if(ty + tipH > H) ty = H - tipH - 4;
         tooltip.style.left = tx + 'px';
         tooltip.style.top  = ty + 'px';
       });
