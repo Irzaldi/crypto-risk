@@ -741,6 +741,23 @@ function installPWA() {
 
     /* ── Market tab panels ── */
     .mob-page .panel { margin-bottom: 10px; }
+    .mob-search-row { display:flex; align-items:center; gap:6px; }
+    .mob-fetch-btn:active { opacity:.7; transform:scale(.97); }
+    /* Larger touch targets for mobile */
+    @media (max-width: 480px) {
+      .pair-btn { min-height:36px !important; }
+      .tf-btn { min-height:36px !important; padding:4px 10px !important; }
+      .mob-section-header { min-height:46px; display:flex; align-items:center; }
+      .mob-section-title { font-size:.7rem !important; }
+      /* Make market dashboard panels full-width */
+      #page-market .market-grid, #page-market .panel-grid { grid-template-columns:1fr !important; }
+      /* Make scanner table scrollable */
+      #page-scanner .scanner-table { overflow-x:auto; }
+      /* AI chat input stays at bottom */
+      .ai-chat-wrap { display:flex; flex-direction:column; height:400px; }
+      #aiChatMessages { flex:1; overflow-y:auto; }
+      #aiChatInput { font-size:16px !important; }
+    }
 
     /* ── Session timer wraps on mobile ── */
     #session-timer { gap: 4px; padding: 4px 12px; }
@@ -7773,14 +7790,13 @@ self.onmessage=function(e){
       return t;
     }
 
-    // ── 5 mobile pages ──────────────────────────────────────────────
     const homeTab      = makeTab('home', true);
     const analysisTab  = makeTab('analysis', false);
     const marketTab    = makeTab('market', false);
     const portfolioTab = makeTab('portfolio', false);
     const moreTab      = makeTab('more', false);
 
-    // ══ HOME tab: search + price overview + quick stats ══════════════
+    // ══ HOME tab ════════════════════════════════════════════════════
     homeTab.innerHTML = `
       <div class="mob-search-row">
         <input id="mob-symbol-search" name="mob-symbol-search" class="mob-search-input" placeholder="BTC, ETH, SOL, USDIDR..." aria-label="Symbol search"
@@ -7788,6 +7804,7 @@ self.onmessage=function(e){
           maxlength="12"
           oninput="document.getElementById('symbolInput').value=this.value.toUpperCase()"
           onkeydown="if(event.key==='Enter'){document.getElementById('symbolInput').value=this.value.toUpperCase();fetchData()}">
+        <button class="mob-fetch-btn" onclick="fetchData()" style="margin-left:8px;padding:8px 14px;background:var(--accent);color:#000;font-family:'Share Tech Mono',monospace;font-size:.65rem;font-weight:700;border:none;border-radius:6px;cursor:pointer;white-space:nowrap">⚡ FETCH</button>
       </div>
       <div class="mob-tf-row" id="mob-tf-row"></div>
       <div class="mob-pairs-row" id="mob-pairs-row"></div>
@@ -7798,7 +7815,7 @@ self.onmessage=function(e){
         </label>
         <span class="countdown" id="mob-countdown"></span>
       </div>
-      <div class="mob-status" id="mob-statusBar">⬡ Ready — tap ⚡ to fetch</div>
+      <div class="mob-status" id="mob-statusBar">⬡ Ready — tap ⚡ FETCH</div>
       <div class="mob-progress"><div class="mob-progress-bar" id="mob-progressBar"></div></div>`;
 
     // Clone TF buttons
@@ -7815,305 +7832,164 @@ self.onmessage=function(e){
       mobTfRow.appendChild(cl);
     });
 
-    // Clone pair buttons grouped by category
+    // Pair buttons grouped by category
     const mobPairsRow = homeTab.querySelector('#mob-pairs-row');
-    // Build categorised pair list
     const pairCategories = [
       { label:'Crypto', color:'rgba(0,229,255,.3)', pairs:['BTC','ETH','SOL','XRP','BNB','DOGE','ADA','AVAX','LINK','LTC','DOT','SUI','PEPE','INJ','TRX'] },
-      { label:'Forex', color:'rgba(0,255,136,.3)', pairs:['USDIDR','EURUSD','GBPUSD','USDJPY','USDSGD','USDMYR','EURIDR','JPYIDR','AUDUSD','USDCAD','NZDUSD','EURJPY','GBPJPY'] },
+      { label:'Forex',  color:'rgba(0,255,136,.3)', pairs:['USDIDR','EURUSD','GBPUSD','USDJPY','USDSGD','USDMYR','EURIDR','JPYIDR','AUDUSD','USDCAD','NZDUSD','EURJPY','GBPJPY'] },
       { label:'Metals', color:'rgba(255,184,0,.3)', pairs:['XAUT','XAGUSD','COPPER'] },
-      { label:'Oil', color:'rgba(255,100,50,.3)', pairs:['USOIL','BRENT','NATGAS'] },
-      { label:'IDX', color:'rgba(0,255,136,.3)', pairs:['ANTAM','BBCA','TLKM','BBRI','GOTO'] },
-      { label:'US', color:'rgba(192,132,252,.3)', pairs:['AAPL','TSLA','NVDA','MSFT'] },
+      { label:'Oil',    color:'rgba(255,100,50,.3)', pairs:['USOIL','BRENT','NATGAS'] },
+      { label:'IDX',    color:'rgba(0,255,136,.3)', pairs:['ANTAM','BBCA','TLKM','BBRI','GOTO'] },
+      { label:'US',     color:'rgba(192,132,252,.3)', pairs:['AAPL','TSLA','NVDA','MSFT'] },
     ];
-
     pairCategories.forEach(function(cat) {
-      const label = document.createElement('span');
-      label.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:.44rem;color:rgba(150,180,200,.5);padding:0 4px;align-self:center;white-space:nowrap;letter-spacing:1px;flex-shrink:0';
-      label.textContent = cat.label;
-      mobPairsRow.appendChild(label);
-
+      const lbl = document.createElement('span');
+      lbl.style.cssText = 'font-family:Share Tech Mono,monospace;font-size:.44rem;color:rgba(150,180,200,.5);padding:0 4px;align-self:center;white-space:nowrap;letter-spacing:1px;flex-shrink:0';
+      lbl.textContent = cat.label;
+      mobPairsRow.appendChild(lbl);
       cat.pairs.forEach(function(sym) {
-        // Find the matching button by onclick
         const btn = document.querySelector(".pairs .pair-btn[onclick*='" + sym + "']");
         if(!btn) return;
         const cl = btn.cloneNode(true);
         cl.setAttribute('onclick', btn.getAttribute('onclick'));
-        // Compact style for mobile
         cl.style.cssText = (cl.style.cssText||'') + ';min-height:32px!important;padding:2px 8px;font-size:.55rem;border-color:' + cat.color;
         if(btn.classList.contains('active')) cl.classList.add('active');
         mobPairsRow.appendChild(cl);
       });
-
-      // Separator
       const sep = document.createElement('span');
       sep.style.cssText = 'width:1px;height:24px;background:rgba(255,255,255,.08);flex-shrink:0;align-self:center';
       mobPairsRow.appendChild(sep);
     });
 
-    // Market overview cards
-    const mktGridEl = wrap.querySelector('.mkt-grid');
-    if(mktGridEl) {
-      const lbl = document.createElement('div');
-      lbl.style.cssText = "font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin:8px 0 6px";
-      lbl.textContent = '📈 MARKET OVERVIEW';
-      homeTab.appendChild(lbl);
-      homeTab.appendChild(mktGridEl);
-    }
-
-    // Price row + Session P&L
+    // Price + score cards on home
     const priceRowEl = wrap.querySelector('.price-row');
-    if(priceRowEl) {
-      const sec = makeMobSection('💵 PRICE', true);
-      sec.body.appendChild(priceRowEl);
-      homeTab.appendChild(sec.wrap);
-    }
+    if(priceRowEl) { const s=makeMobSection('💵 PRICE & SCORE',true); s.body.appendChild(priceRowEl); homeTab.appendChild(s.wrap); }
+    const scoreEl = wrap.querySelector('#scoreRing')?.closest('.panel');
+    if(scoreEl) { const s=makeMobSection('🎯 TRADE SCORE',false); s.body.appendChild(scoreEl); homeTab.appendChild(s.wrap); }
+    const mktGridEl = wrap.querySelector('.mkt-grid');
+    if(mktGridEl) { const s=makeMobSection('📈 MARKET OVERVIEW',false); s.body.appendChild(mktGridEl); homeTab.appendChild(s.wrap); }
 
-    const pnlPanelEl = wrap.querySelector('.pnl-strip')?.closest('.panel');
-    if(pnlPanelEl) {
-      const sec = makeMobSection('📊 SESSION P&L', false);
-      sec.body.appendChild(pnlPanelEl);
-      homeTab.appendChild(sec.wrap);
-    }
-
-    // Score + Fear & Greed preview on home
-    const scoreRingEl = wrap.querySelector('#scoreRing')?.closest('.panel');
-    if(scoreRingEl) {
-      const sec = makeMobSection('🎯 TRADE SCORE', true);
-      sec.body.appendChild(scoreRingEl);
-      homeTab.appendChild(sec.wrap);
-    }
-
-    // ══ ANALYSIS tab: chart + indicators + all analysis panels ═══════
-    const chartPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#miniChart'); });
+    // ══ ANALYSIS tab — move real elements (no clone) so live updates work ══
+    const chartPanelEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#miniChart'));
     if(chartPanelEl) analysisTab.appendChild(chartPanelEl);
 
     const mainGridEl = wrap.querySelector('.main-grid');
-    if(mainGridEl) {
-      const sec = makeMobSection('📡 INDICATORS', true);
-      sec.body.appendChild(mainGridEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    if(mainGridEl) { const s=makeMobSection('📡 INDICATORS',true); s.body.appendChild(mainGridEl); analysisTab.appendChild(s.wrap); }
 
-    const tlPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.textContent.includes('TradingLab Strategy'); });
-    if(tlPanelEl) {
-      const sec = makeMobSection('🎓 TRADINGLAB SIGNAL', true);
-      sec.body.appendChild(tlPanelEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const tlEl = [...wrap.querySelectorAll('.panel')].find(p=>p.textContent.includes('TradingLab Strategy'));
+    if(tlEl) { const s=makeMobSection('🎓 TRADINGLAB SIGNAL',true); s.body.appendChild(tlEl); analysisTab.appendChild(s.wrap); }
 
-    const mtfPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#mtfPanel'); });
-    if(mtfPanelEl) {
-      const sec = makeMobSection('🌐 MULTI-TIMEFRAME', false);
-      sec.body.appendChild(mtfPanelEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const mtfEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#mtfPanel'));
+    if(mtfEl) { const s=makeMobSection('🌐 MULTI-TIMEFRAME',false); s.body.appendChild(mtfEl); analysisTab.appendChild(s.wrap); }
 
-    const predPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#predPanel'); });
-    if(predPanelEl) {
-      const sec = makeMobSection('🤖 AI PREDICTION', false);
-      sec.body.appendChild(predPanelEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const predEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#predPanel'));
+    if(predEl) { const s=makeMobSection('🔮 AI PREDICTION',false); s.body.appendChild(predEl); analysisTab.appendChild(s.wrap); }
 
-    const ichiPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.textContent.includes('Ichimoku'); });
-    if(ichiPanelEl) {
-      const sec = makeMobSection('☁️ ICHIMOKU', false);
-      sec.body.appendChild(ichiPanelEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const rrEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#rr-entry'));
+    if(rrEl) { const s=makeMobSection('⚖️ RISK/REWARD',false); s.body.appendChild(rrEl); analysisTab.appendChild(s.wrap); }
 
     const trioEl = wrap.querySelector('[style*="grid-template-columns:1fr 1fr 1fr"]');
-    if(trioEl) {
-      const sec = makeMobSection('🔬 BACKTEST & RISK', false);
-      trioEl.style.cssText = 'display:grid;grid-template-columns:1fr;gap:10px';
-      sec.body.appendChild(trioEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    if(trioEl) { const s=makeMobSection('🔬 BACKTEST & RISK',false); trioEl.style.cssText='display:grid;grid-template-columns:1fr;gap:10px'; s.body.appendChild(trioEl); analysisTab.appendChild(s.wrap); }
 
-    const bottomGridEl = wrap.querySelector('.bottom-grid');
-    if(bottomGridEl) {
-      const sec = makeMobSection('🕯️ KEY LEVELS & PATTERNS', false);
-      bottomGridEl.style.gridTemplateColumns = '1fr';
-      sec.body.appendChild(bottomGridEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const btmEl = wrap.querySelector('.bottom-grid');
+    if(btmEl) { const s=makeMobSection('🕯️ KEY LEVELS & PATTERNS',false); btmEl.style.gridTemplateColumns='1fr'; s.body.appendChild(btmEl); analysisTab.appendChild(s.wrap); }
 
-    // R/R Calculator
-    const rrPanel = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#rr-entry'); });
-    if(rrPanel) {
-      const sec = makeMobSection('⚖️ RISK/REWARD CALC', false);
-      sec.body.appendChild(rrPanel);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const obEl = document.getElementById('orderbook-panel');
+    if(obEl) { const s=makeMobSection('📖 ORDER BOOK',false); s.body.appendChild(obEl); analysisTab.appendChild(s.wrap); }
 
-    // Order book
-    const obPanel = document.getElementById('orderbook-panel');
-    if(obPanel) {
-      const sec = makeMobSection('📖 ORDER BOOK', false);
-      sec.body.appendChild(obPanel);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const wlEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#wlGrid'));
+    if(wlEl) { const s=makeMobSection('⭐ WATCHLIST',false); s.body.appendChild(wlEl); analysisTab.appendChild(s.wrap); }
 
-    // Watchlist + Alerts in analysis tab for easy access
-    const wlPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#wlGrid'); });
-    if(wlPanelEl) {
-      const sec = makeMobSection('⭐ WATCHLIST', false);
-      sec.body.appendChild(wlPanelEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const alertEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#alertList'));
+    if(alertEl) { const s=makeMobSection('🔔 PRICE ALERTS',false); s.body.appendChild(alertEl); analysisTab.appendChild(s.wrap); }
 
-    const alertPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#alertList'); });
-    if(alertPanelEl) {
-      const sec = makeMobSection('🔔 PRICE ALERTS', false);
-      sec.body.appendChild(alertPanelEl);
-      analysisTab.appendChild(sec.wrap);
-    }
+    const journalEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#journalList')||p.querySelector('#tj-tbody'));
+    if(journalEl) { const s=makeMobSection('📓 TRADE JOURNAL',false); journalEl.style.overflowX='auto'; s.body.appendChild(journalEl); analysisTab.appendChild(s.wrap); }
 
-    const journalPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#journalList') || p.querySelector('#tj-tbody'); });
-    if(journalPanelEl) {
-      const sec = makeMobSection('📓 TRADE JOURNAL', false);
-      journalPanelEl.style.overflowX = 'auto';
-      sec.body.appendChild(journalPanelEl);
-      analysisTab.appendChild(sec.wrap);
-    }
-
-    // ══ MARKET tab: heatmap + movers + news + fear&greed + F&G ════════
-    // Fetch market data panels from page-market
+    // ══ MARKET tab — use REAL page-market so updates work ════════════
+    // Market tab shows the actual desktop market page (no clone = live updates)
     const pageMarket = document.getElementById('page-market');
     if(pageMarket) {
-      const marketSec = makeMobSection('🌐 MARKET DASHBOARD', true);
-      // Add a refresh button
+      // Add a refresh button at top
       const refreshBtn = document.createElement('button');
       refreshBtn.textContent = '⟳ Refresh Market Data';
-      refreshBtn.className = 'mkt-refresh-btn';
-      refreshBtn.style.cssText = 'width:100%;margin-bottom:8px';
+      refreshBtn.style.cssText = 'width:100%;padding:10px;margin-bottom:10px;background:rgba(0,229,255,.1);border:1px solid var(--accent);color:var(--accent);font-family:Share Tech Mono,monospace;font-size:.65rem;border-radius:6px;cursor:pointer';
       refreshBtn.onclick = function(){ fetchMarketDashboard(true); };
-      marketSec.body.appendChild(refreshBtn);
-      // Clone the market page content into mobile
-      const mktContent = pageMarket.querySelector('.wrap');
-      if(mktContent) {
-        const clone = mktContent.cloneNode(true);
-        clone.style.padding = '0';
-        marketSec.body.appendChild(clone);
+      marketTab.appendChild(refreshBtn);
+      // Move inner wrap to market tab so IDs remain unique and updates work
+      const mktInner = pageMarket.querySelector('.wrap');
+      if(mktInner) {
+        mktInner.style.padding = '0';
+        mktInner.style.maxWidth = '100%';
+        marketTab.appendChild(mktInner);
       }
-      marketTab.appendChild(marketSec.wrap);
     }
 
-    // Fear & Greed
-    const fgPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#fgRing'); });
-    if(fgPanelEl) {
-      const sec = makeMobSection('😱 FEAR & GREED', false);
-      sec.body.appendChild(fgPanelEl);
-      marketTab.appendChild(sec.wrap);
-    }
+    const fgEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#fgRing'));
+    if(fgEl) { const s=makeMobSection('😱 FEAR & GREED',false); s.body.appendChild(fgEl); marketTab.appendChild(s.wrap); }
 
-    // Scanner
+    // Scanner — use actual page content
     const pageScanner = document.getElementById('page-scanner');
     if(pageScanner) {
-      const sec = makeMobSection('📡 SCANNER', false);
-      const scanContent = pageScanner.querySelector('.wrap');
-      if(scanContent) {
-        const clone = scanContent.cloneNode(true);
-        clone.style.padding = '0';
-        sec.body.appendChild(clone);
-      }
-      marketTab.appendChild(sec.wrap);
+      const scanInner = pageScanner.querySelector('.wrap');
+      if(scanInner) { const s=makeMobSection('📡 SCANNER',false); scanInner.style.padding='0'; s.body.appendChild(scanInner); marketTab.appendChild(s.wrap); }
     }
 
-    // Forex & Stocks
+    // Forex & Stocks — use actual page content
     const pageFx = document.getElementById('page-fxstocks');
     if(pageFx) {
-      const sec = makeMobSection('💱 FOREX & STOCKS', false);
-      const fxContent = pageFx.querySelector('.wrap');
-      if(fxContent) {
-        const clone = fxContent.cloneNode(true);
-        clone.style.padding = '0';
-        sec.body.appendChild(clone);
-      }
-      marketTab.appendChild(sec.wrap);
+      const fxInner = pageFx.querySelector('.wrap');
+      if(fxInner) { const s=makeMobSection('💱 FOREX & STOCKS',false); fxInner.style.padding='0'; s.body.appendChild(fxInner); marketTab.appendChild(s.wrap); }
     }
 
-    // ══ PORTFOLIO tab: portfolio + AI + social + defi ════════════════
-    // Portfolio tracker panel
-    const portPanel = [...document.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#portTbody'); });
-    if(portPanel) {
-      const sec = makeMobSection('💼 PORTFOLIO', true);
-      sec.body.appendChild(portPanel);
-      portfolioTab.appendChild(sec.wrap);
-    }
+    // ══ PORTFOLIO tab ════════════════════════════════════════════════
+    const portEl = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('#portTbody'));
+    if(portEl) { const s=makeMobSection('💼 PORTFOLIO',true); s.body.appendChild(portEl); portfolioTab.appendChild(s.wrap); }
 
-    // AI Assistant — full panel in portfolio tab
+    const portPerfEl = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('#portPerfChart'));
+    if(portPerfEl) { const s=makeMobSection('📈 PERFORMANCE',false); s.body.appendChild(portPerfEl); portfolioTab.appendChild(s.wrap); }
+
+    // AI — use actual page so chat works
     const pageAI = document.getElementById('page-ai');
     if(pageAI) {
-      const sec = makeMobSection('🤖 AI ASSISTANT', false);
-      const aiContent = pageAI.querySelector('.wrap');
-      if(aiContent) {
-        const clone = aiContent.cloneNode(true);
-        clone.style.padding = '0';
-        sec.body.appendChild(clone);
-      }
-      portfolioTab.appendChild(sec.wrap);
+      const aiInner = pageAI.querySelector('.wrap');
+      if(aiInner) { const s=makeMobSection('🤖 AI ASSISTANT',true); aiInner.style.padding='0'; s.body.appendChild(aiInner); portfolioTab.appendChild(s.wrap); }
     }
 
-    // Social Sentiment
-    const socialPanel = document.getElementById('socialSentimentPanel')?.closest('.panel');
-    if(socialPanel) {
-      const sec = makeMobSection('💬 SOCIAL SENTIMENT', false);
-      sec.body.appendChild(socialPanel);
-      portfolioTab.appendChild(sec.wrap);
-    }
+    const socialEl = document.getElementById('socialSentimentPanel')?.closest('.panel');
+    if(socialEl) { const s=makeMobSection('💬 SOCIAL SENTIMENT',false); s.body.appendChild(socialEl); portfolioTab.appendChild(s.wrap); }
 
-    // DeFi
-    const defiPanel = document.getElementById('defiPanel')?.closest('.panel');
-    if(defiPanel) {
-      const sec = makeMobSection('🏦 DEFI ANALYTICS', false);
-      sec.body.appendChild(defiPanel);
-      portfolioTab.appendChild(sec.wrap);
-    }
+    const defiEl = document.getElementById('defiPanel')?.closest('.panel');
+    if(defiEl) { const s=makeMobSection('🏦 DEFI',false); s.body.appendChild(defiEl); portfolioTab.appendChild(s.wrap); }
 
-    // ══ MORE tab: On-chain, Settings, About ═══════════════════════════
-    // On-Chain & Macro
+    // ══ MORE tab ══════════════════════════════════════════════════════
     const pageOnchain = document.getElementById('page-onchain');
     if(pageOnchain) {
-      const sec = makeMobSection('🔎 ON-CHAIN & MACRO', false);
-      const ocContent = pageOnchain.querySelector('.wrap');
-      if(ocContent) {
-        const clone = ocContent.cloneNode(true);
-        clone.style.padding = '0';
-        sec.body.appendChild(clone);
-      }
-      moreTab.appendChild(sec.wrap);
+      const ocInner = pageOnchain.querySelector('.wrap');
+      if(ocInner) { const s=makeMobSection('🔎 ON-CHAIN & MACRO',false); ocInner.style.padding='0'; s.body.appendChild(ocInner); moreTab.appendChild(s.wrap); }
     }
 
-    // Risk Manager
-    const riskPanelEl = [...wrap.querySelectorAll('.panel')].find(function(p){ return p.querySelector('#rmAccount'); });
-    if(riskPanelEl) {
-      const sec = makeMobSection('⚖️ RISK MANAGER', false);
-      sec.body.appendChild(riskPanelEl);
-      moreTab.appendChild(sec.wrap);
+    const riskEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#rmAccount'));
+    if(riskEl) { const s=makeMobSection('⚖️ RISK MANAGER',false); s.body.appendChild(riskEl); moreTab.appendChild(s.wrap); }
+
+    const dcaEl = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('#dca-rows'));
+    if(dcaEl) { const s=makeMobSection('📉 DCA CALCULATOR',false); s.body.appendChild(dcaEl); moreTab.appendChild(s.wrap); }
+
+    const settingsEl = document.getElementById('settingsPanel');
+    if(settingsEl) {
+      settingsEl.style.display = 'block';
+      const s=makeMobSection('⚙️ SETTINGS',false); s.body.appendChild(settingsEl); moreTab.appendChild(s.wrap);
     }
 
-    // Settings
-    const settingsPanelEl = document.getElementById('settingsPanel');
-    if(settingsPanelEl) {
-      settingsPanelEl.style.display = 'block';
-      const sec = makeMobSection('⚙️ SETTINGS', true);
-      sec.body.appendChild(settingsPanelEl);
-      moreTab.appendChild(sec.wrap);
-    }
+    const connEl = wrap.querySelector('.conn-grid');
+    if(connEl) { const s=makeMobSection('🔀 CONNECTION STATUS',false); s.body.appendChild(connEl); moreTab.appendChild(s.wrap); }
 
-    // Connection status
-    const connGridEl = wrap.querySelector('.conn-grid');
-    if(connGridEl) {
-      const sec = makeMobSection('🔀 CONNECTION STATUS', false);
-      sec.body.appendChild(connGridEl);
-      moreTab.appendChild(sec.wrap);
-    }
+    const alertHistEl = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('#alert-history-panel'));
+    if(alertHistEl) { const s=makeMobSection('🕐 ALERT HISTORY',false); s.body.appendChild(alertHistEl); moreTab.appendChild(s.wrap); }
 
     const aboutDiv = document.createElement('div');
     aboutDiv.style.cssText = "font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);padding:16px;text-align:center;line-height:2.2";
-    aboutDiv.innerHTML = 'Crypto Risk System v5<br>Indonesia Ready ✓<br><span style="color:var(--accent)">Press ? for keyboard shortcuts</span>';
+    aboutDiv.innerHTML = 'TradingLab v5 · Indonesia Ready ✓<br><span style="color:var(--accent)">Press ? for keyboard shortcuts</span>';
     moreTab.appendChild(aboutDiv);
 
     tabContainer.appendChild(homeTab);
@@ -8126,15 +8002,15 @@ self.onmessage=function(e){
     syncMobStatus();
   }
 
-  function makeMobSection(title, open=false) {
+    function makeMobSection(title, open=false) {
     const wrap = document.createElement('div');
     wrap.className = 'mob-section' + (open ? ' open' : '');
     wrap.innerHTML = `
-      <div class="mob-section-header" onclick="this.parentElement.classList.toggle('open')">
-        <span class="mob-section-title">${title}</span>
-        <span class="mob-section-chevron">▼</span>
+      <div class="mob-section-header" onclick="this.parentElement.classList.toggle('open')" style="padding:12px 14px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;background:rgba(0,229,255,.04);border-bottom:1px solid var(--border);user-select:none;-webkit-tap-highlight-color:transparent">
+        <span class="mob-section-title" style="font-family:'Share Tech Mono',monospace;font-size:.68rem;font-weight:700;color:var(--text);letter-spacing:.5px">${title}</span>
+        <span class="mob-section-chevron" style="color:var(--accent);font-size:.8rem;transition:transform .2s">▼</span>
       </div>
-      <div class="mob-section-body"></div>
+      <div class="mob-section-body" style="overflow:hidden"></div>
     `;
     return { wrap, body: wrap.querySelector('.mob-section-body') };
   }
