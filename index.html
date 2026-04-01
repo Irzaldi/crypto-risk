@@ -1241,6 +1241,18 @@ function installPWA() {
     <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('AAPL')">🍎 AAPL</button>
     <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('TSLA')">⚡ TSLA</button>
     <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('NVDA')">🎮 NVDA</button>
+    <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('GOOG')">🔍 GOOG</button>
+    <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('AMZN')">📦 AMZN</button>
+    <button class="pair-btn" style="border-color:rgba(192,132,252,.4);color:#c084fc" onclick="quickPair('META')">👤 META</button>
+    <button class="pair-btn" style="border-color:rgba(255,215,0,.5);color:#ffd700" onclick="quickPair('SPX')">🇺🇸 S&amp;P500</button>
+    <button class="pair-btn" style="border-color:rgba(255,215,0,.5);color:#ffd700" onclick="quickPair('NDX')">📈 NASDAQ</button>
+    <button class="pair-btn" style="border-color:rgba(255,215,0,.5);color:#ffd700" onclick="quickPair('DJI')">🏦 DOW</button>
+    <button class="pair-btn" style="border-color:rgba(255,100,0,.5);color:#ff6400" onclick="quickPair('IHSG')">🇮🇩 IHSG</button>
+    <button class="pair-btn" style="border-color:rgba(255,100,0,.5);color:#ff6400" onclick="quickPair('BMRI')">🇮🇩 BMRI</button>
+    <button class="pair-btn" style="border-color:rgba(255,100,0,.5);color:#ff6400" onclick="quickPair('ASII')">🇮🇩 ASII</button>
+    <button class="pair-btn" style="border-color:rgba(255,215,0,.5);color:#ffd700" onclick="quickPair('NKY')">🇯🇵 NIKKEI</button>
+    <button class="pair-btn" style="border-color:rgba(255,215,0,.5);color:#ffd700" onclick="quickPair('FTSE')">🇬🇧 FTSE</button>
+    <button class="pair-btn" style="border-color:rgba(255,215,0,.5);color:#ffd700" onclick="quickPair('HSI')">🇭🇰 HANGSENG</button>
     <div id="customPairBtns"></div>
     <button class="pair-btn" style="border-color:rgba(255,255,255,.2);color:var(--muted)" onclick="openAddPair()" title="Add custom pair">＋ ADD</button>
   </div>
@@ -4285,6 +4297,16 @@ self.onmessage=function(e){
       if(n>=100) return 'Rp '+n.toLocaleString('id-ID',{maximumFractionDigits:0});
       return 'Rp '+n.toFixed(0);
     }
+    if(sp?.isIndex && sp?.isIDR) {
+      // IHSG — IDR index
+      if(n>=100) return n.toLocaleString('id-ID',{maximumFractionDigits:0});
+      return n.toFixed(0);
+    }
+    if(sp?.isIndex) {
+      // Global indices (S&P, Nikkei etc.) — large numbers, no currency prefix
+      if(n>=1000) return n.toLocaleString('en-US',{maximumFractionDigits:2});
+      return n.toFixed(2);
+    }
     // US stocks (AAPL, TSLA etc.) — USD with 2 decimals
     if(sp?.isStock) {
       return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -4786,7 +4808,7 @@ self.onmessage=function(e){
     if(!cp) throw new Error('Not a commodity pair');
 
     // IDX stocks (.JK) and US stocks — Yahoo only supports daily data reliably
-    const isStock = cp.isIDXStock || cp.isUSStock;
+    const isStock = cp.isIDXStock || cp.isUSStock || cp.isIndex;
     const interval = isStock
       ? '1d'  // force daily for all stocks
       : (TF.yahoo[currentTF] || '1d');
@@ -4863,13 +4885,24 @@ self.onmessage=function(e){
       const quoteCur = 'usd';
       const volatility = sym === 'XAUT' ? 0.008 : 0.012; // gold ~0.8%/day, silver ~1.2%/day
 
-      // Source M1: fawazahmed0 CDN (XAU/XAG against USD — always CORS open)
+      // Source M0: goldprice.org — LIVE intraday price (updates every few minutes)
+      metalSources.unshift(
+        fetch('https://data-asg.goldprice.org/dbXRates/USD', {signal:AbortSignal.timeout(5000)})
+          .then(r=>r.json()).then(function(d) {
+            const item = d?.items?.[0];
+            const price = sym === 'XAUT' ? item?.xauPrice : item?.xagPrice;
+            if(!price || isNaN(price)) throw new Error('no price');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'GoldPrice.org (live)' };
+          })
+      );
+
+      // Source M1: fawazahmed0 CDN (XAU/XAG against USD — daily, always CORS open)
       metalSources.push(
         fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${xauCode}.json`, {signal:AbortSignal.timeout(5000)})
           .then(r=>r.json()).then(function(d) {
             const price = d[xauCode]?.usd;
             if(!price || isNaN(price)) throw new Error('no price');
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'fawazahmed0 (XAU spot)' };
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'fawazahmed0 (XAU daily)' };
           })
       );
       // Source M2: open.er-api (free, CORS open)
@@ -4909,17 +4942,49 @@ self.onmessage=function(e){
             return { ohlcv: buildSynthOHLCV(price, volatility), src: 'currency-api (XAU)' };
           })
       );
-      // Source M6: GoldAPI.io free tier (no key needed for current price)
+      // Source M6: XAUUSDT from Bybit (perpetual futures, very close to spot)
       if(sym === 'XAUT') {
         metalSources.push(
-          fetch('https://data-asg.goldprice.org/GetData/USD-XAU/1', {signal:AbortSignal.timeout(5000)})
-            .then(r=>r.json()).then(function(d) {
-              const price = Array.isArray(d) ? parseFloat(d[0]?.split(',')[1]) : null;
+          smartFetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=XAUUSDT')
+            .then(function(d) {
+              const price = parseFloat(d?.result?.list?.[0]?.lastPrice);
               if(!price || isNaN(price)) throw new Error('no price');
-              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'GoldPrice.org' };
+              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Bybit XAUUSDT (live)' };
+            })
+        );
+        // Source M7: OKX XAUUSDT spot
+        metalSources.push(
+          smartFetch('https://www.okx.com/api/v5/market/ticker?instId=XAU-USDT-SWAP')
+            .then(function(d) {
+              const price = parseFloat(d?.data?.[0]?.last);
+              if(!price || isNaN(price)) throw new Error('no price');
+              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'OKX XAUUSDT (live)' };
             })
         );
       }
+      if(sym === 'XAGUSD') {
+        metalSources.push(
+          smartFetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=XAGUUSDT')
+            .then(function(d) {
+              const price = parseFloat(d?.result?.list?.[0]?.lastPrice);
+              if(!price || isNaN(price)) throw new Error('no price');
+              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Bybit XAGUUSDT (live)' };
+            })
+        );
+      }
+    }
+
+    // Add Yahoo ^XAUUSD spot as a high-accuracy source for gold
+    if(sym === 'XAUT') {
+      metalSources.push(
+        smartFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EXAUUSD?interval=1d&range=1d')
+          .then(function(d) {
+            if(!d?.chart?.result?.[0]) throw new Error('no data');
+            const price = d.chart.result[0].meta?.regularMarketPrice;
+            if(!price || isNaN(price)) throw new Error('no price');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Yahoo ^XAUUSD (spot)' };
+          })
+      );
     }
 
     // Race all sources: metal APIs first (for XAUT/XAGUSD), then stooq, then Yahoo
@@ -4968,6 +5033,23 @@ self.onmessage=function(e){
     'TSLA':   { display:'TSLA/USD',    isStock:true },
     'NVDA':   { display:'NVDA/USD',    isStock:true },
     'MSFT':   { display:'MSFT/USD',    isStock:true },
+    'GOOG':   { display:'GOOG/USD',    isStock:true },
+    'AMZN':   { display:'AMZN/USD',    isStock:true },
+    'META':   { display:'META/USD',    isStock:true },
+    // Global Indices
+    'SPX':    { display:'S&P 500',     isIndex:true },
+    'NDX':    { display:'NASDAQ',      isIndex:true },
+    'DJI':    { display:'Dow Jones',   isIndex:true },
+    'IHSG':   { display:'IHSG/IDR',    isIndex:true, isIDR:true },
+    'NKY':    { display:'Nikkei 225',  isIndex:true },
+    'FTSE':   { display:'FTSE 100',    isIndex:true },
+    'HSI':    { display:'Hang Seng',   isIndex:true },
+    'DAX':    { display:'DAX',         isIndex:true },
+    'STI':    { display:'STI',         isIndex:true },
+    // More IDX
+    'BMRI':   { display:'BMRI/IDR',    isStock:true, isIDR:true },
+    'ASII':   { display:'ASII/IDR',    isStock:true, isIDR:true },
+    'UNVR':   { display:'UNVR/IDR',    isStock:true, isIDR:true },
     // Forex (keep for fmtP detection)
     'USDIDR': { display:'USD/IDR',  isFiat:true },
     'JPYIDR': { display:'JPY/IDR',  isFiat:true },
@@ -6887,7 +6969,10 @@ self.onmessage=function(e){
       crypto:    'Enter the coin symbol. It will be fetched as SYMBOL/USDT from crypto exchanges.\nExamples: WLD, RENDER, NEAR, OP',
       forex:     'Enter a 6-letter forex pair (base+quote). Uses ECB/FX rate APIs.\nExamples: GBPUSD, USDCAD, AUDJPY, CHFJPY',
       commodity: 'Enter a Yahoo Finance futures ticker.\nExamples: GC=F (Gold futures), NG=F (Natural Gas), ZC=F (Corn), HG=F (Copper)',
-      stock:     'Enter a Yahoo Finance stock ticker.\nExamples: AAPL, TSLA, ANTM.JK, BBCA.JK, 700.HK',
+      stock:     'US Stock: AAPL, AMZN, GOOG, MSFT\nIDX Stock: BBTN.JK, BRIS.JK, EXCL.JK\nHK: 0700.HK · Shanghai: 600519.SS',
+      idx:       'Indonesian IDX stock ticker with .JK suffix.\nExamples: BBTN.JK, BRIS.JK, EXCL.JK, INDF.JK, KLBF.JK, HMSP.JK',
+      index:     'Global index Yahoo ticker.\nExamples: ^GSPC (S&P500), ^JKSE (IHSG), ^N225 (Nikkei 225), ^FTSE, ^HSI, ^GDAXI (DAX)',
+      etf:       'ETF Yahoo ticker.\nExamples: SPY (S&P500), QQQ (Nasdaq), VOO, IVV, VTI, GLD (Gold ETF)',
     };
     document.getElementById('addPairHint').textContent = hints[type] || '';
   }
@@ -6910,7 +6995,25 @@ self.onmessage=function(e){
       COMMODITY_PAIRS[sym] = { yahoo:sym, display:label, unit:'USD', isCommodity:true };
       SPECIAL_PAIRS[sym] = { display:label, isCommodity:true };
     } else if(type === 'stock') {
-      // Stock uses same Yahoo fetch as ANTAM
+      window._customStocks = window._customStocks || {};
+      const isIdxSuffix = sym.endsWith('.JK') || sym.endsWith('.JK');
+      window._customStocks[sym] = { yahoo:sym, display:label, isIDR:isIdxSuffix };
+      SPECIAL_PAIRS[sym] = { display:label, isStock:true, isIDR:isIdxSuffix };
+    } else if(type === 'idx') {
+      // IDX stock — add .JK suffix if missing
+      const idxSym = sym.endsWith('.JK') ? sym : sym + '.JK';
+      const idxKey = sym.replace('.JK','');
+      window._customStocks = window._customStocks || {};
+      window._customStocks[idxKey] = { yahoo:idxSym, display:label, isIDR:true };
+      SPECIAL_PAIRS[idxKey] = { display:label, isStock:true, isIDR:true };
+      COMMODITY_PAIRS[idxKey] = { yahoo:idxSym, display:label, unit:'IDR', isCommodity:false, isIDXStock:true };
+    } else if(type === 'index') {
+      // Global index — uses Yahoo (already has ^ prefix)
+      const indexSym = sym.startsWith('^') ? sym : '^' + sym;
+      COMMODITY_PAIRS[sym] = { yahoo:indexSym, display:label, unit:'pts', isCommodity:false, isIndex:true };
+      SPECIAL_PAIRS[sym] = { display:label, isIndex:true };
+    } else if(type === 'etf') {
+      // ETF — same as US stock
       window._customStocks = window._customStocks || {};
       window._customStocks[sym] = { yahoo:sym, display:label };
       SPECIAL_PAIRS[sym] = { display:label, isStock:true };
@@ -6935,6 +7038,22 @@ self.onmessage=function(e){
       COMMODITY_PAIRS[p.sym] = COMMODITY_PAIRS[p.sym] || { yahoo:p.sym, display:p.label||p.sym, unit:'USD', isCommodity:true };
       SPECIAL_PAIRS[p.sym] = SPECIAL_PAIRS[p.sym] || { display:p.label||p.sym, isCommodity:true };
     } else if(p.type === 'stock') {
+      const isIdxSuffix = p.sym.endsWith('.JK');
+      window._customStocks = window._customStocks || {};
+      window._customStocks[p.sym] = window._customStocks[p.sym] || { yahoo:p.sym, display:p.label||p.sym, isIDR:isIdxSuffix };
+      SPECIAL_PAIRS[p.sym] = SPECIAL_PAIRS[p.sym] || { display:p.label||p.sym, isStock:true, isIDR:isIdxSuffix };
+    } else if(p.type === 'idx') {
+      const idxSym = p.sym.endsWith('.JK') ? p.sym : p.sym + '.JK';
+      const idxKey = p.sym.replace('.JK','');
+      window._customStocks = window._customStocks || {};
+      window._customStocks[idxKey] = window._customStocks[idxKey] || { yahoo:idxSym, display:p.label||idxKey, isIDR:true };
+      SPECIAL_PAIRS[idxKey] = SPECIAL_PAIRS[idxKey] || { display:p.label||idxKey, isStock:true, isIDR:true };
+      COMMODITY_PAIRS[idxKey] = COMMODITY_PAIRS[idxKey] || { yahoo:idxSym, display:p.label||idxKey, unit:'IDR', isCommodity:false, isIDXStock:true };
+    } else if(p.type === 'index') {
+      const indexSym = p.sym.startsWith('^') ? p.sym : '^' + p.sym;
+      COMMODITY_PAIRS[p.sym] = COMMODITY_PAIRS[p.sym] || { yahoo:indexSym, display:p.label||p.sym, unit:'pts', isCommodity:false, isIndex:true };
+      SPECIAL_PAIRS[p.sym] = SPECIAL_PAIRS[p.sym] || { display:p.label||p.sym, isIndex:true };
+    } else if(p.type === 'etf') {
       window._customStocks = window._customStocks || {};
       window._customStocks[p.sym] = window._customStocks[p.sym] || { yahoo:p.sym, display:p.label||p.sym };
       SPECIAL_PAIRS[p.sym] = SPECIAL_PAIRS[p.sym] || { display:p.label||p.sym, isStock:true };
@@ -6972,6 +7091,24 @@ self.onmessage=function(e){
     'TSLA':   { yahoo:'TSLA',   stooq:'tsla.us', display:'Tesla (NASDAQ)',     unit:'USD',     isCommodity:false, isUSStock:true  },
     'NVDA':   { yahoo:'NVDA',   stooq:'nvda.us', display:'NVIDIA (NASDAQ)',    unit:'USD',     isCommodity:false, isUSStock:true  },
     'MSFT':   { yahoo:'MSFT',   stooq:'msft.us', display:'Microsoft (NASDAQ)', unit:'USD',     isCommodity:false, isUSStock:true  },
+    'GOOG':   { yahoo:'GOOG',   stooq:'goog.us', display:'Alphabet (NASDAQ)',  unit:'USD',     isCommodity:false, isUSStock:true  },
+    'AMZN':   { yahoo:'AMZN',   stooq:'amzn.us', display:'Amazon (NASDAQ)',    unit:'USD',     isCommodity:false, isUSStock:true  },
+    'META':   { yahoo:'META',   stooq:'meta.us', display:'Meta (NASDAQ)',      unit:'USD',     isCommodity:false, isUSStock:true  },
+    // Global Indices
+    'SPX':    { yahoo:'^GSPC',  stooq:'spx',     display:'S&P 500 (US)',       unit:'USD',     isCommodity:false, isIndex:true    },
+    'NDX':    { yahoo:'^IXIC',  stooq:'ndq',     display:'NASDAQ Composite',   unit:'USD',     isCommodity:false, isIndex:true    },
+    'DJI':    { yahoo:'^DJI',   stooq:'dji',     display:'Dow Jones (US)',      unit:'USD',     isCommodity:false, isIndex:true    },
+    'IHSG':   { yahoo:'^JKSE',  stooq:'jkse',    display:'IHSG (Indonesia)',    unit:'IDR',     isCommodity:false, isIndex:true, isIDR:true },
+    'NKY':    { yahoo:'^N225',  stooq:'n225',    display:'Nikkei 225 (JP)',     unit:'JPY',     isCommodity:false, isIndex:true    },
+    'FTSE':   { yahoo:'^FTSE',  stooq:'ftse',    display:'FTSE 100 (UK)',       unit:'GBP',     isCommodity:false, isIndex:true    },
+    'HSI':    { yahoo:'^HSI',   stooq:'hsi',     display:'Hang Seng (HK)',      unit:'HKD',     isCommodity:false, isIndex:true    },
+    'DAX':    { yahoo:'^GDAXI', stooq:'dax',     display:'DAX (Germany)',       unit:'EUR',     isCommodity:false, isIndex:true    },
+    'STI':    { yahoo:'^STI',   stooq:'sti',     display:'STI (Singapore)',     unit:'SGD',     isCommodity:false, isIndex:true    },
+    // More IDX stocks
+    'BMRI':   { yahoo:'BMRI.JK',stooq:'bmri.jk', display:'Bank Mandiri (IDX)',  unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'ASII':   { yahoo:'ASII.JK',stooq:'asii.jk', display:'Astra (IDX)',         unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'TLKM2':  { yahoo:'TLKM.JK',stooq:'tlkm.jk', display:'Telkom (IDX)',        unit:'IDR',     isCommodity:false, isIDXStock:true },
+    'UNVR':   { yahoo:'UNVR.JK',stooq:'unvr.jk', display:'Unilever ID (IDX)',   unit:'IDR',     isCommodity:false, isIDXStock:true },
   };
 
   const FOREX_NOTICE = {
@@ -7835,12 +7972,13 @@ self.onmessage=function(e){
     // Pair buttons grouped by category
     const mobPairsRow = homeTab.querySelector('#mob-pairs-row');
     const pairCategories = [
-      { label:'Crypto', color:'rgba(0,229,255,.3)', pairs:['BTC','ETH','SOL','XRP','BNB','DOGE','ADA','AVAX','LINK','LTC','DOT','SUI','PEPE','INJ','TRX'] },
-      { label:'Forex',  color:'rgba(0,255,136,.3)', pairs:['USDIDR','EURUSD','GBPUSD','USDJPY','USDSGD','USDMYR','EURIDR','JPYIDR','AUDUSD','USDCAD','NZDUSD','EURJPY','GBPJPY'] },
-      { label:'Metals', color:'rgba(255,184,0,.3)', pairs:['XAUT','XAGUSD','COPPER'] },
-      { label:'Oil',    color:'rgba(255,100,50,.3)', pairs:['USOIL','BRENT','NATGAS'] },
-      { label:'IDX',    color:'rgba(0,255,136,.3)', pairs:['ANTAM','BBCA','TLKM','BBRI','GOTO'] },
-      { label:'US',     color:'rgba(192,132,252,.3)', pairs:['AAPL','TSLA','NVDA','MSFT'] },
+      { label:'Crypto',  color:'rgba(0,229,255,.3)',  pairs:['BTC','ETH','SOL','XRP','BNB','DOGE','ADA','AVAX','LINK','LTC','DOT','SUI','PEPE','INJ','TRX'] },
+      { label:'Forex',   color:'rgba(0,255,136,.3)',  pairs:['USDIDR','EURUSD','GBPUSD','USDJPY','USDSGD','USDMYR','EURIDR','JPYIDR','AUDUSD','USDCAD','NZDUSD','EURJPY','GBPJPY'] },
+      { label:'Metals',  color:'rgba(255,184,0,.3)',  pairs:['XAUT','XAGUSD','COPPER'] },
+      { label:'Oil',     color:'rgba(255,100,50,.3)', pairs:['USOIL','BRENT','NATGAS'] },
+      { label:'IDX',     color:'rgba(255,100,0,.3)',  pairs:['IHSG','ANTAM','BBCA','TLKM','BBRI','GOTO','BMRI','ASII'] },
+      { label:'US',      color:'rgba(192,132,252,.3)',pairs:['AAPL','TSLA','NVDA','MSFT','GOOG','AMZN','META'] },
+      { label:'Indices', color:'rgba(255,215,0,.3)',  pairs:['SPX','NDX','DJI','NKY','FTSE','HSI','DAX'] },
     ];
     pairCategories.forEach(function(cat) {
       const lbl = document.createElement('span');
