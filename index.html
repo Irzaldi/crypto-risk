@@ -4885,80 +4885,41 @@ self.onmessage=function(e){
       const quoteCur = 'usd';
       const volatility = sym === 'XAUT' ? 0.008 : 0.012; // gold ~0.8%/day, silver ~1.2%/day
 
-      // Source M0: goldprice.org — LIVE intraday price (updates every few minutes)
-      metalSources.unshift(
-        fetch('https://data-asg.goldprice.org/dbXRates/USD', {signal:AbortSignal.timeout(5000)})
-          .then(r=>r.json()).then(function(d) {
-            const item = d?.items?.[0];
-            const price = sym === 'XAUT' ? item?.xauPrice : item?.xagPrice;
-            if(!price || isNaN(price)) throw new Error('no price');
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'GoldPrice.org (live)' };
-          })
-      );
-
-      // Source M1: fawazahmed0 CDN (XAU/XAG against USD — daily, always CORS open)
-      metalSources.push(
-        fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${xauCode}.json`, {signal:AbortSignal.timeout(5000)})
-          .then(r=>r.json()).then(function(d) {
-            const price = d[xauCode]?.usd;
-            if(!price || isNaN(price)) throw new Error('no price');
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'fawazahmed0 (XAU daily)' };
-          })
-      );
-      // Source M2: open.er-api (free, CORS open)
-      metalSources.push(
-        fetch(`https://open.er-api.com/v6/latest/${xauCode.toUpperCase()}`, {signal:AbortSignal.timeout(5000)})
-          .then(r=>r.json()).then(function(d) {
-            const price = d?.rates?.USD;
-            if(!price || isNaN(price)) throw new Error('no price');
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'ER-API (XAU spot)' };
-          })
-      );
-      // Source M3: metals.live (free, CORS open)
-      metalSources.push(
-        fetch('https://metals.live/api/v1/latest', {signal:AbortSignal.timeout(5000)})
-          .then(r=>r.json()).then(function(d) {
-            const price = sym === 'XAUT' ? (d?.gold || d?.XAU) : (d?.silver || d?.XAG);
-            if(!price || isNaN(price)) throw new Error('no price');
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'metals.live' };
-          })
-      );
-      // Source M4: Frankfurter EUR/XAU cross (ECB has gold rates)
-      metalSources.push(
-        fetch('https://api.frankfurter.app/latest?from=USD&to=XAU', {signal:AbortSignal.timeout(5000)})
-          .then(r=>r.json()).then(function(d) {
-            const xauPerUsd = d?.rates?.XAU;
-            if(!xauPerUsd || isNaN(xauPerUsd)) throw new Error('no rate');
-            const price = 1 / xauPerUsd; // USD per troy ounce
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Frankfurter (ECB gold)' };
-          })
-      );
-      // Source M5: latest currency-api (also has XAU)
-      metalSources.push(
-        fetch(`https://latest.currency-api.pages.dev/v1/currencies/${xauCode}.json`, {signal:AbortSignal.timeout(5000)})
-          .then(r=>r.json()).then(function(d) {
-            const price = d?.[xauCode]?.['usd'];
-            if(!price || isNaN(price)) throw new Error('no rate');
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'currency-api (XAU)' };
-          })
-      );
-      // Source M6: XAUUSDT from Bybit (perpetual futures, very close to spot)
+      // ── Gold/Silver price sources — ordered by accuracy ────────────
+      // Priority 1: Bybit & OKX perpetual futures (live, no premium, closest to spot)
       if(sym === 'XAUT') {
         metalSources.push(
           smartFetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=XAUUSDT')
             .then(function(d) {
               const price = parseFloat(d?.result?.list?.[0]?.lastPrice);
-              if(!price || isNaN(price)) throw new Error('no price');
+              if(!price || isNaN(price) || price < 1000) throw new Error('no price');
               return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Bybit XAUUSDT (live)' };
             })
         );
-        // Source M7: OKX XAUUSDT spot
         metalSources.push(
           smartFetch('https://www.okx.com/api/v5/market/ticker?instId=XAU-USDT-SWAP')
             .then(function(d) {
               const price = parseFloat(d?.data?.[0]?.last);
-              if(!price || isNaN(price)) throw new Error('no price');
+              if(!price || isNaN(price) || price < 1000) throw new Error('no price');
               return { ohlcv: buildSynthOHLCV(price, volatility), src: 'OKX XAUUSDT (live)' };
+            })
+        );
+        // Priority 2: Yahoo ^XAUUSD — 15min delayed OTC spot (closest to TradingView)
+        metalSources.push(
+          smartFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EXAUUSD?interval=1d&range=1d')
+            .then(function(d) {
+              const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+              if(!price || isNaN(price) || price < 1000) throw new Error('no price');
+              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Yahoo ^XAUUSD (15m delay)' };
+            })
+        );
+        // Priority 2b: Yahoo GC=F front-month futures
+        metalSources.push(
+          smartFetch('https://query1.finance.yahoo.com/v8/finance/chart/GC%3DF?interval=1d&range=1d')
+            .then(function(d) {
+              const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+              if(!price || isNaN(price) || price < 1000) throw new Error('no price');
+              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Yahoo GC=F futures' };
             })
         );
       }
@@ -4967,22 +4928,54 @@ self.onmessage=function(e){
           smartFetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=XAGUUSDT')
             .then(function(d) {
               const price = parseFloat(d?.result?.list?.[0]?.lastPrice);
-              if(!price || isNaN(price)) throw new Error('no price');
+              if(!price || isNaN(price) || price < 5) throw new Error('no price');
               return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Bybit XAGUUSDT (live)' };
             })
         );
+        metalSources.push(
+          smartFetch('https://query1.finance.yahoo.com/v8/finance/chart/SI%3DF?interval=1d&range=1d')
+            .then(function(d) {
+              const price = d?.chart?.result?.[0]?.meta?.regularMarketPrice;
+              if(!price || isNaN(price) || price < 5) throw new Error('no price');
+              return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Yahoo SI=F (silver)' };
+            })
+        );
       }
-    }
-
-    // Add Yahoo ^XAUUSD spot as a high-accuracy source for gold
-    if(sym === 'XAUT') {
+      // Priority 3: metals.live spot (sometimes slightly delayed)
       metalSources.push(
-        smartFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EXAUUSD?interval=1d&range=1d')
-          .then(function(d) {
-            if(!d?.chart?.result?.[0]) throw new Error('no data');
-            const price = d.chart.result[0].meta?.regularMarketPrice;
+        fetch('https://metals.live/api/v1/latest', {signal:AbortSignal.timeout(6000)})
+          .then(r=>r.json()).then(function(d) {
+            const price = sym === 'XAUT' ? (d?.gold || d?.XAU) : (d?.silver || d?.XAG);
             if(!price || isNaN(price)) throw new Error('no price');
-            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Yahoo ^XAUUSD (spot)' };
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'metals.live' };
+          })
+      );
+      // Priority 4: ECB/Frankfurter — daily fix (London AM fix, updates ~10:30 AM UTC)
+      metalSources.push(
+        fetch('https://api.frankfurter.app/latest?from=USD&to=XAU', {signal:AbortSignal.timeout(6000)})
+          .then(r=>r.json()).then(function(d) {
+            const xauPerUsd = d?.rates?.XAU;
+            if(!xauPerUsd || isNaN(xauPerUsd)) throw new Error('no rate');
+            const price = 1 / xauPerUsd;
+            if(price < 1000) throw new Error('bad rate');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'Frankfurter ECB (daily fix)' };
+          })
+      );
+      // Priority 5: fawazahmed0 — daily rate (last resort, updates once/day)
+      metalSources.push(
+        fetch(`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/${xauCode}.json`, {signal:AbortSignal.timeout(6000)})
+          .then(r=>r.json()).then(function(d) {
+            const price = d[xauCode]?.usd;
+            if(!price || isNaN(price)) throw new Error('no price');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'fawazahmed0 (daily)' };
+          })
+      );
+      metalSources.push(
+        fetch(`https://latest.currency-api.pages.dev/v1/currencies/${xauCode}.json`, {signal:AbortSignal.timeout(6000)})
+          .then(r=>r.json()).then(function(d) {
+            const price = d?.[xauCode]?.['usd'];
+            if(!price || isNaN(price)) throw new Error('no rate');
+            return { ohlcv: buildSynthOHLCV(price, volatility), src: 'currency-api (daily)' };
           })
       );
     }
