@@ -14465,6 +14465,300 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     if(el) el.textContent = DATA_WORKER_URL + '/webhook';
   })();
 
+
+
+  // ════════════════════════════════════════════════════════════════════
+  //  AUTH SYSTEM
+  // ════════════════════════════════════════════════════════════════════
+  const AUTH_TOKEN_KEY  = 'tl_session_token';
+  const AUTH_USER_KEY   = 'tl_user_info';
+  let _authToken = null;
+  let _authUser  = null;
+
+  function _authGet(key) { try { return localStorage.getItem(key); } catch(e) { return null; } }
+  function _authSet(key, val) { try { localStorage.setItem(key, val); } catch(e) {} }
+  function _authDel(key) { try { localStorage.removeItem(key); } catch(e) {} }
+
+  // Override _api to use session token instead of USER_SECRET
+  const _origApi = _api;
+  _api = async function(method, path, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    if(_authToken) headers['X-Session-Token'] = _authToken;
+    else if(DATA_SECRET) headers['X-User-Secret'] = DATA_SECRET;
+    const opts = { method, headers };
+    if(body) opts.body = JSON.stringify(body);
+    const res = await fetch(DATA_WORKER_URL + path, opts);
+    if(res.status === 401) {
+      // Session expired — show login
+      _authToken = null;
+      _authDel(AUTH_TOKEN_KEY);
+      authShowOverlay();
+      throw new Error('Session expired');
+    }
+    if(!res.ok) { const e = await res.json().catch(()=>({error:res.status})); throw new Error(e.error||res.status); }
+    return res.json();
+  };
+
+  async function _authApiPublic(method, path, body) {
+    const res = await fetch(DATA_WORKER_URL + path, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    if(!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+
+  function authShowOverlay() {
+    const overlay = document.getElementById('authOverlay');
+    if(overlay) { overlay.style.display = 'flex'; overlay.style.setProperty('display','flex','important'); }
+    // Check if URL has ?reset=TOKEN
+    const resetToken = new URLSearchParams(window.location.search).get('reset');
+    if(resetToken) {
+      authShowTab('reset');
+      window._pendingResetToken = resetToken;
+    }
+  }
+
+  function authHideOverlay() {
+    const overlay = document.getElementById('authOverlay');
+    if(overlay) overlay.style.display = 'none';
+  }
+
+  function authShowTab(tab) {
+    ['login','signup','forgot','reset'].forEach(function(t) {
+      const form = document.getElementById('authForm' + t.charAt(0).toUpperCase() + t.slice(1));
+      const btn  = document.getElementById('authTab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if(form) form.style.display = t === tab ? 'block' : 'none';
+    });
+    // Update tab button styles
+    const loginTab  = document.getElementById('authTabLogin');
+    const signupTab = document.getElementById('authTabSignup');
+    const isLogin   = tab === 'login';
+    if(loginTab)  { loginTab.style.background  = isLogin  ? 'rgba(0,229,255,.15)' : 'transparent'; loginTab.style.color  = isLogin  ? '#00e5ff' : 'rgba(0,229,255,.5)'; }
+    if(signupTab) { signupTab.style.background = !isLogin ? 'rgba(0,229,255,.15)' : 'transparent'; signupTab.style.color = !isLogin ? '#00e5ff' : 'rgba(0,229,255,.5)'; }
+  }
+
+  function authShowForgot() { authShowTab('forgot'); }
+
+  function _authSetLoading(btnId, loading, text) {
+    const btn = document.getElementById(btnId);
+    if(!btn) return;
+    btn.disabled = loading;
+    btn.textContent = loading ? '⟳ LOADING...' : text;
+    btn.style.opacity = loading ? '.6' : '1';
+  }
+
+  function _authShowError(id, msg, isSuccess) {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
+    el.style.color = isSuccess ? '#00ff88' : '#ff3355';
+    el.style.borderColor = isSuccess ? 'rgba(0,255,136,.3)' : 'rgba(255,51,85,.2)';
+    el.style.background  = isSuccess ? 'rgba(0,255,136,.06)' : 'rgba(255,51,85,.08)';
+  }
+
+  function _authOnSuccess(data) {
+    _authToken = data.token;
+    _authUser  = { id:data.userId, email:data.email, name:data.display_name };
+    _authSet(AUTH_TOKEN_KEY, data.token);
+    _authSet(AUTH_USER_KEY, JSON.stringify(_authUser));
+    authHideOverlay();
+    _showUserMenu();
+    // Trigger cloud sync with the new token
+    _cloudEnabled = true;
+    _pullAllFromCloud();
+    // Remove reset token from URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('reset');
+    window.history.replaceState({}, '', url);
+  }
+
+  async function authLogin() {
+    const email    = document.getElementById('authLoginEmail')?.value?.trim();
+    const password = document.getElementById('authLoginPassword')?.value;
+    _authShowError('authLoginError', '');
+    if(!email || !password) { _authShowError('authLoginError', 'Please fill in all fields'); return; }
+    _authSetLoading('authLoginBtn', true, 'SIGN IN →');
+    try {
+      const data = await _authApiPublic('POST', '/auth/login', { email, password });
+      _authOnSuccess(data);
+    } catch(e) {
+      _authShowError('authLoginError', e.message || 'Login failed');
+    } finally {
+      _authSetLoading('authLoginBtn', false, 'SIGN IN →');
+    }
+  }
+
+  async function authSignup() {
+    const name     = document.getElementById('authSignupName')?.value?.trim();
+    const email    = document.getElementById('authSignupEmail')?.value?.trim();
+    const password = document.getElementById('authSignupPassword')?.value;
+    _authShowError('authSignupError', '');
+    if(!email || !password) { _authShowError('authSignupError', 'Email and password required'); return; }
+    if(password.length < 8) { _authShowError('authSignupError', 'Password must be at least 8 characters'); return; }
+    _authSetLoading('authSignupBtn', true, 'CREATE ACCOUNT →');
+    try {
+      const data = await _authApiPublic('POST', '/auth/signup', { email, password, display_name:name });
+      _authOnSuccess(data);
+    } catch(e) {
+      _authShowError('authSignupError', e.message || 'Sign up failed');
+    } finally {
+      _authSetLoading('authSignupBtn', false, 'CREATE ACCOUNT →');
+    }
+  }
+
+  async function authForgotPassword() {
+    const email = document.getElementById('authForgotEmail')?.value?.trim();
+    _authShowError('authForgotError', '');
+    if(!email) { _authShowError('authForgotError', 'Please enter your email'); return; }
+    _authSetLoading('authForgotBtn', true, 'SEND RESET LINK →');
+    try {
+      await _authApiPublic('POST', '/auth/forgot-password', { email });
+      _authShowError('authForgotError', '✓ Reset link sent! Check your email.', true);
+    } catch(e) {
+      _authShowError('authForgotError', e.message || 'Failed to send reset email');
+    } finally {
+      _authSetLoading('authForgotBtn', false, 'SEND RESET LINK →');
+    }
+  }
+
+  async function authResetPassword() {
+    const token    = window._pendingResetToken;
+    const password = document.getElementById('authResetPassword')?.value;
+    const confirm  = document.getElementById('authResetConfirm')?.value;
+    _authShowError('authResetError', '');
+    if(!token)              { _authShowError('authResetError', 'Invalid reset link'); return; }
+    if(password.length < 8) { _authShowError('authResetError', 'Password must be at least 8 characters'); return; }
+    if(password !== confirm) { _authShowError('authResetError', 'Passwords do not match'); return; }
+    _authSetLoading('authResetBtn', true, 'SET NEW PASSWORD →');
+    try {
+      await _authApiPublic('POST', '/auth/reset-password', { token, password });
+      _authShowError('authResetError', '✓ Password updated! Please sign in.', true);
+      setTimeout(function() { authShowTab('login'); }, 1500);
+    } catch(e) {
+      _authShowError('authResetError', e.message || 'Reset failed');
+    } finally {
+      _authSetLoading('authResetBtn', false, 'SET NEW PASSWORD →');
+    }
+  }
+
+  async function authLogout() {
+    try { await _authApiPublic('POST', '/auth/logout'); } catch(e) {}
+    _authToken = null;
+    _authUser  = null;
+    _authDel(AUTH_TOKEN_KEY);
+    _authDel(AUTH_USER_KEY);
+    _cloudEnabled = false;
+    document.getElementById('userMenuBtn').style.display   = 'none';
+    document.getElementById('userMenuDropdown').style.display = 'none';
+    authShowOverlay();
+    authShowTab('login');
+  }
+
+  function _showUserMenu() {
+    const btn   = document.getElementById('userMenuBtn');
+    const name  = document.getElementById('userMenuName');
+    const email = document.getElementById('userMenuEmail');
+    if(btn)   btn.style.display = 'block';
+    if(name)  name.textContent  = _authUser?.name || 'User';
+    if(email) email.textContent = _authUser?.email || '';
+  }
+
+  function toggleUserMenu() {
+    const dd = document.getElementById('userMenuDropdown');
+    if(dd) dd.style.display = dd.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // Close dropdown when clicking elsewhere
+  document.addEventListener('click', function(e) {
+    const btn = document.getElementById('userMenuBtn');
+    const dd  = document.getElementById('userMenuDropdown');
+    if(dd && btn && !btn.contains(e.target)) dd.style.display = 'none';
+  });
+
+  function authChangePassword() {
+    document.getElementById('userMenuDropdown').style.display = 'none';
+    const modal = document.getElementById('changePasswordModal');
+    if(modal) { modal.style.display = 'flex'; modal.style.setProperty('display','flex','important'); }
+  }
+
+  async function submitChangePassword() {
+    const current = document.getElementById('cpCurrent')?.value;
+    const newPw   = document.getElementById('cpNew')?.value;
+    const confirm = document.getElementById('cpConfirm')?.value;
+    const errEl   = document.getElementById('cpError');
+    if(errEl) errEl.style.display = 'none';
+    if(!current || !newPw) { if(errEl){errEl.textContent='All fields required';errEl.style.display='block';} return; }
+    if(newPw.length < 8)  { if(errEl){errEl.textContent='New password must be 8+ characters';errEl.style.display='block';} return; }
+    if(newPw !== confirm)  { if(errEl){errEl.textContent='Passwords do not match';errEl.style.display='block';} return; }
+    try {
+      await _api('POST', '/auth/change-password', { current_password:current, new_password:newPw });
+      document.getElementById('changePasswordModal').style.display = 'none';
+      ['cpCurrent','cpNew','cpConfirm'].forEach(function(id){ const el=document.getElementById(id);if(el)el.value=''; });
+      setStatus('✓ Password changed successfully', 'success');
+    } catch(e) {
+      if(errEl) { errEl.textContent = e.message||'Failed'; errEl.style.display = 'block'; }
+    }
+  }
+
+  // ── Init auth on page load ───────────────────────────────────────────
+  async function initAuth() {
+    const token    = _authGet(AUTH_TOKEN_KEY);
+    const userInfo = _authGet(AUTH_USER_KEY);
+
+    // Check for password reset token in URL
+    const resetToken = new URLSearchParams(window.location.search).get('reset');
+    if(resetToken) {
+      authShowOverlay();
+      authShowTab('reset');
+      window._pendingResetToken = resetToken;
+      return;
+    }
+
+    if(!token) {
+      authShowOverlay();
+      return;
+    }
+
+    // Verify existing token
+    try {
+      const res = await fetch(DATA_WORKER_URL + '/auth/verify', {
+        headers: { 'X-Session-Token': token }
+      });
+      if(res.ok) {
+        const data = await res.json();
+        _authToken = token;
+        _authUser  = { id:data.userId, email:data.email, name:data.display_name };
+        if(userInfo) {
+          try { const u=JSON.parse(userInfo); _authUser.name=u.name||_authUser.name; } catch(e){}
+        }
+        _authSet(AUTH_USER_KEY, JSON.stringify(_authUser));
+        _showUserMenu();
+        // Sync data for this user
+        setTimeout(function() { _cloudEnabled = true; _checkCloud(); }, 800);
+      } else {
+        _authDel(AUTH_TOKEN_KEY);
+        authShowOverlay();
+      }
+    } catch(e) {
+      // Worker unreachable — allow offline use without auth
+      console.warn('Auth check failed (offline?):', e.message);
+      if(userInfo) {
+        try {
+          _authToken = token;
+          _authUser  = JSON.parse(userInfo);
+          _showUserMenu();
+        } catch(e2) {}
+      }
+    }
+  }
+
+  // Run auth init after everything else loads
+  setTimeout(initAuth, 300);
+
 </script><!-- ══ MOBILE BOTTOM NAV ══ -->
 <nav class="mobile-nav" id="mobileNav" style="display:none">
   <button class="mobile-nav-btn active" id="mnav-home"      onclick="mobNav('home')"      aria-label="Home">
@@ -14487,6 +14781,149 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
 
 <!-- ══ FAB FETCH BUTTON (mobile only) ══ -->
 <button class="mobile-fetch-fab" id="mobileFab" style="display:none" onclick="fetchData()" aria-label="Fetch live data">⚡</button>
+
+
+<!-- ══ AUTH OVERLAY ═══════════════════════════════════════════════════════ -->
+<div id="authOverlay" style="display:none;position:fixed;inset:0;background:rgba(3,8,18,.97);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)">
+  <div style="background:#0d1117;border:1px solid rgba(0,229,255,.25);border-radius:16px;padding:32px;width:360px;max-width:92vw;font-family:'Share Tech Mono',monospace;box-shadow:0 24px 64px rgba(0,0,0,.8)">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:1.6rem;font-weight:700;color:#00e5ff;letter-spacing:3px">⬡ TRADINGLAB</div>
+      <div style="font-size:.55rem;color:rgba(0,229,255,.5);letter-spacing:4px;margin-top:4px">CRYPTO RISK SYSTEM v5</div>
+    </div>
+
+    <!-- Tab switcher -->
+    <div style="display:flex;gap:0;margin-bottom:24px;border:1px solid rgba(0,229,255,.2);border-radius:8px;overflow:hidden">
+      <button id="authTabLogin" onclick="authShowTab('login')" style="flex:1;padding:9px;background:rgba(0,229,255,.15);border:none;color:#00e5ff;font-family:'Share Tech Mono',monospace;font-size:.62rem;letter-spacing:1px;cursor:pointer;transition:background .2s">SIGN IN</button>
+      <button id="authTabSignup" onclick="authShowTab('signup')" style="flex:1;padding:9px;background:transparent;border:none;color:rgba(0,229,255,.5);font-family:'Share Tech Mono',monospace;font-size:.62rem;letter-spacing:1px;cursor:pointer;transition:background .2s">SIGN UP</button>
+    </div>
+
+    <!-- Login form -->
+    <div id="authFormLogin">
+      <div style="margin-bottom:12px">
+        <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">EMAIL</div>
+        <input id="authLoginEmail" type="email" placeholder="your@email.com" autocomplete="email"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')document.getElementById('authLoginPassword').focus()">
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+          <span style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px">PASSWORD</span>
+          <button onclick="authShowForgot()" style="background:none;border:none;color:rgba(0,229,255,.5);font-family:'Share Tech Mono',monospace;font-size:.5rem;cursor:pointer;padding:0;text-decoration:underline">Forgot password?</button>
+        </div>
+        <input id="authLoginPassword" type="password" placeholder="••••••••" autocomplete="current-password"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')authLogin()">
+      </div>
+      <div id="authLoginError" style="display:none;color:#ff3355;font-size:.55rem;margin-bottom:12px;padding:8px;background:rgba(255,51,85,.08);border-radius:6px;border:1px solid rgba(255,51,85,.2)"></div>
+      <button onclick="authLogin()" id="authLoginBtn"
+        style="width:100%;padding:12px;background:linear-gradient(135deg,rgba(0,229,255,.2),rgba(0,180,255,.1));border:1px solid rgba(0,229,255,.4);color:#00e5ff;font-family:'Share Tech Mono',monospace;font-size:.65rem;letter-spacing:2px;border-radius:8px;cursor:pointer;font-weight:700;transition:all .2s">
+        SIGN IN →
+      </button>
+    </div>
+
+    <!-- Sign up form -->
+    <div id="authFormSignup" style="display:none">
+      <div style="margin-bottom:12px">
+        <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">DISPLAY NAME</div>
+        <input id="authSignupName" type="text" placeholder="Your name" autocomplete="name"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')document.getElementById('authSignupEmail').focus()">
+      </div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">EMAIL</div>
+        <input id="authSignupEmail" type="email" placeholder="your@email.com" autocomplete="email"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')document.getElementById('authSignupPassword').focus()">
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">PASSWORD (min 8 chars)</div>
+        <input id="authSignupPassword" type="password" placeholder="••••••••" autocomplete="new-password"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')authSignup()">
+      </div>
+      <div id="authSignupError" style="display:none;color:#ff3355;font-size:.55rem;margin-bottom:12px;padding:8px;background:rgba(255,51,85,.08);border-radius:6px;border:1px solid rgba(255,51,85,.2)"></div>
+      <button onclick="authSignup()" id="authSignupBtn"
+        style="width:100%;padding:12px;background:linear-gradient(135deg,rgba(0,255,136,.15),rgba(0,229,255,.1));border:1px solid rgba(0,255,136,.4);color:#00ff88;font-family:'Share Tech Mono',monospace;font-size:.65rem;letter-spacing:2px;border-radius:8px;cursor:pointer;font-weight:700">
+        CREATE ACCOUNT →
+      </button>
+    </div>
+
+    <!-- Forgot password form -->
+    <div id="authFormForgot" style="display:none">
+      <div style="margin-bottom:6px">
+        <button onclick="authShowTab('login')" style="background:none;border:none;color:rgba(0,229,255,.5);font-family:'Share Tech Mono',monospace;font-size:.5rem;cursor:pointer;padding:0 0 12px">← Back to sign in</button>
+      </div>
+      <div style="font-size:.58rem;color:rgba(200,220,240,.7);margin-bottom:16px;line-height:1.6">
+        Enter your email and we'll send you a link to reset your password.
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">EMAIL</div>
+        <input id="authForgotEmail" type="email" placeholder="your@email.com"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')authForgotPassword()">
+      </div>
+      <div id="authForgotError" style="display:none;font-size:.55rem;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid"></div>
+      <button onclick="authForgotPassword()" id="authForgotBtn"
+        style="width:100%;padding:12px;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.3);color:#00e5ff;font-family:'Share Tech Mono',monospace;font-size:.65rem;letter-spacing:2px;border-radius:8px;cursor:pointer">
+        SEND RESET LINK →
+      </button>
+    </div>
+
+    <!-- Reset password form (shown when ?reset=TOKEN in URL) -->
+    <div id="authFormReset" style="display:none">
+      <div style="font-size:.58rem;color:rgba(200,220,240,.7);margin-bottom:16px;line-height:1.6">Enter your new password below.</div>
+      <div style="margin-bottom:12px">
+        <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">NEW PASSWORD</div>
+        <input id="authResetPassword" type="password" placeholder="min 8 characters" autocomplete="new-password"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none">
+      </div>
+      <div style="margin-bottom:16px">
+        <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">CONFIRM PASSWORD</div>
+        <input id="authResetConfirm" type="password" placeholder="same as above" autocomplete="new-password"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')authResetPassword()">
+      </div>
+      <div id="authResetError" style="display:none;font-size:.55rem;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid"></div>
+      <button onclick="authResetPassword()" id="authResetBtn"
+        style="width:100%;padding:12px;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.4);color:#00ff88;font-family:'Share Tech Mono',monospace;font-size:.65rem;letter-spacing:2px;border-radius:8px;cursor:pointer">
+        SET NEW PASSWORD →
+      </button>
+    </div>
+
+    <div style="text-align:center;margin-top:20px;font-size:.48rem;color:rgba(100,140,160,.5)">
+      Your data is private and encrypted · Cloudflare D1
+    </div>
+  </div>
+</div>
+
+<!-- User menu (top-right when logged in) -->
+<div id="userMenuBtn" style="display:none;position:fixed;top:10px;right:14px;z-index:9000;cursor:pointer" onclick="toggleUserMenu()">
+  <div style="background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.25);border-radius:20px;padding:5px 12px;font-family:'Share Tech Mono',monospace;font-size:.55rem;color:#00e5ff;display:flex;align-items:center;gap:6px">
+    <span>👤</span><span id="userMenuName">User</span><span style="opacity:.5">▼</span>
+  </div>
+  <div id="userMenuDropdown" style="display:none;position:absolute;right:0;top:110%;background:#0d1117;border:1px solid rgba(0,229,255,.2);border-radius:8px;padding:8px 0;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,.6)">
+    <div style="padding:6px 16px;font-size:.5rem;color:rgba(0,229,255,.4);letter-spacing:1px" id="userMenuEmail">—</div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:4px 0">
+    <button onclick="authChangePassword()" style="width:100%;padding:8px 16px;background:none;border:none;color:#e0e8ff;font-family:'Share Tech Mono',monospace;font-size:.58rem;text-align:left;cursor:pointer">🔑 Change Password</button>
+    <button onclick="authLogout()" style="width:100%;padding:8px 16px;background:none;border:none;color:#ff5577;font-family:'Share Tech Mono',monospace;font-size:.58rem;text-align:left;cursor:pointer">⎋ Sign Out</button>
+  </div>
+</div>
+
+<!-- Change password modal -->
+<div id="changePasswordModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99998;display:none;align-items:center;justify-content:center">
+  <div style="background:#0d1117;border:1px solid rgba(0,229,255,.25);border-radius:12px;padding:28px;width:320px;max-width:90vw;font-family:'Share Tech Mono',monospace">
+    <div style="font-size:.65rem;letter-spacing:3px;color:#00e5ff;margin-bottom:20px">🔑 CHANGE PASSWORD</div>
+    <input id="cpCurrent" type="password" placeholder="Current password" style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:9px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.62rem;outline:none;margin-bottom:10px">
+    <input id="cpNew" type="password" placeholder="New password (min 8)" style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:9px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.62rem;outline:none;margin-bottom:10px">
+    <input id="cpConfirm" type="password" placeholder="Confirm new password" style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:9px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.62rem;outline:none;margin-bottom:12px">
+    <div id="cpError" style="display:none;color:#ff3355;font-size:.55rem;margin-bottom:10px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="document.getElementById('changePasswordModal').style.display='none'" style="flex:1;padding:9px;background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-family:'Share Tech Mono',monospace;font-size:.58rem;border-radius:6px;cursor:pointer">CANCEL</button>
+      <button onclick="submitChangePassword()" style="flex:1;padding:9px;background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.3);color:#00e5ff;font-family:'Share Tech Mono',monospace;font-size:.58rem;border-radius:6px;cursor:pointer">UPDATE</button>
+    </div>
+  </div>
+</div>
 
 </main>
 </body>
