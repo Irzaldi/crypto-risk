@@ -4981,18 +4981,58 @@ self.onmessage=function(e){
     }
 
     // Race all sources: metal APIs first (for XAUT/XAGUSD), then stooq, then Yahoo
-    const { ohlcv, src } = await Promise.any([
-      ...metalSources,
-      fetchStooqCSV(stooqSym),
-      fetchStooqCSV(sym==='XAGUSD' ? 'xag' : sym==='XAUT' ? 'xau' : stooqSym+'.us'),
-      Promise.race([
-        _yahooRace(cp.yahoo, interval, range),
-        new Promise((_,rj)=>setTimeout(()=>rj(new Error('Yahoo timeout')),6000))
-      ]).then(d => ({ohlcv:d.ohlcv, src:'Yahoo Finance'})),
-    ]).catch(function() { throw new Error(cp.display + ': all sources failed — try 1D or 1W timeframe'); });
+    // For metals: fetch REAL historical candles from Yahoo/Stooq for chart accuracy,
+    // then override the last price with a live spot quote from Bybit/OKX.
+    // This gives correct chart history AND correct current price.
 
+    // Step 1: Get historical OHLCV (real candles for chart)
+    let ohlcv, src;
+    try {
+      const histResult = await Promise.any([
+        Promise.race([
+          _yahooRace(cp.yahoo, interval, range),
+          new Promise((_,rj)=>setTimeout(()=>rj(new Error('Yahoo timeout')),8000))
+        ]).then(d => ({ohlcv:d.ohlcv, src:'Yahoo Finance'})),
+        fetchStooqCSV(stooqSym),
+        fetchStooqCSV(sym==='XAGUSD' ? 'xag' : sym==='XAUT' ? 'xau' : stooqSym+'.us'),
+      ]);
+      ohlcv = histResult.ohlcv;
+      src   = histResult.src;
+    } catch(e) {
+      // Fallback: use synthetic candles from metalSources
+      const synthResult = await Promise.any(metalSources)
+        .catch(function() { throw new Error(cp.display + ': all sources failed'); });
+      ohlcv = synthResult.ohlcv;
+      src   = synthResult.src;
+    }
+
+    // Step 2: Override last price with live spot (Bybit → OKX → fallback to chart close)
     const { closes, opens, highs, lows, volumes } = ohlcv;
-    const price = closes[closes.length-1];
+    let livePrice = null;
+    try {
+      if(sym === 'XAUT') {
+        const bd = await Promise.any([
+          smartFetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=XAUUSDT')
+            .then(d => { const p=parseFloat(d?.result?.list?.[0]?.lastPrice); if(!p||p<1000) throw new Error('bad'); return p; }),
+          smartFetch('https://www.okx.com/api/v5/market/ticker?instId=XAU-USDT-SWAP')
+            .then(d => { const p=parseFloat(d?.data?.[0]?.last); if(!p||p<1000) throw new Error('bad'); return p; }),
+        ]);
+        livePrice = bd;
+      } else if(sym === 'XAGUSD') {
+        const bd = await smartFetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=XAGUUSDT')
+          .then(d => { const p=parseFloat(d?.result?.list?.[0]?.lastPrice); if(!p||p<5) throw new Error('bad'); return p; });
+        livePrice = bd;
+      }
+    } catch(e) { /* use chart's last close as price */ }
+
+    // Override last candle with live price if available
+    const price = livePrice || closes[closes.length-1];
+    if(livePrice && closes.length > 0) {
+      closes[closes.length-1] = livePrice;
+      // Adjust high/low of last candle to include live price
+      highs[highs.length-1] = Math.max(highs[highs.length-1], livePrice);
+      lows[lows.length-1]   = Math.min(lows[lows.length-1],  livePrice);
+    }
     const result = {
       price,
       high24: Math.max(...highs.slice(-2)),
