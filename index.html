@@ -1452,6 +1452,7 @@ function installPWA() {
           <div class="ind-row"><span class="ind-name">RSI (14)</span><div class="ind-bar-wrap"><div class="ind-bar" id="rsiBar" style="width:2%;background:var(--warn)"></div></div><span class="ind-val" id="rsiVal">—</span><span class="badge badge-neut" id="rsiBadge">—</span></div>
           <div class="ind-row"><span class="ind-name">MACD</span><div class="ind-bar-wrap"><div class="ind-bar" id="macdBar" style="width:2%;background:var(--warn)"></div></div><span class="ind-val" id="macdVal">—</span><span class="badge badge-neut" id="macdBadge">—</span></div>
           <div class="ind-row"><span class="ind-name">Stoch RSI</span><div class="ind-bar-wrap"><div class="ind-bar" id="stochBar" style="width:2%;background:var(--warn)"></div></div><span class="ind-val" id="stochVal">—</span><span class="badge badge-neut" id="stochBadge">—</span></div>
+          <div class="ind-row"><span class="ind-name">Stoch %K/%D</span><div class="ind-bar-wrap"><div class="ind-bar" id="stochKBar" style="width:2%;background:var(--warn)"></div></div><span class="ind-val" id="stochKVal">—</span><span class="badge badge-neut" id="stochKBadge">—</span></div>
           <div class="ind-row"><span class="ind-name">Williams %R</span><div class="ind-bar-wrap"><div class="ind-bar" id="willBar" style="width:2%;background:var(--warn)"></div></div><span class="ind-val" id="willVal">—</span><span class="badge badge-neut" id="willBadge">—</span></div>
           <div class="ind-row"><span class="ind-name">Bollinger %B</span><div class="ind-bar-wrap"><div class="ind-bar" id="bbBar" style="width:2%;background:var(--warn)"></div></div><span class="ind-val" id="bbVal">—</span><span class="badge badge-neut" id="bbBadge">—</span></div>
           <div class="ind-row"><span class="ind-name">RSI Divergence</span><div class="ind-bar-wrap"><div class="ind-bar" id="divRsiBar" style="width:2%;background:var(--warn)"></div></div><span class="ind-val" id="divRsiVal">—</span><span class="badge badge-neut" id="divRsiBadge">—</span></div>
@@ -2687,13 +2688,7 @@ function installPWA() {
             <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
           </select>
         </div>
-        <div style="flex:2;min-width:180px;display:none" id="ai-key-wrap">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">API KEY <span style="color:var(--warn)">(stored locally only)</span></div>
-          <div style="display:flex;gap:4px">
-            <input id="ai-api-key" type="password" placeholder="sk-..." style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
-            <button onclick="saveAiKey()" style="padding:6px 10px;background:rgba(192,132,252,.15);border:1px solid rgba(192,132,252,.4);color:#c084fc;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.55rem;cursor:pointer;white-space:nowrap">SAVE</button>
-          </div>
-        </div>
+        <!-- API key input removed — keys set in Cloudflare Worker secrets -->
       </div>
       <!-- AI Market Summary auto-generate -->
       <div id="ai-market-summary" style="display:none;padding:10px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;margin-bottom:10px;font-family:'Rajdhani',sans-serif;font-size:.82rem;line-height:1.6;color:var(--text)"></div>
@@ -2910,6 +2905,21 @@ function calcEMABatch(a,periods){
 function calcRSI(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}let ag=g/p,al=l/p;for(let i=p+1;i<a.length;i++){const d=a[i]-a[i-1];ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;}return al===0?100:100-100/(1+ag/al);}
 function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?e12-e26:null;}
 function calcBB(a,p=20){if(a.length<p)return null;const s=a.slice(-p),m=s.reduce((x,y)=>x+y,0)/p;const std=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/p);const up=m+2*std,lo=m-2*std,pr=a[a.length-1];return(up-lo)>0?(pr-lo)/(up-lo):0.5;}
+function calcStochastic(highs,lows,closes,kPeriod=14,dPeriod=3){
+  if(!highs||!lows||!closes||closes.length<kPeriod+dPeriod) return null;
+  const kLine=[];
+  for(let i=kPeriod-1;i<closes.length;i++){
+    const h=Math.max(...highs.slice(i-kPeriod+1,i+1));
+    const l=Math.min(...lows.slice(i-kPeriod+1,i+1));
+    kLine.push(h===l?50:((closes[i]-l)/(h-l))*100);
+  }
+  // %D = SMA(3) of %K
+  const dLine=[];
+  for(let i=dPeriod-1;i<kLine.length;i++){
+    dLine.push(kLine.slice(i-dPeriod+1,i+1).reduce((a,b)=>a+b,0)/dPeriod);
+  }
+  return {k:kLine[kLine.length-1],d:dLine[dLine.length-1]};
+}
 function calcStochRSI(a,p=14){if(a.length<p*2+1)return null;let gains=0,losses=0;for(let i=a.length-p*2;i<a.length-p;i++){const d=a[i+1]-a[i];if(d>0)gains+=d;else losses-=d;}gains/=p;losses/=p;const rsiSeries=[];for(let i=a.length-p;i<a.length;i++){const d=a[i]-a[i-1];gains=(gains*(p-1)+(d>0?d:0))/p;losses=(losses*(p-1)+(d<0?-d:0))/p;const rs=losses===0?100:gains/losses;rsiSeries.push(100-(100/(1+rs)));}let mn=rsiSeries[0],mx=rsiSeries[0];for(let i=1;i<rsiSeries.length;i++){if(rsiSeries[i]<mn)mn=rsiSeries[i];if(rsiSeries[i]>mx)mx=rsiSeries[i];}const last=rsiSeries[rsiSeries.length-1];return mx===mn?50:((last-mn)/(mx-mn))*100;}
 function calcCCI(h,l,c,p=20){if(c.length<p)return null;const hs=h.slice(-p),ls=l.slice(-p),cs=c.slice(-p);const tp=cs.map((v,i)=>(hs[i]+ls[i]+v)/3);const mean=tp.reduce((a,b)=>a+b,0)/p;const md=tp.reduce((a,b)=>a+Math.abs(b-mean),0)/p;return md===0?0:(tp[tp.length-1]-mean)/(0.015*md);}
 function calcMFI(h,l,c,v,p=14){if(c.length<p+1||!v||v.length<p+1)return null;let pF=0,nF=0;for(let i=c.length-p;i<c.length;i++){const tp=(h[i]+l[i]+c[i])/3,ptp=(h[i-1]+l[i-1]+c[i-1])/3,mf=tp*v[i];if(tp>ptp)pF+=mf;else nF+=mf;}return nF===0?100:100-(100/(1+pF/nF));}
@@ -2980,6 +2990,7 @@ function computeIndicators(closes,highs,lows,volumes,price,cfg){
   const atr=calcATR(highs,lows,closes);
   const adxData=calcADX(highs,lows,closes);
   const st=calcSuperTrend(highs,lows,closes,cfg.stPeriod||10,cfg.stMult||3);
+  const stochasticOsc=calcStochastic(highs,lows,closes,14,3);
   const piv=calcPivots(highs,lows,closes);
   // Volume
   const obvData=calcOBV(closes,volumes);
@@ -2998,7 +3009,7 @@ function computeIndicators(closes,highs,lows,volumes,price,cfg){
   // Complex (intentionally last — most expensive)
   const ichi=calcIchimoku(highs,lows,closes); // fast version — no spread
   const div=calcDivergence(closes); // fast version — only 2 calcs instead of 12
-  return{rsi,macdV,ema8,ema13,ema20,ema21,ema50,ema55,ema200,bbP,stoch,willR,atr,adxData,obvData,ichi,st,piv,div,vwap,mvwap,cci,mfi,roc,ult,volR,psar,cmf,kelt};
+  return{rsi,macdV,ema8,ema13,ema20,ema21,ema50,ema55,ema200,bbP,stoch,willR,atr,stochasticOsc,adxData,obvData,ichi,st,piv,div,vwap,mvwap,cci,mfi,roc,ult,volR,psar,cmf,kelt};
 }
 
 // ─── TRADE SCORE ─────────────────────────────────────────────
@@ -3414,11 +3425,12 @@ self.onmessage=function(e){
           const avgV=volumes.length>=20?volumes.slice(-20).reduce((a,b)=>a+b,0)/20:volumes.reduce((a,b)=>a+b,0)/volumes.length;
           const volR=avgV>0?(volumes[volumes.length-1]/avgV)*100:100;
           const mfi=calcMFI(highs,lows,closes,volumes),cmf=calcCMF(highs,lows,closes,volumes);
+          const stochasticOsc=calcStochastic(highs,lows,closes,14,3);
           const cci=calcCCI(highs,lows,closes),roc=calcROC(closes);
           const ult=calcUltimateOscillator(highs,lows,closes),psar=calcParabolicSAR(highs,lows,closes);
           const kelt=calcKeltner(highs,lows,closes),ichi=calcIchimoku(highs,lows,closes);
           const div=calcDivergence(closes);
-          const ind={rsi,macdV,ema8,ema13,ema20,ema21,ema50,ema55,ema200,bbP,stoch,willR,atr,
+          const ind={rsi,macdV,ema8,ema13,ema20,ema21,ema50,ema55,ema200,bbP,stoch,willR,atr,stochasticOsc,
             adxData,obvData,ichi,st,piv,div,vwap,mvwap,cci,mfi,roc,ult,volR,psar,cmf,kelt};
 
           // Score
@@ -3854,6 +3866,20 @@ self.onmessage=function(e){
   function calcRSI(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}let ag=g/p,al=l/p;for(let i=p+1;i<a.length;i++){const d=a[i]-a[i-1];ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;}return al===0?100:100-100/(1+ag/al);}
   function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?e12-e26:null;}
   function calcBB(a,p=20){if(a.length<p)return null;const s=a.slice(-p),m=s.reduce((x,y)=>x+y,0)/p;const std=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/p);const up=m+2*std,lo=m-2*std,pr=a[a.length-1];return(up-lo)>0?(pr-lo)/(up-lo):0.5;}
+  function calcStochastic(highs,lows,closes,kPeriod=14,dPeriod=3){
+    if(!highs||!lows||!closes||closes.length<kPeriod+dPeriod) return null;
+    const kLine=[];
+    for(let i=kPeriod-1;i<closes.length;i++){
+      const h=Math.max(...highs.slice(i-kPeriod+1,i+1));
+      const l=Math.min(...lows.slice(i-kPeriod+1,i+1));
+      kLine.push(h===l?50:((closes[i]-l)/(h-l))*100);
+    }
+    const dLine=[];
+    for(let i=dPeriod-1;i<kLine.length;i++){
+      dLine.push(kLine.slice(i-dPeriod+1,i+1).reduce((a,b)=>a+b,0)/dPeriod);
+    }
+    return {k:kLine[kLine.length-1],d:dLine[dLine.length-1]};
+  }
   function calcStochRSI(a,p=14){if(a.length<p*2+1)return null;let gains=0,losses=0;for(let i=a.length-p*2;i<a.length-p;i++){const d=a[i+1]-a[i];if(d>0)gains+=d;else losses-=d;}gains/=p;losses/=p;const rsiSeries=[];for(let i=a.length-p;i<a.length;i++){const d=a[i]-a[i-1];gains=(gains*(p-1)+(d>0?d:0))/p;losses=(losses*(p-1)+(d<0?-d:0))/p;const rs=losses===0?100:gains/losses;rsiSeries.push(100-(100/(1+rs)));}let mn=rsiSeries[0],mx=rsiSeries[0];for(let i=1;i<rsiSeries.length;i++){if(rsiSeries[i]<mn)mn=rsiSeries[i];if(rsiSeries[i]>mx)mx=rsiSeries[i];}const last=rsiSeries[rsiSeries.length-1];return mx===mn?50:((last-mn)/(mx-mn))*100;}
 
   function calcCCI(highs, lows, closes, p=20) {
@@ -5832,6 +5858,7 @@ self.onmessage=function(e){
     {const vc=volR>120?'var(--green)':volR<80?'var(--red)':'var(--warn)';setInd('volBar','volVal','volBadge',Math.min(100,volR/2),vc,volR.toFixed(0)+'%',volR>120?'bull':volR<80?'bear':'neut',volR>150?'VERY HIGH':volR>120?'HIGH':volR<80?'LOW':'AVERAGE');}
     if(bbP!==null){const c=bbP>0.8?'var(--red)':bbP<0.2?'var(--green)':'var(--warn)';setInd('bbBar','bbVal','bbBadge',bbP*100,c,(bbP*100).toFixed(1)+'%',bbP>0.8?'bear':bbP<0.2?'bull':'neut',bbP>0.8?'UPPER BB':bbP<0.2?'LOWER BB':'MID BB');}
     if(stoch!==null){const c=stoch>80?'var(--red)':stoch<20?'var(--green)':'var(--warn)';setInd('stochBar','stochVal','stochBadge',stoch,c,stoch.toFixed(1),stoch>80?'bear':stoch<20?'bull':'neut',stoch>80?'OVERBOUGHT':stoch<20?'OVERSOLD':'NEUTRAL');}
+    if(ind.stochasticOsc){const{k,d}=ind.stochasticOsc;const c=k>80?'var(--red)':k<20?'var(--green)':'var(--warn)';const cross=k>d?'K>D ↑':'K<D ↓';const sig=k>80?'OVERBOUGHT':k<20?'OVERSOLD':k>50?'BULLISH':'BEARISH';setInd('stochKBar','stochKVal','stochKBadge',k,c,k.toFixed(1)+'/ '+d.toFixed(1),k>80?'bear':k<20?'bull':'neut',sig+' · '+cross);}
     if(willR!==null){const c=willR>-20?'var(--red)':willR<-80?'var(--green)':'var(--warn)';const p=((willR+100)/100)*100;setInd('willBar','willVal','willBadge',p,c,willR.toFixed(1),willR>-20?'bear':willR<-80?'bull':'neut',willR>-20?'OVERBOUGHT':willR<-80?'OVERSOLD':'NEUTRAL');}
     if(cci!==null){const c=cci>100?'var(--red)':cci<-100?'var(--green)':'var(--warn)';const bp=Math.min(100,Math.max(0,50+cci/4));setInd('cciBar','cciVal','cciBadge',bp,c,cci.toFixed(1),cci>100?'bear':cci<-100?'bull':'neut',cci>200?'EXTREME OB':cci>100?'OVERBOUGHT':cci<-200?'EXTREME OS':cci<-100?'OVERSOLD':'NEUTRAL');}
     if(mfi!==null){const c=mfi>80?'var(--red)':mfi<20?'var(--green)':'var(--warn)';setInd('mfiBar','mfiVal','mfiBadge',mfi,c,mfi.toFixed(1),mfi>80?'bear':mfi<20?'bull':'neut',mfi>80?'OVERBOUGHT':mfi<20?'OVERSOLD':mfi>=50?'BULLISH FLOW':'BEARISH FLOW');}
@@ -11950,7 +11977,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
       hint: 'Uses your crypto-data worker — no key needed',
     },
     openrouter: {
-      label: 'OpenRouter (FREE models available)',
+      label: 'OpenRouter (FREE models)',
       models: [
         'meta-llama/llama-3.3-70b-instruct:free',
         'google/gemini-2.0-flash-exp:free',
@@ -11958,47 +11985,32 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         'microsoft/phi-3-mini-128k-instruct:free',
         'qwen/qwen-2.5-72b-instruct:free',
       ],
-      needsKey: true,
-      keyName: 'ai_key_openrouter',
-      hint: 'Free API key at openrouter.ai — no credit card needed',
+      needsKey: true, keyName: 'ai_key_openrouter',
+      hint: 'Set OPENROUTER_API_KEY in your Cloudflare Worker secrets',
     },
     groq: {
       label: 'Groq (fast + free)',
-      models: [
-        'llama-3.3-70b-versatile',
-        'llama-3.1-8b-instant',
-        'openai/gpt-oss-120b',
-        'openai/gpt-oss-20b',
-        'meta-llama/llama-4-scout-17b-16e-instruct',
-      ],
-      needsKey: true,
-      keyName: 'ai_key_groq',
-      hint: 'Free API key at console.groq.com',
+      models: ['llama-3.3-70b-versatile','llama-3.1-8b-instant','meta-llama/llama-4-scout-17b-16e-instruct'],
+      needsKey: true, keyName: 'ai_key_groq',
+      hint: 'Set GROQ_API_KEY in your Cloudflare Worker secrets',
     },
     gemini: {
       label: 'Gemini (Google)',
-      models: [
-        'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
-        'gemini-2.5-pro',
-      ],
-      needsKey: true,
-      keyName: 'ai_key_gemini',
-      hint: 'Free API key at aistudio.google.com',
+      models: ['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.5-pro'],
+      needsKey: true, keyName: 'ai_key_gemini',
+      hint: 'Set GEMINI_API_KEY in your Cloudflare Worker secrets',
     },
     claude: {
-      label: 'Claude (Anthropic)',
-      models: ['claude-sonnet-4-5', 'claude-opus-4-5', 'claude-haiku-4-5-20251001'],
-      needsKey: true,
-      keyName: 'ai_key_claude',
-      hint: 'Paid — get key at console.anthropic.com',
+      label: 'Claude direct (Anthropic)',
+      models: ['claude-sonnet-4-20250514','claude-opus-4-5','claude-haiku-4-5-20251001'],
+      needsKey: true, keyName: 'ai_key_claude',
+      hint: 'Set ANTHROPIC_API_KEY in your Cloudflare Worker secrets',
     },
     openai: {
       label: 'OpenAI (GPT)',
-      models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'],
-      needsKey: true,
-      keyName: 'ai_key_openai',
-      hint: 'Paid — get key at platform.openai.com',
+      models: ['gpt-4o','gpt-4o-mini','gpt-4.1','gpt-4.1-mini'],
+      needsKey: true, keyName: 'ai_key_openai',
+      hint: 'Set OPENAI_API_KEY in your Cloudflare Worker secrets',
     },
   };
 
@@ -12011,15 +12023,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     if(modelSel) {
       modelSel.innerHTML = cfg.models.map(m => `<option value="${m}">${m}</option>`).join('');
     }
-    // Show/hide API key field
-    const keyWrap = document.getElementById('ai-key-wrap');
-    if(keyWrap) keyWrap.style.display = cfg.needsKey ? 'block' : 'none';
-    // Load saved key
-    if(cfg.needsKey) {
-      const keyEl = document.getElementById('ai-api-key');
-      const saved = localStorage.getItem(cfg.keyName);
-      if(keyEl) keyEl.placeholder = saved ? '••••••• (saved — enter new to change)' : (cfg.hint || 'sk-...');
-    }
+    // Key wrap removed — API keys managed in Cloudflare Worker secrets
     // Show provider hint
     const hintEl = document.getElementById('ai-provider-hint');
     if(hintEl && cfg.hint) { hintEl.textContent = cfg.hint; hintEl.style.color = 'var(--warn)'; }
@@ -12098,76 +12102,18 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
         if(data.content?.[0]?.text) reply = data.content[0].text;
         else if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
 
-      } else if(provider === 'openrouter') {
-        // ── OpenRouter API ─────────────────────────────────────────────
-        if(!apiKey) throw new Error('No OpenRouter key saved. Enter your key and click SAVE.');
-        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-12)];
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+apiKey,'HTTP-Referer':'https://crypto-risk.vercel.app','X-Title':'TradingLab' },
-          body:JSON.stringify({ model, messages:msgs, max_tokens:1500 }),
-          signal:AbortSignal.timeout(30000)
-        });
+      } else {
+        // ── All other providers route through Cloudflare Worker ────────
+        // Keys (OPENROUTER_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY)
+        // are set as secrets in the Cloudflare Worker — never exposed to browser
+        const payload = { provider, model, max_tokens:1500, system:systemPrompt, messages:_aiChatHistory.slice(-12) };
+        const res = await fetch(DATA_WORKER_URL + '/ai', { method:'POST', headers:_workerHeaders(), body:JSON.stringify(payload), signal:AbortSignal.timeout(30000) });
+        if(!res.ok) { const t=await res.text().catch(()=>''); throw new Error('AI error ('+res.status+'): '+t.slice(0,120)); }
         const data = await res.json();
-        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
+        if(data.content?.[0]?.text) reply = data.content[0].text;          // Anthropic format
+        else if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content; // OpenAI format
+        else if(data.candidates?.[0]?.content?.parts?.[0]?.text) reply = data.candidates[0].content.parts[0].text; // Gemini
         else if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-      } else if(provider === 'groq') {
-        // ── Groq API ───────────────────────────────────────────────────
-        if(!apiKey) throw new Error('No Groq key saved. Enter your key and click SAVE.');
-        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-12)];
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+apiKey },
-          body:JSON.stringify({ model, messages:msgs, max_tokens:1500 }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
-        else if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-      } else if(provider === 'gemini') {
-        // ── Google Gemini API ──────────────────────────────────────────
-        if(!apiKey) throw new Error('No Gemini key saved. Enter your key and click SAVE.');
-        const geminiMsgs = _aiChatHistory.slice(-12).map(function(m) {
-          return { role: m.role === 'assistant' ? 'model' : 'user', parts:[{ text: m.content }] };
-        });
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body:JSON.stringify({ system_instruction:{ parts:[{ text:systemPrompt }] }, contents:geminiMsgs }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.candidates?.[0]?.content?.parts?.[0]?.text) reply = data.candidates[0].content.parts[0].text;
-        else if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-
-      } else if(provider === 'claude') {
-        // ── Direct Claude API ──────────────────────────────────────────
-        if(!apiKey) throw new Error('No Anthropic key saved. Enter your key and click SAVE.');
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-          body:JSON.stringify({ model, max_tokens:1500, system:systemPrompt, messages:_aiChatHistory.slice(-12) }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.content?.[0]?.text) reply = data.content[0].text;
-        else if(data.error) throw new Error(data.error.message);
-
-      } else if(provider === 'openai') {
-        // ── OpenAI API ─────────────────────────────────────────────────
-        if(!apiKey) throw new Error('No OpenAI key saved. Enter your key and click SAVE.');
-        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-12)];
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+apiKey },
-          body:JSON.stringify({ model, messages:msgs, max_tokens:1500 }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
-        else if(data.error) throw new Error(data.error.message);
       }
     } catch(e) {
       reply = '⚠️ **' + (cfg?.label||'AI') + ' error:** ' + e.message;
