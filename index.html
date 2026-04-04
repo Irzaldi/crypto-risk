@@ -2668,33 +2668,18 @@ function installPWA() {
         <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">Powered by Claude · Uses your live indicator data as context</span>
         <button onclick="clearAiChat()" class="theme-btn" style="margin-left:auto;font-size:.52rem;padding:3px 10px;border-color:rgba(192,132,252,.4);color:#c084fc">🗑 Clear</button>
       </div>
-      <!-- AI Provider selector -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px">
-        <div style="flex:1;min-width:140px">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">AI PROVIDER</div>
-          <select id="ai-provider" onchange="onAiProviderChange()" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
-            <option value="worker">🔧 Cloudflare Worker (default)</option>
-            <option value="openrouter">🆓 OpenRouter (free models)</option>
-            <option value="groq">⚡ Groq (fast + free)</option>
-            <option value="gemini">♊ Gemini (Google)</option>
-            <option value="claude">🤖 Claude (Anthropic)</option>
-            <option value="openai">💚 OpenAI (GPT)</option>
-          </select>
+      <!-- AI powered by badge — no key needed, routes through worker -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 12px;background:rgba(192,132,252,.05);border:1px solid rgba(192,132,252,.2);border-radius:8px">
+        <span style="font-size:.8rem">🤖</span>
+        <div>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.58rem;color:#c084fc;font-weight:700">Powered by Claude AI</span>
+          <span style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-left:8px">No API key needed · Routed through your worker</span>
         </div>
-        <div style="flex:1;min-width:140px" id="ai-model-wrap">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">MODEL</div>
-          <select id="ai-model" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
-            <option value="claude-sonnet-4-5">claude-sonnet-4-5</option>
-          </select>
-        </div>
-        <div style="flex:2;min-width:180px" id="ai-key-wrap" style="display:none">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">API KEY <span style="color:var(--warn)">(stored locally only)</span></div>
-          <div style="display:flex;gap:4px">
-            <input id="ai-api-key" type="password" placeholder="sk-..." style="flex:1;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
-            <button onclick="saveAiKey()" style="padding:6px 10px;background:rgba(192,132,252,.15);border:1px solid rgba(192,132,252,.4);color:#c084fc;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.55rem;cursor:pointer;white-space:nowrap">SAVE</button>
-          </div>
-        </div>
+        <div id="ai-status-dot" style="margin-left:auto;width:8px;height:8px;border-radius:50%;background:var(--muted)"></div>
       </div>
+      <!-- Hidden inputs kept for backward compat -->
+      <select id="ai-provider" style="display:none"><option value="worker" selected>worker</option></select>
+      <select id="ai-model" style="display:none"><option value="claude-sonnet-4-20250514" selected>claude-sonnet-4-20250514</option></select>
       <!-- AI Market Summary auto-generate -->
       <div id="ai-market-summary" style="display:none;padding:10px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;margin-bottom:10px;font-family:'Rajdhani',sans-serif;font-size:.82rem;line-height:1.6;color:var(--text)"></div>
 
@@ -2724,8 +2709,7 @@ function installPWA() {
           style="padding:12px 20px;background:rgba(192,132,252,.2);border:1px solid rgba(192,132,252,.5);color:#c084fc;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.6rem;cursor:pointer;white-space:nowrap;letter-spacing:1px;align-self:flex-end">⚡ SEND</button>
       </div>
       <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:6px;line-height:1.8">
-        Shift+Enter for newline · Live indicator context auto-injected · <span id='ai-provider-hint' style='color:var(--warn)'>Select a provider above</span>
-        &nbsp;·&nbsp; <span id="ai-status-badge" style="color:var(--warn)">⚙️ Requires /ai route on your Cloudflare Worker</span>
+        Shift+Enter for newline · Live indicator context auto-injected · <span id='ai-provider-hint' style='color:var(--muted)'>Claude via your worker</span>
       </div>
     </div>
   </div>
@@ -12073,104 +12057,27 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     const typingId = 'ai-typing-' + Date.now();
     _appendAiMsg('typing', '···', typingId);
 
-    const provider = document.getElementById('ai-provider')?.value || 'worker';
-    const model    = document.getElementById('ai-model')?.value || 'claude-sonnet-4-5';
+    const provider = 'worker';
+    const model    = 'claude-sonnet-4-20250514';
     const cfg      = AI_PROVIDERS[provider];
-    const apiKey   = cfg?.needsKey ? localStorage.getItem(cfg.keyName) : null;
+    const apiKey   = null; // no user key needed — worker uses its own ANTHROPIC_API_KEY
     const systemPrompt = _buildAiContext();
     let reply = null;
 
     try {
-      if(provider === 'worker' || (!apiKey && provider !== 'worker')) {
-        // ── Route through Cloudflare Worker ───────────────────────────
-        if(provider !== 'worker' && !apiKey) {
-          throw new Error('No API key saved for ' + cfg.label + '. Enter your key above and click SAVE.');
-        }
-        const payload = { model, max_tokens:1000, system:systemPrompt, messages:_aiChatHistory.slice(-10) };
-        for(const workerBase of [DATA_WORKER_URL, ...WORKERS]) {
-          try {
-            const headers = { 'Content-Type':'application/json' };
-            if(DATA_SECRET) headers['X-User-Secret'] = DATA_SECRET;
-            const res = await fetch(workerBase + '/ai', { method:'POST', headers, body:JSON.stringify(payload), signal:AbortSignal.timeout(30000) });
-            if(!res.ok) { const t = await res.text().catch(()=>''); throw new Error(res.status+': '+t.slice(0,100)); }
-            const data = await res.json();
-            if(data.content?.[0]?.text) { reply = data.content[0].text; break; }
-            if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
-          } catch(e) { console.warn('Worker AI failed:', e.message); }
-        }
-
-      } else if(provider === 'claude') {
-        // ── Direct Claude API ──────────────────────────────────────────
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true' },
-          body:JSON.stringify({ model, max_tokens:1000, system:systemPrompt, messages:_aiChatHistory.slice(-10) }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.content?.[0]?.text) reply = data.content[0].text;
-        else if(data.error) throw new Error(data.error.message);
-
-      } else if(provider === 'openai') {
-        // ── OpenAI API ─────────────────────────────────────────────────
-        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-10)];
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+apiKey },
-          body:JSON.stringify({ model, messages:msgs, max_tokens:1000 }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
-        else if(data.error) throw new Error(data.error.message);
-
-      } else if(provider === 'gemini') {
-        // ── Google Gemini API ──────────────────────────────────────────
-        const geminiMsgs = _aiChatHistory.slice(-10).map(function(m) {
-          return { role: m.role === 'assistant' ? 'model' : 'user', parts:[{ text: m.content }] };
-        });
-        // Prepend system as first user message if history starts with assistant
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json' },
-          body:JSON.stringify({ system_instruction:{ parts:[{ text:systemPrompt }] }, contents:geminiMsgs }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.candidates?.[0]?.content?.parts?.[0]?.text) reply = data.candidates[0].content.parts[0].text;
-        else if(data.error) throw new Error(data.error.message);
-
-      } else if(provider === 'groq') {
-        // ── Groq API (OpenAI-compatible) ───────────────────────────────
-        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-10)];
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method:'POST',
-          headers:{ 'Content-Type':'application/json','Authorization':'Bearer '+apiKey },
-          body:JSON.stringify({ model, messages:msgs, max_tokens:1000 }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
-        else if(data.error) throw new Error(data.error.message);
-
-      } else if(provider === 'openrouter') {
-        // ── OpenRouter API (OpenAI-compatible, has free models) ────────
-        const msgs = [{ role:'system', content:systemPrompt }, ..._aiChatHistory.slice(-10)];
-        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method:'POST',
-          headers:{
-            'Content-Type':'application/json',
-            'Authorization':'Bearer '+apiKey,
-            'HTTP-Referer':'https://crypto-risk.vercel.app',
-            'X-Title':'Crypto Risk System',
-          },
-          body:JSON.stringify({ model, messages:msgs, max_tokens:1000 }),
-          signal:AbortSignal.timeout(30000)
-        });
-        const data = await res.json();
-        if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
-        else if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+      // ── Always route through Cloudflare Worker (no user key needed) ──
+      const aiPayload = { model: 'claude-sonnet-4-20250514', max_tokens:1500, system:systemPrompt, messages:_aiChatHistory.slice(-12) };
+      const aiHeaders = { 'Content-Type':'application/json' };
+      if(_authToken) aiHeaders['X-Session-Token'] = _authToken;
+      else if(DATA_SECRET) aiHeaders['X-User-Secret'] = DATA_SECRET;
+      const aiRes = await fetch(DATA_WORKER_URL + '/ai', { method:'POST', headers:aiHeaders, body:JSON.stringify(aiPayload), signal:AbortSignal.timeout(30000) });
+      if(!aiRes.ok) {
+        const t = await aiRes.text().catch(()=>'');
+        throw new Error('AI unavailable (' + aiRes.status + '). Ensure ANTHROPIC_API_KEY is set in your Cloudflare Worker secrets.');
       }
+      const aiData = await aiRes.json();
+      if(aiData.content?.[0]?.text) reply = aiData.content[0].text;
+      else if(aiData.error) throw new Error(aiData.error.message || JSON.stringify(aiData.error));
     } catch(e) {
       reply = '⚠️ **' + (cfg?.label||'AI') + ' error:** ' + e.message;
     }
