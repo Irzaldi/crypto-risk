@@ -1785,7 +1785,7 @@ function installPWA() {
 
     <!-- Fear & Greed -->
     <div class="panel">
-      <div class="ptitle">😱 Fear &amp; Greed Index</div>
+      <div class="ptitle">😱 <span id="fg-panel-title">Fear &amp; Greed Index</span></div>
       <div class="fg-wrap">
         <svg class="fg-gauge" viewBox="0 0 120 70">
           <path d="M15,65 A50,50 0 0,1 105,65" class="fg-arc" stroke="rgba(255,255,255,.06)"/>
@@ -5534,6 +5534,7 @@ self.onmessage=function(e){
     const pct=((price-open24)/open24*100);
     document.getElementById('pcPrice').textContent=fmtP(price);
     window._lastAnalysisPrice = price;
+    window._lastIndicators    = w1?.ind || null;
     window._lastAnalysisSym   = sym;
     document.getElementById('pcPair').textContent=pair;
     const _symNewsTab = document.getElementById('ntab-sym');
@@ -5827,12 +5828,14 @@ self.onmessage=function(e){
 
     updateSessionPnL();
     calcBTCCorrelation(sym, closes);
+    setTimeout(_fetchFearGreedAnalysis, 50); // update F&G with indicator context
     document.getElementById('fetchBtn').disabled=false;
   }
 
   // ── DOM apply after worker returns ────────────────────────────────────────
   // ── WAVE 1: indicators + score + prediction + patterns ───────────────────
   function _applyWave1(w1, pair, source, sym, price, opens, closes, highs, lows, volumes, isBUY, isSELL, tf, rm, _rsi, _macdV) {
+    if(w1?.ind) window._lastIndicators = w1.ind;
     stepProgress('indicators','done');
     const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
@@ -6474,36 +6477,124 @@ self.onmessage=function(e){
     de.textContent=desc;
   }
 
+  function _fgRender(val, label, ydText, lwText, titleText) {
+    const color = val>=75?'var(--red)':val>=60?'var(--warn)':val>=45?'var(--warn)':val>=25?'var(--green)':'var(--green)';
+    const fgEl  = document.getElementById('fg-label');
+    const fgNum = document.getElementById('fg-num');
+    const arc   = document.getElementById('fg-arc-fill');
+    const yd    = document.getElementById('fg-yesterday');
+    const lw    = document.getElementById('fg-lastweek');
+    const fgSig = document.getElementById('fg-signal');
+    const title = document.getElementById('fg-panel-title');
+    if(title) title.innerHTML = titleText || 'Fear &amp; Greed Index';
+    if(fgEl)  { fgEl.textContent=val+' — '+label; fgEl.style.color=color; }
+    if(fgNum) { fgNum.textContent=val; fgNum.setAttribute('fill',color); }
+    if(arc)   { arc.style.strokeDasharray=`${(val/100)*157} 157`; arc.style.stroke=color; arc.style.strokeDashoffset='0'; }
+    if(yd)    yd.textContent = ydText || '—';
+    if(lw)    lw.textContent = lwText || '—';
+    const sig = val>=75?'🔴 Extreme Greed — caution':val>=60?'🟡 Greed — stay alert':val>=45?'🟡 Neutral':val>=35?'🟢 Fear — watch for entry':'🟢 Extreme Fear — contrarian buy';
+    if(fgSig) { fgSig.textContent=sig; fgSig.style.color=color; }
+  }
+
   async function _fetchFearGreedAnalysis() {
+    const sym = window._lastAnalysisSym || '';
+    const isCrypto = sym && !FOREX_PAIRS[sym] && !COMMODITY_PAIRS[sym] && !window._customStocks?.[sym];
+    const isGold   = sym === 'XAUT' || sym === 'XAGUSD' || sym === 'COPPER';
+    const isOil    = sym === 'USOIL' || sym === 'BRENT' || sym === 'NATGAS';
+    const isStock  = COMMODITY_PAIRS[sym]?.isUSStock || COMMODITY_PAIRS[sym]?.isIndex || window._customStocks?.[sym];
+    const isIDX    = COMMODITY_PAIRS[sym]?.isIDXStock;
+    const isForex  = !!FOREX_PAIRS[sym];
+
     try {
-      const data = await smartFetch('https://api.alternative.me/fng/?limit=7&format=json');
-      if(!data||!data.data||!data.data.length) return;
-      const latest = data.data[0];
-      const yest   = data.data[1];
-      const lastWk = data.data[6]||data.data[data.data.length-1];
-      const val    = parseInt(latest.value);
-      const color  = val>=75?'var(--red)':val>=55?'var(--warn)':val>=45?'var(--warn)':val>=25?'var(--green)':'var(--green)';
-      const label  = latest.value_classification;
-      // Label
-      const fgEl   = document.getElementById('fg-label');
-      if(fgEl){ fgEl.textContent=val+' — '+label; fgEl.style.color=color; }
-      // Number inside SVG
-      const fgNum = document.getElementById('fg-num');
-      if(fgNum){ fgNum.textContent=val; fgNum.setAttribute('fill',color); }
-      // Arc gauge (id=fg-arc-fill, full arc length=157)
-      const arc = document.getElementById('fg-arc-fill');
-      if(arc){ const pct=val/100; arc.style.strokeDasharray=`${pct*157} 157`; arc.style.stroke=color; arc.style.strokeDashoffset='0'; }
-      // Yesterday / last week
-      const yd=document.getElementById('fg-yesterday'),lw=document.getElementById('fg-lastweek');
-      if(yd)yd.textContent=yest.value+' ('+yest.value_classification+')';
-      if(lw)lw.textContent=lastWk.value+' ('+lastWk.value_classification+')';
-      // Signal
-      const sig = val>=75?'🔴 Extreme Greed — caution':val>=55?'🟡 Greed — stay alert':val>=45?'🟡 Neutral':val>=25?'🟢 Fear — possible buy zone':'🟢 Extreme Fear — contrarian buy';
-      const fgSig=document.getElementById('fg-signal');
-      if(fgSig){fgSig.textContent=sig;fgSig.style.color=color;}
+      if(!sym || isCrypto) {
+        // ── Crypto: alternative.me Fear & Greed ─────────────────────
+        const data = await smartFetch('https://api.alternative.me/fng/?limit=7&format=json');
+        if(!data?.data?.length) return;
+        const latest=data.data[0], yest=data.data[1], lastWk=data.data[6]||data.data[data.data.length-1];
+        _fgRender(
+          parseInt(latest.value), latest.value_classification,
+          yest.value+' ('+yest.value_classification+')',
+          lastWk.value+' ('+lastWk.value_classification+')',
+          '😱 Crypto Fear &amp; Greed'
+        );
+
+      } else if(isGold || isOil) {
+        // ── Gold/Silver/Oil: derive sentiment from RSI + price momentum ──
+        const closes = window._lastChartData?.closes;
+        if(!closes || closes.length < 20) {
+          _fgRender(50,'Neutral','—','—', isGold?'🥇 Gold Sentiment':'🛢️ Commodity Sentiment');
+          return;
+        }
+        // RSI-based sentiment (normalized to 0-100)
+        const rsi = window._lastIndicators?.rsi;
+        const macd = window._lastIndicators?.macdV;
+        const bb   = window._lastIndicators?.bbP;
+        let score = 50;
+        if(rsi!=null)  score += (rsi-50)*0.4;
+        if(macd!=null) score += (macd>0?8:-8);
+        if(bb!=null)   score += (bb-0.5)*-20;
+        score = Math.max(0,Math.min(100,Math.round(score)));
+        const label = score>=75?'Greed':score>=60?'Mild Greed':score>=45?'Neutral':score>=25?'Fear':'Extreme Fear';
+        // Also fetch VIX as a market risk proxy
+        let vixText = '—';
+        try {
+          const vd = await smartFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d');
+          const vix = vd?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if(vix) vixText = 'VIX: '+vix.toFixed(2)+(vix>25?' ⚠️ High':vix>18?' Moderate':' Low');
+        } catch(e) {}
+        _fgRender(score, label, vixText, 'RSI-based', isGold?'🥇 Gold Sentiment Index':'🛢️ Commodity Sentiment');
+
+      } else if(isStock || isIDX) {
+        // ── Stocks/Indices: CNN Fear & Greed proxy via RSI + VIX ──────
+        const closes = window._lastChartData?.closes;
+        const rsi  = window._lastIndicators?.rsi;
+        const macd = window._lastIndicators?.macdV;
+        const bb   = window._lastIndicators?.bbP;
+        let score = 50;
+        if(rsi!=null)  score += (rsi-50)*0.5;
+        if(macd!=null) score += (macd>0?10:-10);
+        if(bb!=null)   score += (bb-0.5)*-15;
+        score = Math.max(0,Math.min(100,Math.round(score)));
+        const label = score>=75?'Extreme Greed':score>=60?'Greed':score>=45?'Neutral':score>=25?'Fear':'Extreme Fear';
+        // VIX
+        let vixText='—', vixWk='—';
+        try {
+          const vd = await smartFetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=5d');
+          const res0 = vd?.chart?.result?.[0];
+          const vix = res0?.meta?.regularMarketPrice;
+          const prevClose = res0?.indicators?.quote?.[0]?.close;
+          if(vix) {
+            vixText = 'VIX: '+vix.toFixed(2)+(vix>30?' 🔴 High risk':vix>20?' 🟡 Elevated':' 🟢 Low');
+            if(prevClose?.length>1) vixWk='VIX prev: '+prevClose[prevClose.length-2]?.toFixed(2);
+          }
+        } catch(e) {}
+        const title = isIDX ? '🇮🇩 IHSG Sentiment' : (sym==='SPX'||sym==='NDX'||sym==='DJI' ? '🇺🇸 Market Sentiment' : '📊 Stock Sentiment');
+        _fgRender(score, label, vixText, vixWk||'Indicator-based', title);
+
+      } else if(isForex) {
+        // ── Forex: USD strength proxy ─────────────────────────────────
+        const rsi  = window._lastIndicators?.rsi;
+        const macd = window._lastIndicators?.macdV;
+        let score = 50;
+        if(rsi!=null)  score += (rsi-50)*0.6;
+        if(macd!=null) score += (macd>0?12:-12);
+        score = Math.max(0,Math.min(100,Math.round(score)));
+        const label = score>=70?'Strong Bullish':score>=55?'Bullish':score>=45?'Neutral':score>=30?'Bearish':'Strong Bearish';
+        const pair = FOREX_PAIRS[sym];
+        const title = '💱 '+sym.slice(0,3)+'/'+sym.slice(3)+' Sentiment';
+        _fgRender(score, label, 'Trend-based', 'RSI+MACD signal', title);
+
+      } else {
+        // Fallback: crypto F&G
+        const data = await smartFetch('https://api.alternative.me/fng/?limit=1&format=json');
+        if(data?.data?.length) {
+          const latest=data.data[0];
+          _fgRender(parseInt(latest.value), latest.value_classification,'—','—','😱 Market Sentiment');
+        }
+      }
     } catch(e) {
       const fgEl=document.getElementById('fg-label');
-      if(fgEl)fgEl.textContent='Fear & Greed: unavailable';
+      if(fgEl)fgEl.textContent='Sentiment: unavailable';
     }
   }
 
@@ -12104,16 +12195,19 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
 
       } else {
         // ── All other providers route through Cloudflare Worker ────────
-        // Keys (OPENROUTER_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY)
-        // are set as secrets in the Cloudflare Worker — never exposed to browser
-        const payload = { provider, model, max_tokens:1500, system:systemPrompt, messages:_aiChatHistory.slice(-12) };
-        const res = await fetch(DATA_WORKER_URL + '/ai', { method:'POST', headers:_workerHeaders(), body:JSON.stringify(payload), signal:AbortSignal.timeout(30000) });
-        if(!res.ok) { const t=await res.text().catch(()=>''); throw new Error('AI error ('+res.status+'): '+t.slice(0,120)); }
-        const data = await res.json();
-        if(data.content?.[0]?.text) reply = data.content[0].text;          // Anthropic format
-        else if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content; // OpenAI format
+        const maxTok = provider === 'openrouter' ? 1024 : 1500; // free OpenRouter models have lower limits
+        const payload = { provider, model, max_tokens:maxTok, system:systemPrompt, messages:_aiChatHistory.slice(-12) };
+        const res = await fetch(DATA_WORKER_URL + '/ai', { method:'POST', headers:_workerHeaders(), body:JSON.stringify(payload), signal:AbortSignal.timeout(40000) });
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok) {
+          const msg = data?.error?.message || data?.error || JSON.stringify(data).slice(0,150);
+          throw new Error('AI error ('+res.status+'): '+msg);
+        }
+        if(data.content?.[0]?.text) reply = data.content[0].text;                              // Anthropic
+        else if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;  // OpenAI/OpenRouter/Groq
         else if(data.candidates?.[0]?.content?.parts?.[0]?.text) reply = data.candidates[0].content.parts[0].text; // Gemini
-        else if(data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+        else if(data.error?.message) throw new Error(data.error.message);
+        else if(!reply) throw new Error('Empty response from '+provider+'. Check model name and API key in Worker secrets.');
       }
     } catch(e) {
       reply = '⚠️ **' + (cfg?.label||'AI') + ' error:** ' + e.message;
