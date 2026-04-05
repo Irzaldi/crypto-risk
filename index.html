@@ -1716,14 +1716,11 @@ function installPWA() {
   <div class="panel" style="margin-top:14px;border-color:rgba(0,229,255,0.2)">
     <div class="ptitle" style="color:var(--accent)">🕐 Multi-Timeframe Confirmation</div>
     <div class="mtf-grid" id="mtf-grid">
-      <div class="mtf-card"><div class="mtf-tf">15m</div><div class="mtf-sig" id="mtf-15m-sig">—</div><div class="mtf-detail" id="mtf-15m-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-15m-score">—</div></div>
-      <div class="mtf-card"><div class="mtf-tf">30m</div><div class="mtf-sig" id="mtf-30m-sig">—</div><div class="mtf-detail" id="mtf-30m-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-30m-score">—</div></div>
-      <div class="mtf-card"><div class="mtf-tf">1H</div><div class="mtf-sig" id="mtf-1h-sig">—</div><div class="mtf-detail" id="mtf-1h-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-1h-score">—</div></div>
+                  <div class="mtf-card"><div class="mtf-tf">1H</div><div class="mtf-sig" id="mtf-1h-sig">—</div><div class="mtf-detail" id="mtf-1h-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-1h-score">—</div></div>
       <div class="mtf-card"><div class="mtf-tf">4H</div><div class="mtf-sig" id="mtf-4h-sig">—</div><div class="mtf-detail" id="mtf-4h-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-4h-score">—</div></div>
       <div class="mtf-card"><div class="mtf-tf">1D</div><div class="mtf-sig" id="mtf-1d-sig">—</div><div class="mtf-detail" id="mtf-1d-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-1d-score">—</div></div>
       <div class="mtf-card"><div class="mtf-tf">1W</div><div class="mtf-sig" id="mtf-1w-sig">—</div><div class="mtf-detail" id="mtf-1w-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-1w-score">—</div></div>
-      <div class="mtf-card"><div class="mtf-tf">1M</div><div class="mtf-sig" id="mtf-1M-sig">—</div><div class="mtf-detail" id="mtf-1M-detail">Fetching...</div><div style="font-family:'Orbitron',monospace;font-size:.7rem;font-weight:700;margin-top:6px" id="mtf-1M-score">—</div></div>
-    </div>
+          </div>
     <div style="background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:12px">
       <div style="font-family:'Share Tech Mono',monospace;font-size:.56rem;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">MTF Consensus</div>
       <div style="font-family:'Orbitron',monospace;font-size:.9rem;font-weight:700" id="mtf-consensus">—</div>
@@ -3411,7 +3408,8 @@ self.onmessage=function(e){
       const {closes,highs,lows,volumes,opens,price,isBUY,isSELL,
              belowCount,aboveCount,mtfScore,rm,cfg,sym,tf} = payload;
 
-      // Wave 1 after one frame (status bar gets to paint first)
+      // Double RAF: first paints status, second starts computation
+      requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         try {
           // Compute all indicators inline (same math as worker, duplicated in main thread)
@@ -3521,7 +3519,8 @@ self.onmessage=function(e){
             } catch(e2) { reject(e2); }
           });
         } catch(e) { reject(e); }
-      });
+      }); // end 2nd RAF
+      }); // end 1st RAF
     });
   }
 
@@ -5403,8 +5402,8 @@ self.onmessage=function(e){
     currentPrice=price;
 
     const sym2 = sym;
-    const mtfTFs = ['15m','30m','1h','4h','1d','1w','1M'];
-    const mtfIds = ['15m','30m','1h','4h','1d','1w','1M'];
+    const mtfTFs = ['1h','4h','1d','1w'];  // Reduced from 7 to 4 — faster
+    const mtfIds = ['1h','4h','1d','1w'];
 
     if(FOREX_PAIRS[sym] || COMMODITY_PAIRS[sym] || sym==='ANTAM' || window._customStocks?.[sym]) {
       // For forex/stocks: calculate MTF from the daily candles we already have
@@ -5461,7 +5460,7 @@ self.onmessage=function(e){
     function getCacheKey(s, tf) { return `${s}_${tf}`; }
     function getCached(s, tf) {
       const entry = window._candleCache[getCacheKey(s, tf)];
-      if(entry && Date.now() - entry.ts < 60000) return entry.data;
+      if(entry && Date.now() - entry.ts < 300000) return entry.data; // 5min cache
       return null;
     }
     function setCache(s, tf, d) { window._candleCache[getCacheKey(s, tf)] = { data:d, ts:Date.now() }; }
@@ -5470,7 +5469,7 @@ self.onmessage=function(e){
       if(FOREX_PAIRS[s] || COMMODITY_PAIRS[s] || s==='ANTAM' || window._customStocks?.[s]) return null;
       const cached = getCached(s, tf);
       if(cached) return cached;
-      const exOrder = ['binance','okx','bybit','mexc','gateio','kucoin'];
+      const exOrder = ['okx','bybit','gateio','kucoin','mexc','binance']; // OKX first
       const ordered = (workingExchangeId && workingExchangeId!=='forex' && workingExchangeId!=='yahoo')
         ? [workingExchangeId, ...exOrder.filter(e=>e!==workingExchangeId)] : exOrder;
 
@@ -5510,7 +5509,7 @@ self.onmessage=function(e){
         try {
           const batchResults = await Promise.race([
             workerBatch(batchUrls),
-            new Promise((_,rj) => setTimeout(() => rj(new Error('MTF timeout')), 8000))
+            new Promise((_,rj) => setTimeout(() => rj(new Error('MTF timeout')), 5000))
           ]);
           return mtfTFs.map((tf, i) => {
             const raw = batchResults[i];
@@ -5605,9 +5604,9 @@ self.onmessage=function(e){
         }
         // Update indicator panel MTF bars
         const barId = id.replace('m','m').replace('h','h'); // e.g. '15m','1h','4h','1d','1w','1M'
-        const barMap={'15m':'mtf15Bar','30m':'mtf30mBar','1h':'mtf1hBar','4h':'mtf4hBar','1d':'mtf1dBar','1w':'mtf1wBar','1M':'mtf1MBar'};
-        const valMap={'15m':'mtf15Val','30m':'mtf30mVal','1h':'mtf1hVal','4h':'mtf4hVal','1d':'mtf1dVal','1w':'mtf1wVal','1M':'mtf1MVal'};
-        const badgeMap={'15m':'mtf15Badge','30m':'mtf30mBadge','1h':'mtf1hBadge','4h':'mtf4hBadge','1d':'mtf1dBadge','1w':'mtf1wBadge','1M':'mtf1MBadge'};
+        const barMap={'1h':'mtf1hBar','4h':'mtf4hBar','1d':'mtf1dBar','1w':'mtf1wBar'};
+        const valMap={'1h':'mtf1hVal','4h':'mtf4hVal','1d':'mtf1dVal','1w':'mtf1wVal'};
+        const badgeMap={'1h':'mtf1hBadge','4h':'mtf4hBadge','1d':'mtf1dBadge','1w':'mtf1wBadge'};
         if(barMap[id]){
           const sc=res.score!==null?res.score:50;
           setInd(barMap[id],valMap[id],badgeMap[id],sc,res.color,res.score!==null?sc+'/100':'N/A',res.color==='var(--green)'?'bull':res.color==='var(--red)'?'bear':'neut',res.sig);
@@ -5777,7 +5776,7 @@ self.onmessage=function(e){
     checkAlerts(_snapPrice, sym);
 
     // ── Trim candle arrays for performance (200 is plenty for all indicators) ──
-    const _maxCandles = 500; // 500 daily = ~2 years, more than enough for all indicators
+    const _maxCandles = 200; // 200 candles is plenty — faster indicator computation
     const _trimArr = a => (a && a.length > _maxCandles) ? a.slice(-_maxCandles) : a;
     const _tCloses  = _trimArr(_snapCloses);
     const _tHighs   = _trimArr(_snapHighs);
