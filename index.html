@@ -2907,13 +2907,13 @@ function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?
 function calcBB(a,p=20){if(a.length<p)return null;const s=a.slice(-p),m=s.reduce((x,y)=>x+y,0)/p;const std=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/p);const up=m+2*std,lo=m-2*std,pr=a[a.length-1];return(up-lo)>0?(pr-lo)/(up-lo):0.5;}
 function calcStochastic(highs,lows,closes,kPeriod=14,dPeriod=3){
   if(!highs||!lows||!closes||closes.length<kPeriod+dPeriod) return null;
+  // Use loops instead of Math.max/min spread — avoids stack overflow on large arrays
   const kLine=[];
   for(let i=kPeriod-1;i<closes.length;i++){
-    const h=Math.max(...highs.slice(i-kPeriod+1,i+1));
-    const l=Math.min(...lows.slice(i-kPeriod+1,i+1));
+    let h=highs[i-kPeriod+1],l=lows[i-kPeriod+1];
+    for(let j=i-kPeriod+2;j<=i;j++){if(highs[j]>h)h=highs[j];if(lows[j]<l)l=lows[j];}
     kLine.push(h===l?50:((closes[i]-l)/(h-l))*100);
   }
-  // %D = SMA(3) of %K
   const dLine=[];
   for(let i=dPeriod-1;i<kLine.length;i++){
     dLine.push(kLine.slice(i-dPeriod+1,i+1).reduce((a,b)=>a+b,0)/dPeriod);
@@ -3870,8 +3870,8 @@ self.onmessage=function(e){
     if(!highs||!lows||!closes||closes.length<kPeriod+dPeriod) return null;
     const kLine=[];
     for(let i=kPeriod-1;i<closes.length;i++){
-      const h=Math.max(...highs.slice(i-kPeriod+1,i+1));
-      const l=Math.min(...lows.slice(i-kPeriod+1,i+1));
+      let h=highs[i-kPeriod+1],l=lows[i-kPeriod+1];
+      for(let j=i-kPeriod+2;j<=i;j++){if(highs[j]>h)h=highs[j];if(lows[j]<l)l=lows[j];}
       kLine.push(h===l?50:((closes[i]-l)/(h-l))*100);
     }
     const dLine=[];
@@ -4679,8 +4679,8 @@ self.onmessage=function(e){
 
     return {
       price,
-      high24: Math.max(...highs.slice(-2)),
-      low24:  Math.min(...lows.slice(-2)),
+      high24: Math.max(highs[highs.length-1], highs[highs.length-2]||0),
+      low24:  Math.min(lows[lows.length-1], lows[lows.length-2]||Infinity),
       open24: opens[opens.length-1],
       vol24:  0,
       opens, closes, highs, lows, volumes,
@@ -4816,8 +4816,8 @@ self.onmessage=function(e){
 
     const stockResult = {
       price,
-      high24: Math.max(...highs.slice(-2)),
-      low24:  Math.min(...lows.slice(-2)),
+      high24: Math.max(highs[highs.length-1], highs[highs.length-2]||0),
+      low24:  Math.min(lows[lows.length-1], lows[lows.length-2]||Infinity),
       open24: opens[opens.length-1],
       vol24:  volumes[volumes.length-1]||0,
       opens, closes, highs, lows, volumes,
@@ -5061,8 +5061,8 @@ self.onmessage=function(e){
     }
     const result = {
       price,
-      high24: Math.max(...highs.slice(-2)),
-      low24:  Math.min(...lows.slice(-2)),
+      high24: Math.max(highs[highs.length-1], highs[highs.length-2]||0),
+      low24:  Math.min(lows[lows.length-1], lows[lows.length-2]||Infinity),
       open24: opens[opens.length-1],
       vol24:  volumes[volumes.length-1]||0,
       opens, closes, highs, lows, volumes,
@@ -5181,8 +5181,8 @@ self.onmessage=function(e){
     const sourceName = url==='stooq' ? 'Stooq (ANTM.JK · Daily)' : `Yahoo Finance (ANTM.JK · ${interval})`;
     const result = {
       price,
-      high24: Math.max(...highs.slice(-2)),
-      low24:  Math.min(...lows.slice(-2)),
+      high24: Math.max(highs[highs.length-1], highs[highs.length-2]||0),
+      low24:  Math.min(lows[lows.length-1], lows[lows.length-2]||Infinity),
       open24: opens[opens.length-1],
       vol24:  volumes[volumes.length-1]||0,
       opens, closes, highs, lows, volumes,
@@ -7599,7 +7599,7 @@ self.onmessage=function(e){
     const el = document.getElementById('volProfilePanel');
     if(!el||closes.length<20) return;
     const BINS = 12;
-    const minP = Math.min(...lows), maxP = Math.max(...highs);
+    let minP=lows[0],maxP=highs[0]; for(let i=1;i<lows.length;i++){if(lows[i]<minP)minP=lows[i];if(highs[i]>maxP)maxP=highs[i];}  // safe loop instead of spread
     const step = (maxP-minP)/BINS;
     const bins = Array(BINS).fill(0);
     const labels = [];
@@ -11037,10 +11037,9 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
     try {
       const mods = 'price,summaryDetail,defaultKeyStatistics,financialData';
       const raw = await Promise.any([
-        fetch('https://query1.finance.yahoo.com/v11/finance/quoteSummary/'+sym+'?modules='+mods, {signal:AbortSignal.timeout(5000)}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}),
-        fetch('https://query2.finance.yahoo.com/v11/finance/quoteSummary/'+sym+'?modules='+mods, {signal:AbortSignal.timeout(5000)}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}),
         smartFetch('https://query1.finance.yahoo.com/v11/finance/quoteSummary/'+sym+'?modules='+mods),
-        fetch('https://query1.finance.yahoo.com/v10/finance/quoteSummary/'+sym+'?modules='+mods, {signal:AbortSignal.timeout(5000)}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();}),
+        smartFetch('https://query2.finance.yahoo.com/v11/finance/quoteSummary/'+sym+'?modules='+mods),
+        smartFetch('https://query1.finance.yahoo.com/v10/finance/quoteSummary/'+sym+'?modules='+mods),
       ]).catch(function(){ return null; });
       if(raw && raw.quoteSummary && raw.quoteSummary.result && raw.quoteSummary.result[0]) {
         data = { source:'Yahoo Finance', raw: raw.quoteSummary.result[0] };
@@ -11052,9 +11051,8 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
       try {
         const chartUrl = 'https://query1.finance.yahoo.com/v8/finance/chart/'+sym+'?interval=1d&range=5d';
         const raw = await Promise.any([
-          fetch(chartUrl, {signal:AbortSignal.timeout(4000)}).then(function(r){return r.json();}),
-          fetch('https://query2.finance.yahoo.com/v8/finance/chart/'+sym+'?interval=1d&range=5d', {signal:AbortSignal.timeout(4000)}).then(function(r){return r.json();}),
           smartFetch(chartUrl),
+          smartFetch('https://query2.finance.yahoo.com/v8/finance/chart/'+sym+'?interval=1d&range=5d'),
         ]).catch(function(){ return null; });
         if(raw && raw.chart && raw.chart.result && raw.chart.result[0]) {
           const meta = raw.chart.result[0].meta || {};
