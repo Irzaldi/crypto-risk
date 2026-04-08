@@ -3392,6 +3392,7 @@ self.onmessage=function(e){
     }
   }
   let workingExchangeId = null;
+  let _isFetching = false; // true while fetchData() runs — pauses background tasks
   // Main candle cache — avoids re-fetching same symbol within 30s
   const _mainCandleCache = {};
   function _getCachedCandles(sym, tf) {
@@ -3580,7 +3581,22 @@ self.onmessage=function(e){
   // Pull all data from cloud on load
   async function _pullAllFromCloud() {
     try {
-      const data = await _api('GET', '/sync');
+      // Light sync first (fast) — skips AI chat history/snapshots
+      const data = await _api('GET', '/sync?light=1');
+      // Full sync in background after 2s
+      setTimeout(async function() {
+        try {
+          const fullData = await _api('GET', '/sync');
+          if(fullData.aiChatHistory?.length) {
+            _aiChatHistory = fullData.aiChatHistory.map(m=>({role:m.role,content:m.content}));
+          }
+          if(fullData.alertHistory?.length) {
+            // trigger alert history render if panel exists
+            const ahEl = document.getElementById('alert-history-panel');
+            if(ahEl && typeof loadAlertHistory === 'function') loadAlertHistory();
+          }
+        } catch(e) {}
+      }, 2000);
       // Portfolio
       if(data.portfolio && data.portfolio.length) {
         portfolio = data.portfolio.map(p => ({
@@ -5209,6 +5225,7 @@ self.onmessage=function(e){
       b.classList.toggle('active', t===sym);
     });
     document.getElementById('fetchBtn').disabled=true;
+    _isFetching = true; // pause background fetches to free bandwidth for analysis
     document.getElementById('headerDot').className='loading-dot';
     document.getElementById('sourceLabel').textContent='SEARCHING...';
     resetAll();
@@ -5262,7 +5279,8 @@ self.onmessage=function(e){
           stepProgress('exchange','done');
         } else {
           setStatus(`✗ ${sym}: all sources failed (${e.message}) — showing TradingView chart`,'error');
-          document.getElementById('fetchBtn').disabled=false;
+          _isFetching = false;
+    document.getElementById('fetchBtn').disabled=false;
           _showTradingViewFallback(sym);
           return;
         }
@@ -5297,7 +5315,8 @@ self.onmessage=function(e){
           stepProgress('exchange','done');
         } else {
           setStatus(`✗ ${cp.display}: all sources failed (${e.message}) — showing TradingView chart`,'error');
-          document.getElementById('fetchBtn').disabled=false;
+          _isFetching = false;
+    document.getElementById('fetchBtn').disabled=false;
           _showTradingViewFallback(sym);
           return;
         }
@@ -5318,7 +5337,8 @@ self.onmessage=function(e){
       } catch(e) {
         setStatus('✗ ANTAM unavailable — Yahoo Finance & Stooq both failed. Showing TradingView.','error');
         _showTradingViewFallback('ANTAM');
-        document.getElementById('fetchBtn').disabled=false;
+        _isFetching = false;
+    document.getElementById('fetchBtn').disabled=false;
         return;
       }
     }
@@ -5348,7 +5368,8 @@ self.onmessage=function(e){
           stepProgress('exchange','done');
         } else {
           setStatus(`✗ ${cs.display} unavailable — ${e.message}`,'error');
-          document.getElementById('fetchBtn').disabled=false;
+          _isFetching = false;
+    document.getElementById('fetchBtn').disabled=false;
           _showTradingViewFallback(sym);
           return;
         }
@@ -5405,7 +5426,8 @@ self.onmessage=function(e){
       setStatus('✗ Could not connect. Make sure you have internet access and try again.','error');
       document.getElementById('headerDot').className='live-dot';
       document.getElementById('sourceLabel').textContent='FAILED';
-      document.getElementById('fetchBtn').disabled=false;
+      _isFetching = false;
+    document.getElementById('fetchBtn').disabled=false;
       PROGRESS_STEPS.forEach(s=>{ const el=document.getElementById('ps-'+s.id); if(el&&el.classList.contains('active'))el.className='progress-step fail'; });
       // Show TradingView embed as fallback so user can still see chart
       _showTradingViewFallback(sym);
@@ -5427,7 +5449,8 @@ self.onmessage=function(e){
     // ── Validate data arrays before processing ──
     if(!closes || closes.length < 2 || !isFinite(price) || price <= 0) {
       setStatus('✗ Invalid candle data received — retrying...','error');
-      document.getElementById('fetchBtn').disabled=false;
+      _isFetching = false;
+    document.getElementById('fetchBtn').disabled=false;
       return;
     }
 
@@ -5877,6 +5900,7 @@ self.onmessage=function(e){
     updateSessionPnL();
     calcBTCCorrelation(sym, closes);
     setTimeout(_fetchFearGreedAnalysis, 50); // update F&G with indicator context
+    _isFetching = false;
     document.getElementById('fetchBtn').disabled=false;
   }
 
@@ -6498,7 +6522,8 @@ self.onmessage=function(e){
     // Yield to browser so wave1 UI updates render, then apply wave2 (chart + backtest)
     setTimeout(function() {
       _applyWave2({chart:{e8:e8s,e21:e21s,e55:e55s,e200:e200s},backtest:btData,volumeProfile:vpData,keyLevels:klData,advPatterns:advPatsData,elapsed2:0,totalElapsed:0},price,opens,closes,highs,lows,volumes,sym,tf);
-      document.getElementById('fetchBtn').disabled=false;
+      _isFetching = false;
+    document.getElementById('fetchBtn').disabled=false;
     }, 0);
     saveSnapshot({pair,source,price,tf,rsi:ind.rsi?.toFixed(2),macd:ind.macdV?.toFixed(4),ema55:ind.ema55?.toFixed(4),ema200:ind.ema200?.toFixed(4),adx:ind.adxData?.adx?.toFixed(1),atr:ind.atr?.toFixed(4),volR:ind.volR?.toFixed(1),score:scoreData.overall,strategy:isBUY?'BUY':isSELL?'SELL':'NEUTRAL',prediction:predData.direction,confidence:predData.confidence+'%',entry:fmtP(predData.entry),sl:fmtP(predData.sl),tp1:fmtP(predData.tp1),tp2:fmtP(predData.tp2)});
   }
@@ -7731,6 +7756,7 @@ self.onmessage=function(e){
   const TICK_SYMS = ['BTC','ETH','SOL','BNB','XRP','DOGE'];
 
   async function fetchMarketOverview() {
+    if(_isFetching) return; // pause during analysis
     for(const sym of MKT_SYMS) {
       try {
         const d = await smartFetch(`https://api.bybit.com/v5/market/tickers?category=spot&symbol=${sym}USDT`);
@@ -7747,6 +7773,7 @@ self.onmessage=function(e){
   }
 
   async function updateTicker() {
+    if(_isFetching) return; // pause during analysis
     // Try OKX batch first (no geo-block in Indonesia), fall back to Bybit per-symbol
     try {
       const syms = TICK_SYMS.map(s => s + '-USDT').join(',');
@@ -13305,6 +13332,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
   //  PRICE CHANGE BADGES ON PAIR BUTTONS (live 24h %)
   // ══════════════════════════════════════════════════════════════════
   async function _updatePairButtonBadges() {
+    if(_isFetching) return;
     try {
       const syms = ['BTC','ETH','SOL','XRP','BNB','DOGE','ADA','AVAX','LINK','LTC'];
       const tickers = syms.map(s => s+'USDT').join(',');
