@@ -3422,6 +3422,7 @@ self.onmessage=function(e){
       // setTimeout(0) yields to event loop — browser paints between each step
       setTimeout(function() {
         try {
+          const _tDA = performance.now();
           // Compute all indicators inline (same math as worker, duplicated in main thread)
           const [ema8,ema13,ema20,ema21,ema50,ema55,ema200] = calcEMABatch(closes,[8,13,20,21,50,55,200]);
           const rsi=calcRSI(closes),macdV=calcMACD(closes),bbP=calcBB(closes);
@@ -3513,9 +3514,11 @@ self.onmessage=function(e){
             isBull,signals:[]};
 
           const patterns = opens&&opens.length ? computeCandlePatterns(opens,highs,lows,closes) : null;
+          console.log(`⏱ [dispatch] indicators+score computed in ${(performance.now()-_tDA).toFixed(1)}ms`);
           try { onWave1({ind,score,prediction,patterns,elapsed1:0}); } catch(e) { console.warn('wave1 err:',e); }
 
           // Wave 2 after yielding — browser paints wave1 results first
+          console.log('⏱ [dispatch] wave2 starting');
           setTimeout(function() {
             try {
               const e8s=calcEMASeries(closes,8),e21s=calcEMASeries(closes,21);
@@ -5227,6 +5230,9 @@ self.onmessage=function(e){
     document.getElementById('fetchBtn').disabled=true;
     _isFetching = true; // pause background fetches to free bandwidth for analysis
     document.getElementById('headerDot').className='loading-dot';
+    const _t0 = performance.now();
+    const _tlog = (label) => console.log(`⏱ [${((performance.now()-_t0)/1000).toFixed(2)}s] ${label}`);
+    _tlog('fetchData started');
     document.getElementById('sourceLabel').textContent='SEARCHING...';
     resetAll();
     initProgress();
@@ -5435,6 +5441,7 @@ self.onmessage=function(e){
     }
 
     stepProgress('candles','done');
+    _tlog(`candles loaded — ${data.closes?.length} candles from ${data.source}`);
     setStatus('⟳ Data loaded — starting analysis...','loading');
     activeProgress('indicators');
 
@@ -5464,6 +5471,7 @@ self.onmessage=function(e){
     currentPrice=price;
     // Yield so chart paints immediately
     await new Promise(r => setTimeout(r, 0));
+    _tlog('after chart yield');
 
     const sym2 = sym;
     const mtfTFs = ['1h','4h','1d','1w'];  // Reduced from 7 to 4 — faster
@@ -5596,6 +5604,7 @@ self.onmessage=function(e){
 
     // Yield so MTF async IIFE can start and progress bar stays responsive
     await new Promise(r => setTimeout(r, 0));
+    _tlog('after price yield — starting sync work block');
     const pct=((price-open24)/open24*100);
     document.getElementById('pcPrice').textContent=fmtP(price);
     window._lastAnalysisPrice = price;
@@ -5868,6 +5877,7 @@ self.onmessage=function(e){
     const _sOpens   = _sanitize(_tOpens);
 
     // Final yield before analysis — all UI updates painted, now compute
+    _tlog('before dispatchAnalysis');
     await new Promise(r => setTimeout(r, 0));
 
     // ── dispatch ALL heavy work to analysis worker ──────────────────────────
@@ -5910,6 +5920,8 @@ self.onmessage=function(e){
     if(w1?.ind) window._lastIndicators = w1.ind;
     stepProgress('indicators','done');
     activeProgress('score');
+    console.log('⏱ [wave1] _applyWave1 started — rendering indicators');
+    const _tW1 = performance.now();
     const { ind, score, prediction, patterns, elapsed1 } = w1;
     const { rsi, macdV, ema8, ema13, ema21, ema20, ema50, ema55, ema200, bbP, stoch, willR, atr, adxData, obvData, ichi, st, piv, div, vwap, mvwap, cci, mfi, roc, ult, volR, psar, cmf, kelt } = ind;
 
@@ -6064,6 +6076,7 @@ self.onmessage=function(e){
     document.getElementById('pred-direction-detail').textContent=prediction.dirDetail;
     document.getElementById('pred-direction-detail').style.color=prediction.dirColor;
     stepProgress('predict','done');
+    console.log(`⏱ [wave1] _applyWave1 done in ${(performance.now()-_tW1).toFixed(1)}ms`);
     setStatus('✓ ' + sym + ' — analysis complete', 'loading');
     const pc=document.getElementById('pred-confidence');pc.textContent=prediction.confidence+'%';pc.style.color=prediction.confColor;
     document.getElementById('pred-confidence-detail').textContent=prediction.confLabel;
