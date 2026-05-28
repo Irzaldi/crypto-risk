@@ -115,6 +115,8 @@ function installPWA() {
   .progress-step.fail { border-color:var(--red); color:var(--red); background:rgba(255,45,85,.06); animation:none; }
   @keyframes stepDone { 0%{transform:scale(1.12)} 60%{transform:scale(.96)} 100%{transform:scale(1)} }
   @keyframes verdictReveal { 0%{transform:scale(.96);opacity:.6} 60%{transform:scale(1.02)} 100%{transform:scale(1);opacity:1} }
+  @keyframes msgSlide { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes typDot { 0%,80%,100%{transform:scale(.6);opacity:.4} 40%{transform:scale(1);opacity:1} }
 
   .refresh-row { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
   .auto-label { display:flex; align-items:center; gap:6px; font-family:'Share Tech Mono',monospace; font-size:.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; cursor:pointer; user-select:none; }
@@ -377,6 +379,8 @@ function installPWA() {
   }
   @media(max-width:720px){
     .main-grid,.bottom-grid,.price-row,.conn-grid,.vwap-grid,.mtf-grid,.pattern-grid { grid-template-columns:1fr 1fr; }
+    #page-ai .wrap > div:last-child { grid-template-columns:1fr !important; }
+    #page-ai .wrap > div:last-child > div:first-child { display:none; }
     .mkt-grid { grid-template-columns:repeat(3,1fr); }
     .wl-grid { grid-template-columns:1fr 1fr; }
     .settings-grid { grid-template-columns:1fr; }
@@ -2711,63 +2715,101 @@ function installPWA() {
   <!-- ══ PAGE: AI Assistant ══ -->
   <div class="page-content" id="page-ai">
   <div class="wrap" style="padding-top:0">
-    <div class="panel" style="border-color:rgba(192,132,252,.3);margin-bottom:14px">
-      <div class="ptitle" style="color:#c084fc">🤖 AI Trading Assistant
-        <span style="font-size:.5rem;color:var(--muted);font-weight:400;margin-left:6px">Powered by Claude · Uses your live indicator data as context</span>
-        <button onclick="clearAiChat()" class="theme-btn" style="margin-left:auto;font-size:.52rem;padding:3px 10px;border-color:rgba(192,132,252,.4);color:#c084fc">🗑 Clear</button>
-      </div>
-      <!-- AI Provider selector -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px">
-        <div style="flex:1;min-width:140px">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">AI PROVIDER</div>
-          <select id="ai-provider" onchange="onAiProviderChange()" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
-            <option value="worker">🔧 Worker · Claude (no key needed)</option>
-            <option value="openrouter">🆓 OpenRouter (free models)</option>
-            <option value="groq">⚡ Groq (fast + free)</option>
-            <option value="gemini">♊ Gemini (Google)</option>
-            <option value="claude">🤖 Claude direct (Anthropic)</option>
-            <option value="openai">💚 OpenAI (GPT)</option>
-          </select>
-        </div>
-        <div style="flex:1;min-width:140px" id="ai-model-wrap">
-          <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-bottom:4px">MODEL</div>
-          <select id="ai-model" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:6px 8px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
-            <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
-          </select>
-        </div>
-        <!-- API key input removed — keys set in Cloudflare Worker secrets -->
-      </div>
-      <!-- AI Market Summary auto-generate -->
-      <div id="ai-market-summary" style="display:none;padding:10px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.15);border-radius:8px;margin-bottom:10px;font-family:'Rajdhani',sans-serif;font-size:.82rem;line-height:1.6;color:var(--text)"></div>
 
-      <!-- Quick prompts -->
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        <button class="pair-btn" onclick="aiQuickPrompt('analyze')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📊 Analyze Current</button>
-        <button class="pair-btn" onclick="aiQuickPrompt('risk')"    style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">⚖️ Risk Check</button>
-        <button class="pair-btn" onclick="aiQuickPrompt('strategy')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">🎓 Strategy Tips</button>
-        <button class="pair-btn" onclick="aiQuickPrompt('sentiment')" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">😱 Market Mood</button>
-        <button class="pair-btn" onclick="aiAnalyzeJournal()" style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📓 Analyze Journal</button>
-        <button class="pair-btn" onclick="aiQuickPrompt('entry')"    style="font-size:.55rem;min-height:34px;border-color:rgba(192,132,252,.3);color:#c084fc">📍 Entry/Exit Plan</button>
+    <!-- FinRobot Header Bar -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1">
+        <div style="font-family:'Orbitron',monospace;font-size:.9rem;font-weight:900;color:#c084fc;letter-spacing:2px">🤖 FinRobot AI</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.54rem;color:var(--muted)">Quantitative Analysis · Powered by Claude · Live indicator context injected</div>
       </div>
-      <!-- Chat messages -->
-      <div id="aiChatMessages" style="min-height:280px;max-height:480px;overflow-y:auto;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px;font-family:'Rajdhani',sans-serif;font-size:.85rem;line-height:1.6;scroll-behavior:smooth">
-        <div style="color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:.6rem;text-align:center;padding:20px 0">
-          👋 Hello! I'm your AI trading assistant.<br>Ask me anything about your current setup, or click a quick prompt above.<br><br>
-          <span style="color:var(--accent)">Tip: Fetch a symbol first so I have live indicator context.</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div id="ai-status-badge" style="font-family:'Share Tech Mono',monospace;font-size:.54rem;padding:4px 10px;border-radius:20px;border:1px solid rgba(192,132,252,.3);color:#c084fc;background:rgba(192,132,252,.06)">⚙️ Ready</div>
+        <button onclick="clearAiChat()" style="padding:5px 12px;background:rgba(255,45,85,.08);border:1px solid rgba(255,45,85,.3);color:var(--red);border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer;transition:all .2s" onmouseover="this.style.background='rgba(255,45,85,.15)'" onmouseout="this.style.background='rgba(255,45,85,.08)'">🗑 Clear</button>
+      </div>
+    </div>
+
+    <!-- Provider + Model row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:14px;padding:12px;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.15);border-radius:10px">
+      <div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px;letter-spacing:1px">AI ENGINE</div>
+        <select id="ai-provider" onchange="onAiProviderChange()" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.25);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='rgba(192,132,252,.6)'" onblur="this.style.borderColor='rgba(192,132,252,.25)'">
+          <option value="worker">🔧 Cloudflare Worker (Claude)</option>
+          <option value="openrouter">🆓 OpenRouter (free)</option>
+          <option value="groq">⚡ Groq (fast)</option>
+          <option value="gemini">♊ Gemini</option>
+          <option value="claude">🤖 Claude Direct</option>
+          <option value="openai">💚 OpenAI GPT</option>
+        </select>
+      </div>
+      <div id="ai-model-wrap">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-bottom:4px;letter-spacing:1px">MODEL</div>
+        <select id="ai-model" style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(192,132,252,.25);color:var(--text);padding:7px 10px;border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.6rem;outline:none">
+          <option value="claude-sonnet-4-20250514">claude-sonnet-4-20250514</option>
+        </select>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);line-height:1.6" id="ai-provider-hint">API keys via Worker secrets</div>
+      </div>
+    </div>
+
+    <!-- Two-column layout: quick actions left, chat right -->
+    <div style="display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:start">
+
+      <!-- LEFT: Quick Actions Panel (OpenBB-style sidebar) -->
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);letter-spacing:2px;padding:0 2px;margin-bottom:2px">QUICK ACTIONS</div>
+        <button onclick="aiGenerateReport()" style="width:100%;padding:10px 12px;background:linear-gradient(135deg,rgba(192,132,252,.2),rgba(192,132,252,.08));border:1px solid rgba(192,132,252,.4);color:#c084fc;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.58rem;cursor:pointer;text-align:left;transition:all .2s;letter-spacing:1px" onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.3),rgba(192,132,252,.15))'" onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.2),rgba(192,132,252,.08))'">📋 Full Research Report</button>
+        <button onclick="aiQuickPrompt('analyze')" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">📊 Analyze Setup</button>
+        <button onclick="aiQuickPrompt('entry')" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">📍 Entry / Exit Plan</button>
+        <button onclick="aiQuickPrompt('risk')" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">⚖️ Risk Check</button>
+        <button onclick="aiQuickPrompt('strategy')" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">🎓 Strategy Tips</button>
+        <button onclick="aiQuickPrompt('sentiment')" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">😱 Market Mood</button>
+        <button onclick="aiAnalyzeJournal()" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">📓 Analyze Journal</button>
+        <button onclick="aiQuickPrompt('compare')" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">🔄 Compare Timeframes</button>
+        <button onclick="aiQuickPrompt('macro')" style="width:100%;padding:9px 12px;background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.2);color:var(--accent);border-radius:7px;font-family:'Share Tech Mono',monospace;font-size:.56rem;cursor:pointer;text-align:left;transition:all .2s" onmouseover="this.style.background='rgba(0,229,255,.1)'" onmouseout="this.style.background='rgba(0,229,255,.05)'">🌐 Macro Context</button>
+
+        <!-- Context indicator box -->
+        <div style="margin-top:8px;padding:10px;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:8px">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:.48rem;color:var(--muted);letter-spacing:1px;margin-bottom:6px">CONTEXT LOADED</div>
+          <div id="ai-context-status" style="font-family:'Share Tech Mono',monospace;font-size:.54rem;line-height:1.8;color:var(--muted)">
+            <div id="ai-ctx-sym">Symbol: —</div>
+            <div id="ai-ctx-score">Score: —/100</div>
+            <div id="ai-ctx-sig">Signal: —</div>
+            <div id="ai-ctx-indicators" style="color:rgba(0,229,255,.5);font-size:.48rem;margin-top:4px">Fetch a symbol to load context</div>
+          </div>
         </div>
       </div>
-      <!-- Input -->
-      <div style="display:flex;gap:8px;align-items:flex-end">
-        <textarea id="aiChatInput" placeholder="Ask anything... e.g. 'Is this a good BTC entry?' or 'Explain the RSI divergence'"
-          style="flex:1;background:rgba(192,132,252,.06);border:1px solid rgba(192,132,252,.3);color:var(--text);padding:10px 12px;border-radius:8px;font-family:'Rajdhani',sans-serif;font-size:.85rem;resize:none;outline:none;line-height:1.5;min-height:52px;max-height:120px;"
-          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"
-          oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-        <button onclick="sendAiMessage()" id="aiSendBtn"
-          style="padding:12px 20px;background:rgba(192,132,252,.2);border:1px solid rgba(192,132,252,.5);color:#c084fc;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.6rem;cursor:pointer;white-space:nowrap;letter-spacing:1px;align-self:flex-end">⚡ SEND</button>
-      </div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:.52rem;color:var(--muted);margin-top:6px;line-height:1.8">
-        Shift+Enter for newline · Live indicator context auto-injected · <span id='ai-provider-hint' style='color:var(--warn)'>Select a provider above</span>
-        &nbsp;·&nbsp; <span id="ai-status-badge" style="color:var(--warn)">⚙️ Checking connection...</span>
+
+      <!-- RIGHT: Chat panel -->
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <!-- Chat messages -->
+        <div id="aiChatMessages" style="min-height:460px;max-height:600px;overflow-y:auto;background:rgba(0,0,0,.35);border:1px solid rgba(192,132,252,.15);border-radius:10px;padding:16px;font-family:'Rajdhani',sans-serif;font-size:.88rem;line-height:1.65;scroll-behavior:smooth">
+          <div id="ai-welcome-msg" style="text-align:center;padding:30px 20px">
+            <div style="font-family:'Orbitron',monospace;font-size:1.2rem;font-weight:900;color:rgba(192,132,252,.6);margin-bottom:12px">FinRobot</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:.6rem;color:var(--muted);line-height:2">
+              Institutional-grade AI trading analyst<br>
+              <span style="color:rgba(0,229,255,.6)">→ Fetch a symbol first, then use Quick Actions</span><br>
+              <span style="color:rgba(192,132,252,.5)">→ All 25+ live indicators auto-injected as context</span><br>
+              <span style="color:rgba(0,255,136,.5)">→ "Full Research Report" generates an institutional report</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Input area -->
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <textarea id="aiChatInput" placeholder="Ask FinRobot anything... 'Analyse the MACD divergence' · 'What are my key risks?' · 'Give me an entry plan'"
+            style="flex:1;background:rgba(192,132,252,.04);border:1px solid rgba(192,132,252,.2);color:var(--text);padding:11px 14px;border-radius:9px;font-family:'Rajdhani',sans-serif;font-size:.88rem;resize:none;outline:none;line-height:1.5;min-height:52px;max-height:140px;transition:border-color .2s"
+            onfocus="this.style.borderColor='rgba(192,132,252,.5)'" onblur="this.style.borderColor='rgba(192,132,252,.2)'"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,140)+'px'"></textarea>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button onclick="sendAiMessage()" id="aiSendBtn"
+              style="padding:12px 20px;background:linear-gradient(135deg,rgba(192,132,252,.25),rgba(192,132,252,.1));border:1px solid rgba(192,132,252,.5);color:#c084fc;border-radius:8px;font-family:'Share Tech Mono',monospace;font-size:.6rem;cursor:pointer;white-space:nowrap;letter-spacing:1px;transition:all .2s"
+              onmouseover="this.style.background='linear-gradient(135deg,rgba(192,132,252,.4),rgba(192,132,252,.2))'"
+              onmouseout="this.style.background='linear-gradient(135deg,rgba(192,132,252,.25),rgba(192,132,252,.1))'">⚡ SEND</button>
+          </div>
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted)">Shift+Enter = newline · Full indicator context auto-injected · Context loads when you fetch a symbol</div>
       </div>
     </div>
   </div>
@@ -2934,7 +2976,7 @@ function installPWA() {
    ============================================================ */
 
 // ─── MATH HELPERS ───────────────────────────────────────────
-function calcEMA(a,p){if(!a||a.length<p)return null;const k=2/(p+1);let e=a[0];for(let i=1;i<a.length;i++)e=a[i]*k+e*(1-k);return e;}
+function calcEMA(a,p){if(!a||a.length<p)return null;const k=2/(p+1);let e=a.slice(0,p).reduce((s,v)=>s+v,0)/p;for(let i=p;i<a.length;i++)e=a[i]*k+e*(1-k);return e;}
 // Batch EMA: compute multiple periods in one pass — much faster than calling calcEMA 7 times
 function calcEMABatch(a,periods){
   if(!a||!a.length)return periods.map(()=>null);
@@ -2950,7 +2992,17 @@ function calcEMABatch(a,periods){
   return result;
 }
 function calcRSI(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}let ag=g/p,al=l/p;for(let i=p+1;i<a.length;i++){const d=a[i]-a[i-1];ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;}return al===0?100:100-100/(1+ag/al);}
-function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?e12-e26:null;}
+function calcMACD(a){
+  if(!a||a.length<35)return null;
+  // Build MACD line series then compute signal (9-EMA of MACD) and histogram
+  const ema12s=calcEMASeries(a,12),ema26s=calcEMASeries(a,26);
+  const macdSeries=ema12s.map((v,i)=>(v!==null&&ema26s[i]!==null)?v-ema26s[i]:null).filter(v=>v!==null);
+  if(macdSeries.length<9)return null;
+  const macdLine=macdSeries[macdSeries.length-1];
+  const signalLine=calcEMA(macdSeries,9);
+  const histogram=signalLine!==null?macdLine-signalLine:null;
+  return{line:macdLine,signal:signalLine,hist:histogram};
+}
 function calcBB(a,p=20){if(a.length<p)return null;const s=a.slice(-p),m=s.reduce((x,y)=>x+y,0)/p;const std=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/p);const up=m+2*std,lo=m-2*std,pr=a[a.length-1];return(up-lo)>0?(pr-lo)/(up-lo):0.5;}
 function calcStochastic(highs,lows,closes,kPeriod=14,dPeriod=3){
   if(!highs||!lows||!closes||closes.length<kPeriod+dPeriod) return null;
@@ -2982,25 +3034,54 @@ function calcWilliamsR(h,l,c,p=14){if(c.length<p)return null;let hh=h[c.length-p
 function calcATR(h,l,c,p=14){if(c.length<p+1)return null;const trs=[];for(let i=1;i<c.length;i++){trs.push(Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1])));}let atr=trs.slice(0,p).reduce((a,b)=>a+b,0)/p;for(let i=p;i<trs.length;i++)atr=(atr*(p-1)+trs[i])/p;return atr;}
 function calcADX(h,l,c,p=14){if(c.length<p*2)return null;const dmP=[],dmM=[],trs=[];for(let i=1;i<c.length;i++){const up=h[i]-h[i-1],dn=l[i-1]-l[i];dmP.push(up>dn&&up>0?up:0);dmM.push(dn>up&&dn>0?dn:0);trs.push(Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1])));}let atr=trs.slice(0,p).reduce((a,b)=>a+b,0)/p,sdmP=dmP.slice(0,p).reduce((a,b)=>a+b,0)/p,sdmM=dmM.slice(0,p).reduce((a,b)=>a+b,0)/p;for(let i=p;i<trs.length;i++){atr=(atr*(p-1)+trs[i])/p;sdmP=(sdmP*(p-1)+dmP[i])/p;sdmM=(sdmM*(p-1)+dmM[i])/p;}if(atr===0)return null;const diP=(sdmP/atr)*100,diM=(sdmM/atr)*100;return{adx:Math.abs(diP-diM)/(diP+diM)*100,diPlus:diP,diMinus:diM};}
 function calcOBV(c,v){if(c.length<2)return null;let obv=0;const arr=[0];for(let i=1;i<c.length;i++){if(c[i]>c[i-1])obv+=v[i];else if(c[i]<c[i-1])obv-=v[i];arr.push(obv);}const r=arr.slice(-20);const ef=calcEMA(r,5),es=calcEMA(r,10);return{value:obv,rising:ef!==null&&es!==null?ef>es:obv>arr[arr.length-10]};}
-function calcSuperTrend(h,l,c,period=10,mult=3){if(c.length<period+1)return null;const atr=calcATR(h,l,c,period);if(!atr)return null;const hl2=(h[h.length-1]+l[l.length-1])/2,lb=hl2-mult*atr,price=c[c.length-1];const trend=price>lb?'up':'down';return{trend,value:trend==='up'?lb:hl2+mult*atr,atr};}
-function calcPivots(h,l,c){if(c.length<2)return null;const ph=h[h.length-2],pl=l[l.length-2],pc=c[c.length-2],pp=(ph+pl+pc)/3;return{pp,r1:2*pp-pl,r2:pp+(ph-pl),s1:2*pp-ph,s2:pp-(ph-pl)};}
+function calcSuperTrend(h,l,c,period=10,mult=3){
+  if(c.length<period+2)return null;
+  // Build proper SuperTrend series tracking band state flips
+  const n=c.length;
+  let upperBand=[], lowerBand=[], superTrend=new Array(n).fill(null), trend=new Array(n).fill(1);
+  for(let i=period;i<n;i++){
+    const slice_h=h.slice(i-period,i+1),slice_l=l.slice(i-period,i+1),slice_c=c.slice(i-period,i+1);
+    const atrV=calcATR(slice_h,slice_l,slice_c,period);
+    if(!atrV)continue;
+    const hl2=(h[i]+l[i])/2;
+    const ub=hl2+mult*atrV, lb=hl2-mult*atrV;
+    // Band calculations with previous band continuity
+    const prevUB=upperBand[i-1]||ub, prevLB=lowerBand[i-1]||lb;
+    lowerBand[i]=lb>prevLB||c[i-1]<prevLB?lb:prevLB;
+    upperBand[i]=ub<prevUB||c[i-1]>prevUB?ub:prevUB;
+    // Determine trend
+    const prevTrend=trend[i-1]||1;
+    if(prevTrend===1&&c[i]<lowerBand[i])trend[i]=-1;
+    else if(prevTrend===-1&&c[i]>upperBand[i])trend[i]=1;
+    else trend[i]=prevTrend;
+    superTrend[i]=trend[i]===1?lowerBand[i]:upperBand[i];
+  }
+  const lastI=n-1;
+  if(superTrend[lastI]===null)return null;
+  const lastATR=calcATR(h,l,c,period);
+  return{trend:trend[lastI]===1?'up':'down',value:superTrend[lastI],atr:lastATR,flipped:trend[lastI]!==trend[lastI-1]};
+}
+function calcPivots(h,l,c){if(c.length<2)return null;const ph=h[h.length-2],pl=l[l.length-2],pc=c[c.length-2],pp=(ph+pl+pc)/3;const hl=ph-pl;return{pp,r1:2*pp-pl,r2:pp+hl,r3:ph+2*(pp-pl),s1:2*pp-ph,s2:pp-hl,s3:pl-2*(ph-pp)};}
 // Divergence: compare RSI/MACD at two points only — no repeated full recalculations
 function calcDivergence(c,period=14){
-  const n=c.length; if(n<period+10)return{rsi:'none',macd:'none'};
-  // Compare current vs 5 candles ago — single calc each
+  const n=c.length; if(n<period+20)return{rsi:'none',macd:'none'};
+  // Use 15-candle lookback for more meaningful divergence signals
+  const lookback=15;
   const rsiNow=calcRSI(c,period);
-  const rsiPrev=calcRSI(c.slice(0,-5),period);
+  const rsiPrev=calcRSI(c.slice(0,-lookback),period);
   const macdNow=calcMACD(c);
-  const macdPrev=calcMACD(c.slice(0,-5));
-  const pNow=c[n-1],pPrev=c[n-6];
+  const macdPrev=calcMACD(c.slice(0,-lookback));
+  const macdNowLine=macdNow?.line??null, macdPrevLine=macdPrev?.line??null;
+  const pNow=c[n-1],pPrev=c[n-1-lookback];
   let rsiDiv='none',macdDiv='none';
+  // Require >1% price move and meaningful RSI divergence to reduce false signals
   if(rsiNow!==null&&rsiPrev!==null){
-    if(pNow>pPrev*1.002&&rsiNow<rsiPrev-2)rsiDiv='bearish';
-    else if(pNow<pPrev*0.998&&rsiNow>rsiPrev+2)rsiDiv='bullish';
+    if(pNow>pPrev*1.01&&rsiNow<rsiPrev-3)rsiDiv='bearish';    // price UP, RSI DOWN
+    else if(pNow<pPrev*0.99&&rsiNow>rsiPrev+3)rsiDiv='bullish'; // price DOWN, RSI UP
   }
-  if(macdNow!==null&&macdPrev!==null){
-    if(pNow>pPrev*1.002&&macdNow<macdPrev-0.001)macdDiv='bearish';
-    else if(pNow<pPrev*0.998&&macdNow>macdPrev+0.001)macdDiv='bullish';
+  if(macdNowLine!==null&&macdPrevLine!==null){
+    if(pNow>pPrev*1.01&&macdNowLine<macdPrevLine-0.001)macdDiv='bearish';
+    else if(pNow<pPrev*0.99&&macdNowLine>macdPrevLine+0.001)macdDiv='bullish';
   }
   return{rsi:rsiDiv,macd:macdDiv};
 }
@@ -3064,7 +3145,7 @@ function computeScore(ind,price,isBUY,isSELL,belowCount,aboveCount,mtfScore,rm){
   const{rsi,macdV,stoch,willR,bbP,div,ema8,ema13,ema21,ema55,ema200,adxData,ichi,st,piv,obvData,volR,cci,mfi,roc,ult,psar,cmf,kelt}=ind;
   let momS=0,momMax=0;
   if(rsi!==null){momMax+=20;if(rsi>=45&&rsi<=65)momS+=20;else if(rsi>=35&&rsi<45)momS+=12;else if(rsi<30)momS+=16;else if(rsi>70)momS+=4;else momS+=8;}
-  if(macdV!==null){momMax+=20;momS+=macdV>0?20:4;}
+  if(macdV?.line!==null&&macdV?.line!==undefined){momMax+=20;if(macdV.line>0&&macdV.hist>0)momS+=20;else if(macdV.line>0)momS+=12;else if(macdV.hist>0)momS+=8;else momS+=2;}
   if(stoch!==null){momMax+=15;if(stoch>=30&&stoch<=70)momS+=15;else if(stoch<20)momS+=12;else if(stoch>80)momS+=3;else momS+=8;}
   if(willR!==null){momMax+=12;if(willR>=-50&&willR<=-20)momS+=12;else if(willR<-80)momS+=10;else if(willR>-20)momS+=2;else momS+=6;}
   if(bbP!==null){momMax+=12;if(bbP>=0.35&&bbP<=0.65)momS+=12;else if(bbP<0.2)momS+=10;else if(bbP>0.8)momS+=2;else momS+=6;}
@@ -3081,13 +3162,13 @@ function computeScore(ind,price,isBUY,isSELL,belowCount,aboveCount,mtfScore,rm){
   if(ema8){tMax+=8;tS+=price>ema8?8:0;}if(ema13){tMax+=8;tS+=price>ema13?8:0;}if(ema21){tMax+=8;tS+=price>ema21?8:0;}if(ema55){tMax+=12;tS+=price>ema55?12:0;}if(ema200){tMax+=14;tS+=price>ema200?14:0;}
   if(adxData){tMax+=15;const{adx,diPlus,diMinus}=adxData;if(adx>40)tS+=diPlus>diMinus?15:3;else if(adx>25)tS+=diPlus>diMinus?10:3;else tS+=6;}
   if(ichi){tMax+=12;const ct=Math.max(ichi.senkouA,ichi.senkouB);const is=[ichi.price>ct,ichi.tenkan>ichi.kijun,ichi.senkouA>ichi.senkouB].filter(Boolean).length;tS+=is===3?12:is===2?8:is===1?4:0;}
-  if(st){tMax+=15;tS+=st.trend==='up'?15:0;}if(piv){tMax+=8;tS+=price>piv.pp?6:0;tS+=price>piv.s1&&price<piv.r1?2:0;}
+  if(st){tMax+=15;const stBase=st.trend==='up'?15:0;tS+=st.flipped?Math.min(tMax,stBase+3):stBase;}if(piv){tMax+=8;tS+=price>piv.pp?6:0;tS+=price>piv.s1&&price<piv.r1?2:0;}
   tS=tMax>0?Math.round((tS/tMax)*100):0;
   let vS=0,vMax=0;if(obvData){vMax+=60;vS+=obvData.rising?60:0;}vMax+=40;vS+=volR>120?40:volR>100?30:volR>80?20:5;vS=vMax>0?Math.round((vS/vMax)*100):0;
   let stS=0;if(isBUY)stS=100;else if(belowCount===2)stS=70;else if(belowCount===1)stS=45;else if(aboveCount===1)stS=35;else if(aboveCount===2)stS=20;else if(isSELL)stS=5;
   let rS=0;if(rm){rS+=rm.rr>=3?60:rm.rr>=2?45:rm.rr>=1.5?25:5;rS+=rm.riskPct<=1?40:rm.riskPct<=2?30:rm.riskPct<=3?15:0;}rS=Math.min(100,rS);
   const overall=Math.round(momS*0.20+tS*0.25+vS*0.15+stS*0.20+(mtfScore||50)*0.10+rS*0.10);
-  const bc=[rsi!==null&&rsi>50,macdV!==null&&macdV>0,price>(ema8||0),price>(ema55||0),price>(ema200||0),obvData!==null&&obvData.rising,adxData!==null&&adxData.diPlus>adxData.diMinus,st!==null&&st.trend==='up',isBUY,div&&div.rsi==='bullish'].filter(Boolean).length;
+  const bc=[rsi!==null&&rsi>50,macdV?.line!==null&&macdV.line>0,price>(ema8||0),price>(ema55||0),price>(ema200||0),obvData!==null&&obvData.rising,adxData!==null&&adxData.diPlus>adxData.diMinus,st!==null&&st.trend==='up',isBUY,div&&div.rsi==='bullish'].filter(Boolean).length;
   const biasT=bc>=7?'🟢 STRONG BULL':bc>=5?'🟢 BULLISH':bc===4?'🟡 MIXED':bc<=2?'🔴 BEARISH':'🟡 NEUTRAL';
   const biasC=bc>=5?'var(--green)':bc===4?'var(--warn)':'var(--red)';
   return{overall,momS,tS,vS,stS,rS,biasT,biasC};
@@ -3136,7 +3217,7 @@ function computePrediction(price,closes,highs,lows,ind,isBUY,isSELL){
     tp1Detail=`${pivOk?'Pivot S1':'1× ATR target'} · ${(((price-tp1)/price)*100).toFixed(2)}% gain`;
     tp2Detail=`${pivOk?'Pivot S2':'2× ATR target'} · ${(((price-tp2)/price)*100).toFixed(2)}% gain`;
   }
-  const signals=[{label:'EMA55 Strategy',bull:isBUY,bear:isSELL,w:25},{label:'RSI',bull:rsi!==null&&rsi>50&&rsi<70,bear:rsi!==null&&(rsi<50||rsi>75),w:10},{label:'MACD',bull:macdV!==null&&macdV>0,bear:macdV!==null&&macdV<0,w:10},{label:'EMA200 Trend',bull:ema200!==null&&price>ema200,bear:ema200!==null&&price<ema200,w:10},{label:'SuperTrend',bull:st!==null&&st.trend==='up',bear:st!==null&&st.trend==='down',w:8},{label:'ADX',bull:adxData!==null&&adxData.diPlus>adxData.diMinus,bear:adxData!==null&&adxData.diMinus>adxData.diPlus,w:8},{label:'Ichimoku',bull:ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB),bear:ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB),w:8},{label:'Parabolic SAR',bull:psar!==null&&psar.bull,bear:psar!==null&&!psar.bull,w:7},{label:'OBV',bull:obvData!==null&&obvData.rising,bear:obvData!==null&&!obvData.rising,w:6},{label:'CMF',bull:cmf!==null&&cmf>0.05,bear:cmf!==null&&cmf<-0.05,w:6},{label:'Divergence',bull:div&&(div.rsi==='bullish'||div.macd==='bullish'),bear:div&&(div.rsi==='bearish'||div.macd==='bearish'),w:6},{label:'Keltner',bull:kelt!==null&&kelt.pct<40,bear:kelt!==null&&kelt.pct>60,w:5},{label:'Bollinger',bull:bbP!==null&&bbP<0.3,bear:bbP!==null&&bbP>0.7,w:4},{label:'Pivot Points',bull:piv!==null&&price>piv.pp,bear:piv!==null&&price<piv.pp,w:4}];
+  const signals=[{label:'EMA55 Strategy',bull:isBUY,bear:isSELL,w:25},{label:'RSI',bull:rsi!==null&&rsi>50&&rsi<70,bear:rsi!==null&&(rsi<50||rsi>75),w:10},{label:'MACD',bull:macdV?.line!==null&&macdV.line>0,bear:macdV?.line!==null&&macdV.line<0,w:10},{label:'EMA200 Trend',bull:ema200!==null&&price>ema200,bear:ema200!==null&&price<ema200,w:10},{label:'SuperTrend',bull:st!==null&&st.trend==='up',bear:st!==null&&st.trend==='down',w:8},{label:'ADX',bull:adxData!==null&&adxData.diPlus>adxData.diMinus,bear:adxData!==null&&adxData.diMinus>adxData.diPlus,w:8},{label:'Ichimoku',bull:ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB),bear:ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB),w:8},{label:'Parabolic SAR',bull:psar!==null&&psar.bull,bear:psar!==null&&!psar.bull,w:7},{label:'OBV',bull:obvData!==null&&obvData.rising,bear:obvData!==null&&!obvData.rising,w:6},{label:'CMF',bull:cmf!==null&&cmf>0.05,bear:cmf!==null&&cmf<-0.05,w:6},{label:'Divergence',bull:div&&(div.rsi==='bullish'||div.macd==='bullish'),bear:div&&(div.rsi==='bearish'||div.macd==='bearish'),w:6},{label:'Keltner',bull:kelt!==null&&kelt.pct<40,bear:kelt!==null&&kelt.pct>60,w:5},{label:'Bollinger',bull:bbP!==null&&bbP<0.3,bear:bbP!==null&&bbP>0.7,w:4},{label:'Pivot Points',bull:piv!==null&&price>piv.pp,bear:piv!==null&&price<piv.pp,w:4}];
   return{direction,dirColor,dirDetail,confidence:conf,confLabel:conf>=75?'HIGH 🔥':conf>=60?'MODERATE':'LOW ⚠️',confColor:conf>=75?'var(--green)':conf>=60?'var(--warn)':'var(--red)',rangeHigh,rangeLow,entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail,isBull,signals};
 }
 
@@ -3910,8 +3991,8 @@ self.onmessage=function(e){
   function calcEMA(a, p) {
     if(!a || a.length < p) return null;
     const k = 2 / (p + 1);
-    let e = a[0];
-    for(let i = 1; i < a.length; i++) e = a[i] * k + e * (1 - k);
+    let e = a.slice(0, p).reduce(function(s,v){return s+v;}, 0) / p;
+    for(let i = p; i < a.length; i++) e = a[i] * k + e * (1 - k);
     return e;
   }
 
@@ -3931,13 +4012,23 @@ self.onmessage=function(e){
     if(!a || !a.length) return periods.map(() => null);
     return periods.map(function(p) {
       if(a.length < p) return null;
-      const k = 2/(p+1); let e = a[0];
-      for(let i=1;i<a.length;i++) e=a[i]*k+e*(1-k);
+      const k = 2/(p+1); let e = a.slice(0,p).reduce((s,v)=>s+v,0)/p;
+      for(let i=p;i<a.length;i++) e=a[i]*k+e*(1-k);
       return e;
     });
   }
   function calcRSI(a,p=14){if(a.length<p+1)return null;let g=0,l=0;for(let i=1;i<=p;i++){const d=a[i]-a[i-1];if(d>0)g+=d;else l-=d;}let ag=g/p,al=l/p;for(let i=p+1;i<a.length;i++){const d=a[i]-a[i-1];ag=(ag*(p-1)+Math.max(d,0))/p;al=(al*(p-1)+Math.max(-d,0))/p;}return al===0?100:100-100/(1+ag/al);}
-  function calcMACD(a){const e12=calcEMA(a,12),e26=calcEMA(a,26);return(e12&&e26)?e12-e26:null;}
+  function calcMACD(a){
+  if(!a||a.length<35)return null;
+  // Build MACD line series then compute signal (9-EMA of MACD) and histogram
+  const ema12s=calcEMASeries(a,12),ema26s=calcEMASeries(a,26);
+  const macdSeries=ema12s.map((v,i)=>(v!==null&&ema26s[i]!==null)?v-ema26s[i]:null).filter(v=>v!==null);
+  if(macdSeries.length<9)return null;
+  const macdLine=macdSeries[macdSeries.length-1];
+  const signalLine=calcEMA(macdSeries,9);
+  const histogram=signalLine!==null?macdLine-signalLine:null;
+  return{line:macdLine,signal:signalLine,hist:histogram};
+}
   function calcBB(a,p=20){if(a.length<p)return null;const s=a.slice(-p),m=s.reduce((x,y)=>x+y,0)/p;const std=Math.sqrt(s.reduce((x,y)=>x+(y-m)**2,0)/p);const up=m+2*std,lo=m-2*std,pr=a[a.length-1];return(up-lo)>0?(pr-lo)/(up-lo):0.5;}
   function calcStochastic(highs,lows,closes,kPeriod=14,dPeriod=3){
     if(!highs||!lows||!closes||closes.length<kPeriod+dPeriod) return null;
@@ -4102,17 +4193,27 @@ self.onmessage=function(e){
   }
 
   function calcSuperTrend(highs, lows, closes, period=10, mult=3) {
-    if(closes.length < period+1) return null;
-    const atr = calcATR(highs, lows, closes, period);
-    if(!atr) return null;
-    const hl2 = (highs[highs.length-1] + lows[lows.length-1]) / 2;
-    const upperBand = hl2 + mult * atr;
-    const lowerBand = hl2 - mult * atr;
-    const price = closes[closes.length-1];
-
-    const trend = price > lowerBand ? 'up' : 'down';
-    const stVal = trend === 'up' ? lowerBand : upperBand;
-    return { trend, value: stVal, atr };
+    if(closes.length < period+2) return null;
+    const n=closes.length;
+    let upperBandArr=[], lowerBandArr=[], trendArr=new Array(n).fill(1), stValArr=new Array(n).fill(null);
+    for(let i=period;i<n;i++){
+      const sh=highs.slice(i-period,i+1),sl=lows.slice(i-period,i+1),sc=closes.slice(i-period,i+1);
+      const atrV=calcATR(sh,sl,sc,period); if(!atrV)continue;
+      const hl2=(highs[i]+lows[i])/2,ub=hl2+mult*atrV,lb=hl2-mult*atrV;
+      const pUB=upperBandArr[i-1]||ub,pLB=lowerBandArr[i-1]||lb;
+      lowerBandArr[i]=lb>pLB||closes[i-1]<pLB?lb:pLB;
+      upperBandArr[i]=ub<pUB||closes[i-1]>pUB?ub:pUB;
+      const pt=trendArr[i-1]||1;
+      if(pt===1&&closes[i]<lowerBandArr[i])trendArr[i]=-1;
+      else if(pt===-1&&closes[i]>upperBandArr[i])trendArr[i]=1;
+      else trendArr[i]=pt;
+      stValArr[i]=trendArr[i]===1?lowerBandArr[i]:upperBandArr[i];
+    }
+    const li=n-1; if(stValArr[li]===null)return null;
+    const atr=calcATR(highs,lows,closes,period);
+    const trend = trendArr[li]===1?'up':'down';
+    const stVal = stValArr[li];
+    return { trend, value: stVal, atr, flipped: trendArr[li]!==trendArr[li-1] };
   }
 
   function calcPivots(highs, lows, closes) {
@@ -4120,9 +4221,9 @@ self.onmessage=function(e){
     const h = highs[highs.length-2];
     const l = lows[lows.length-2];
     const c = closes[closes.length-2];
-    const pp = (h + l + c) / 3;
-    const r1 = 2*pp - l;
-    const s1 = 2*pp - h;
+    const pp = (h + l + c) / 3, hl = h - l;
+    const r1 = 2*pp - l, r2 = pp + hl, r3 = h + 2*(pp-l);
+    const s1 = 2*pp - h, s2 = pp - hl, s3 = l - 2*(h-pp);
     const r2 = pp + (h - l);
     const s2 = pp - (h - l);
     return { pp, r1, r2, s1, s2 };
@@ -5558,6 +5659,7 @@ self.onmessage=function(e){
 
     document.getElementById('headerDot').className='live-dot';
     document.getElementById('sourceLabel').textContent=data.source.toUpperCase()+' LIVE';
+    if(typeof _updateAiContextStatus==='function') setTimeout(_updateAiContextStatus, 2000);
 
     const{price,high24,low24,open24,vol24,opens,closes,highs,lows,volumes,source,pair}=data;
 
@@ -6062,7 +6164,7 @@ self.onmessage=function(e){
 
     // ── Indicator bars ──────────────────────────────────────────────────────
     if(rsi!==null){const c=rsi<30?'var(--green)':rsi>70?'var(--red)':'var(--warn)';setInd('rsiBar','rsiVal','rsiBadge',rsi,c,rsi.toFixed(1),rsi<30?'bull':rsi>70?'bear':'neut',rsi<30?'OVERSOLD':rsi>70?'OVERBOUGHT':rsi>=50?'BULLISH':'BEARISH');}
-    if(macdV!==null){const c=macdV>=0?'var(--green)':'var(--red)';setInd('macdBar','macdVal','macdBadge',Math.min(100,50+Math.abs(macdV)/price*5000),c,(macdV>=0?'+':'')+macdV.toFixed(4),macdV>0?'bull':'bear',macdV>0?'BULLISH':'BEARISH');}
+    if(macdV?.line!==null&&macdV?.line!==undefined){const ml=macdV.line,ms=macdV.signal,mh=macdV.hist;const c=ml>0?'var(--green)':mh>0?'var(--warn)':'var(--red)';const hDir=mh>0?'↑':'↓';const sig=ml>0&&mh>0?'BULLISH+':ml>0&&mh<0?'WEAKENING':ml<0&&mh>0?'RECOVERING':'BEARISH';const badge=ml>0&&mh>0?'bull':ml<0&&mh<0?'bear':'neut';setInd('macdBar','macdVal','macdBadge',ml>0?75:25,c,ml.toFixed(4)+' H:'+mh.toFixed(4)+hDir,badge,sig+' · Sig:'+ms.toFixed(4));};}
     if(ema20!==null){const a=price>ema20;setInd('ema20Bar','ema20Val','ema20Badge',75,a?'var(--green)':'var(--red)',fmtP(ema20),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
     if(ema50!==null){const a=price>ema50;setInd('ema50Bar','ema50Val','ema50Badge',75,a?'var(--green)':'var(--red)',fmtP(ema50),a?'bull':'bear',a?'EMA BELOW ↓':'EMA ABOVE ↑');}
     {const vc=volR>120?'var(--green)':volR<80?'var(--red)':'var(--warn)';setInd('volBar','volVal','volBadge',Math.min(100,volR/2),vc,volR.toFixed(0)+'%',volR>120?'bull':volR<80?'bear':'neut',volR>150?'VERY HIGH':volR>120?'HIGH':volR<80?'LOW':'AVERAGE');}
@@ -6144,7 +6246,7 @@ self.onmessage=function(e){
     {
       const _e55above8=ema55!==null&&ema8!==null&&ema55>ema8, _e55above13=ema55!==null&&ema13!==null&&ema55>ema13, _e55above21=ema55!==null&&ema21!==null&&ema55>ema21;
       const _obvBull=obvData!==null&&obvData.rising, _adxStrong=adxData!==null&&adxData.adx>25;
-      const _macdBull2=macdV!==null&&macdV>0, _rsiOk2=rsi!==null&&rsi>40&&rsi<70;
+      const _macdBull2=macdV?.line!==null&&macdV.line>0, _rsiOk2=rsi!==null&&rsi>40&&rsi<70;
       const _isBUY=[_e55above8,_e55above13,_e55above21].every(v=>!v);
       const _isSELL=[_e55above8,_e55above13,_e55above21].every(Boolean);
       const _e55AboveCount=[_e55above8,_e55above13,_e55above21].filter(Boolean).length;
@@ -6622,7 +6724,7 @@ self.onmessage=function(e){
     const {rsi,macdV,stoch,willR,bbP,div,ema8,ema13,ema21,ema55,ema200,adxData,ichi,st,piv,obvData,volR,cci,mfi,roc,ult,psar,cmf,kelt}=ind;
     let momS=0,momMax=0;
     if(rsi!==null){momMax+=20;if(rsi>=45&&rsi<=65)momS+=20;else if(rsi>=35&&rsi<45)momS+=12;else if(rsi<30)momS+=16;else if(rsi>70)momS+=4;else momS+=8;}
-    if(macdV!==null){momMax+=20;momS+=macdV>0?20:4;}if(stoch!==null){momMax+=15;if(stoch>=30&&stoch<=70)momS+=15;else if(stoch<20)momS+=12;else if(stoch>80)momS+=3;else momS+=8;}
+    if(macdV?.line!==null&&macdV?.line!==undefined){momMax+=20;if(macdV.line>0&&macdV.hist>0)momS+=20;else if(macdV.line>0)momS+=12;else if(macdV.hist>0)momS+=8;else momS+=2;}if(stoch!==null){momMax+=15;if(stoch>=30&&stoch<=70)momS+=15;else if(stoch<20)momS+=12;else if(stoch>80)momS+=3;else momS+=8;}
     if(willR!==null){momMax+=12;if(willR>=-50&&willR<=-20)momS+=12;else if(willR<-80)momS+=10;else if(willR>-20)momS+=2;else momS+=6;}if(bbP!==null){momMax+=12;if(bbP>=0.35&&bbP<=0.65)momS+=12;else if(bbP<0.2)momS+=10;else if(bbP>0.8)momS+=2;else momS+=6;}
     if(cci!==null){momMax+=10;momS+=cci<-100?10:cci>100?1:cci<0?7:5;}if(mfi!==null){momMax+=10;momS+=mfi<20?10:mfi>80?1:mfi<50?6:8;}if(roc!==null){momMax+=8;momS+=roc>2?8:roc>0?5:roc>-2?3:1;}if(ult!==null){momMax+=8;momS+=ult<30?8:ult>70?1:ult>=50?5:3;}
     if(div){momMax+=21;momS+=div.rsi==='bullish'?14:div.rsi==='bearish'?0:7;momS+=div.macd==='bullish'?7:div.macd==='bearish'?0:4;}momS=momMax>0?Math.round((momS/momMax)*100):0;
@@ -6631,7 +6733,7 @@ self.onmessage=function(e){
     let stS=0;if(isBUY)stS=100;else if(belowCount===2)stS=70;else if(belowCount===1)stS=45;else if(aboveCount===1)stS=35;else if(aboveCount===2)stS=20;else if(isSELL)stS=5;
     let rS=0;if(rm){rS+=rm.rr>=3?60:rm.rr>=2?45:rm.rr>=1.5?25:5;rS+=rm.riskPct<=1?40:rm.riskPct<=2?30:rm.riskPct<=3?15:0;}rS=Math.min(100,rS);
     const overall=Math.round(momS*0.20+tS*0.25+vS*0.15+stS*0.20+(window._mtfScore||50)*0.10+rS*0.10);
-    const bc=[rsi!==null&&rsi>50,macdV!==null&&macdV>0,price>(ema8||0),price>(ema55||0),price>(ema200||0),obvData!==null&&obvData.rising,adxData!==null&&adxData.diPlus>adxData.diMinus,st!==null&&st.trend==='up',isBUY,div&&div.rsi==='bullish'].filter(Boolean).length;
+    const bc=[rsi!==null&&rsi>50,macdV?.line!==null&&macdV.line>0,price>(ema8||0),price>(ema55||0),price>(ema200||0),obvData!==null&&obvData.rising,adxData!==null&&adxData.diPlus>adxData.diMinus,st!==null&&st.trend==='up',isBUY,div&&div.rsi==='bullish'].filter(Boolean).length;
     const biasT=bc>=7?'🟢 STRONG BULL':bc>=5?'🟢 BULLISH':bc===4?'🟡 MIXED':bc<=2?'🔴 BEARISH':'🟡 NEUTRAL';
     const biasC=bc>=5?'var(--green)':bc===4?'var(--warn)':'var(--red)';
     const scoreData={overall,momS,tS,vS,stS,rS,biasT,biasC};
@@ -6645,7 +6747,7 @@ self.onmessage=function(e){
     let entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail;
     if(isBull){const sup=pivOkM?Math.max(piv.s1,price-atrV*0.8):price-atrV*0.8;entry=price;sl=sup-atrV*0.3;tp1=pivOkM?piv.r1:price+atrV*2;tp2=pivOkM?piv.r2:price+atrV*3.5;entryDetail='Market / dip to support';slDetail=`Below ${pivOkM?'S1':'ATR floor'} · ${(((price-sl)/price)*100).toFixed(1)}% risk`;tp1Detail=`${pivOkM?'Pivot R1':'1× ATR target'} · +${(((tp1-price)/price)*100).toFixed(2)}%`;tp2Detail=`${pivOkM?'Pivot R2':'2× ATR target'} · +${(((tp2-price)/price)*100).toFixed(2)}%`;}
     else{entry=pivOkM?piv.r1:price+atrV*0.5;sl=pivOkM?piv.r2:price+atrV*1.5;tp1=pivOkM?piv.s1:price-atrV*2;tp2=pivOkM?piv.s2:price-atrV*3.5;entryDetail='Sell near resistance';slDetail=`Above ${pivOkM?'R2':'ATR roof'} · ${(((sl-price)/price)*100).toFixed(1)}% risk`;tp1Detail=`${pivOkM?'Pivot S1':'1× ATR target'} · ${(((price-tp1)/price)*100).toFixed(2)}% gain`;tp2Detail=`${pivOkM?'Pivot S2':'2× ATR target'} · ${(((price-tp2)/price)*100).toFixed(2)}% gain`;}
-    const signals=[{label:'EMA55 Strategy',bull:isBUY,bear:isSELL,w:25},{label:'RSI',bull:rsi!==null&&rsi>50&&rsi<70,bear:rsi!==null&&(rsi<50||rsi>75),w:10},{label:'MACD',bull:macdV!==null&&macdV>0,bear:macdV!==null&&macdV<0,w:10},{label:'EMA200 Trend',bull:ema200!==null&&price>ema200,bear:ema200!==null&&price<ema200,w:10},{label:'SuperTrend',bull:st!==null&&st.trend==='up',bear:st!==null&&st.trend==='down',w:8},{label:'ADX',bull:adxData!==null&&adxData.diPlus>adxData.diMinus,bear:adxData!==null&&adxData.diMinus>adxData.diPlus,w:8},{label:'Ichimoku',bull:ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB),bear:ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB),w:8},{label:'Parabolic SAR',bull:psar!==null&&psar.bull,bear:psar!==null&&!psar.bull,w:7},{label:'OBV',bull:obvData!==null&&obvData.rising,bear:obvData!==null&&!obvData.rising,w:6},{label:'CMF',bull:cmf!==null&&cmf>0.05,bear:cmf!==null&&cmf<-0.05,w:6},{label:'Divergence',bull:div&&(div.rsi==='bullish'||div.macd==='bullish'),bear:div&&(div.rsi==='bearish'||div.macd==='bearish'),w:6},{label:'Keltner',bull:kelt!==null&&kelt.pct<40,bear:kelt!==null&&kelt.pct>60,w:5},{label:'Bollinger',bull:bbP!==null&&bbP<0.3,bear:bbP!==null&&bbP>0.7,w:4},{label:'Pivot Points',bull:piv!==null&&price>piv.pp,bear:piv!==null&&price<piv.pp,w:4}];
+    const signals=[{label:'EMA55 Strategy',bull:isBUY,bear:isSELL,w:25},{label:'RSI',bull:rsi!==null&&rsi>50&&rsi<70,bear:rsi!==null&&(rsi<50||rsi>75),w:10},{label:'MACD',bull:macdV?.line!==null&&macdV.line>0,bear:macdV?.line!==null&&macdV.line<0,w:10},{label:'EMA200 Trend',bull:ema200!==null&&price>ema200,bear:ema200!==null&&price<ema200,w:10},{label:'SuperTrend',bull:st!==null&&st.trend==='up',bear:st!==null&&st.trend==='down',w:8},{label:'ADX',bull:adxData!==null&&adxData.diPlus>adxData.diMinus,bear:adxData!==null&&adxData.diMinus>adxData.diPlus,w:8},{label:'Ichimoku',bull:ichi!==null&&price>Math.max(ichi.senkouA,ichi.senkouB),bear:ichi!==null&&price<Math.min(ichi.senkouA,ichi.senkouB),w:8},{label:'Parabolic SAR',bull:psar!==null&&psar.bull,bear:psar!==null&&!psar.bull,w:7},{label:'OBV',bull:obvData!==null&&obvData.rising,bear:obvData!==null&&!obvData.rising,w:6},{label:'CMF',bull:cmf!==null&&cmf>0.05,bear:cmf!==null&&cmf<-0.05,w:6},{label:'Divergence',bull:div&&(div.rsi==='bullish'||div.macd==='bullish'),bear:div&&(div.rsi==='bearish'||div.macd==='bearish'),w:6},{label:'Keltner',bull:kelt!==null&&kelt.pct<40,bear:kelt!==null&&kelt.pct>60,w:5},{label:'Bollinger',bull:bbP!==null&&bbP<0.3,bear:bbP!==null&&bbP>0.7,w:4},{label:'Pivot Points',bull:piv!==null&&price>piv.pp,bear:piv!==null&&price<piv.pp,w:4}];
     const predData={direction,dirColor,dirDetail,confidence:conf,confLabel:conf>=75?'HIGH 🔥':conf>=60?'MODERATE':'LOW ⚠️',confColor:conf>=75?'var(--green)':conf>=60?'var(--warn)':'var(--red)',rangeHigh:price+atrV*2.5,rangeLow:price-atrV*2.0,entry,sl,tp1,tp2,entryDetail,slDetail,tp1Detail,tp2Detail,isBull,signals};
     const e8s=calcEMASeries(closes,8),e21s=calcEMASeries(closes,21),e55s=calcEMASeries(closes,55),e200s=calcEMASeries(closes,200);
     const btData=computeBacktest(closes,highs,lows,e8s,e21s,e55s);
@@ -12301,25 +12403,157 @@ function myIndicator(closes, opens, highs, lows, volumes, price, ind) {
   let _aiTyping = false;
 
   function _buildAiContext() {
-    const sym   = document.getElementById('symbolInput')?.value?.trim() || '—';
-    const price = document.getElementById('pcPrice')?.textContent || '—';
-    const rsi   = document.getElementById('rsiVal')?.textContent || '—';
-    const macd  = document.getElementById('macdVal')?.textContent || '—';
-    const score = document.getElementById('scoreNum')?.textContent || '—';
-    const dir   = document.getElementById('pred-direction')?.textContent || '—';
-    const sig   = document.getElementById('tl-signal')?.textContent || '—';
-    const tf    = document.getElementById('chart-tf-label')?.textContent || '—';
-    const fng   = document.getElementById('fg-label')?.textContent || '—';
-    const atr   = document.getElementById('tl-atr')?.textContent || '—';
-    return `You are an expert crypto trading assistant. Current live market data context:
-- Symbol: ${sym} | Timeframe: ${tf}
-- Price: ${price} | ATR: ${atr}
-- Trade Score: ${score}/100
-- EMA55 Strategy Signal: ${sig}
-- RSI: ${rsi} | MACD: ${macd}
-- AI Prediction Direction: ${dir}
-- Fear & Greed Index: ${fng}
-The user is an Indonesian crypto trader. Be concise, practical and actionable. Give specific price levels where relevant. Use IDR context when appropriate. Format responses clearly with bullet points where helpful.`;
+    const g = id => document.getElementById(id)?.textContent?.trim() || '—';
+    const sym    = document.getElementById('symbolInput')?.value?.trim() || '—';
+    const tf     = g('chart-tf-label');
+    const price  = g('pcPrice'); const high = g('pcHigh'); const low = g('pcLow');
+    const chg    = g('pcChg');
+    // Indicators
+    const rsi    = g('rsiVal');    const rsiBadge = g('rsiBadge');
+    const macd   = g('macdVal');   const macdBadge = g('macdBadge');
+    const ema8   = g('ema8Val');   const ema21 = g('ema21Val');
+    const ema55  = g('ema55Val');  const ema200 = g('ema200Val');
+    const bb     = g('bbVal');     const bbBadge = g('bbBadge');
+    const stoch  = g('stochKVal');
+    const willR  = g('willVal');
+    const adx    = g('adxVal');    const adxBadge = g('adxBadge');
+    const atr    = g('tl-atr');
+    const obv    = g('obvVal');    const obvBadge = g('obvBadge');
+    const cci    = g('cciVal');
+    const mfi    = g('mfiVal');
+    const psar   = g('psarVal');
+    const vwap   = g('vwap-price');
+    const vol    = g('volVal');
+    // Strategy & score
+    const score  = g('scoreNum');
+    const sig    = g('tl-signal');
+    const tlSig  = g('tl-signal-detail');
+    const tlSL   = g('tl-sl');    const tlTP = g('tl-tp');
+    const pred   = g('pred-direction');  const conf = g('pred-confidence');
+    const entry  = g('pred-entry');
+    const sl     = g('pred-sl');   const tp1 = g('pred-tp1'); const tp2 = g('pred-tp2');
+    // Ichimoku
+    const ichiCloud = g('ichi-cloud'); const ichiInterp = g('ichi-interpretation');
+    // MTF
+    const mtf1h = g('mtf-1h-sig'); const mtf4h = g('mtf-4h-sig');
+    const mtf1d = g('mtf-1d-sig'); const mtf1w = g('mtf-1w-sig');
+    const mtfCons = g('mtf-consensus');
+    // Patterns
+    const patMain = g('pat-main'); const patOverall = g('pat-overall');
+    const advOverall = g('pat-adv-overall');
+    // Fear & Greed
+    const fng = g('fg-label'); const fngNum = g('fg-num');
+    // S/R
+    const snr = document.getElementById('snrPanel')?.innerText?.slice(0,300) || '—';
+    // Risk
+    const rr  = g('rmRR'); const posSize = g('rmPosSize'); const riskAmt = g('rmRiskAmt');
+    // Checklist summary
+    const chkOk = document.querySelectorAll('.chk-icon.ci-ok')?.length || 0;
+    const chkFail = document.querySelectorAll('.chk-icon.ci-fail')?.length || 0;
+    const chkWarn = document.querySelectorAll('.chk-icon.ci-warn')?.length || 0;
+
+    return \`You are FinRobot, an elite quantitative trading analyst and portfolio risk manager. You have deep expertise in technical analysis, risk management, and crypto/equity markets. You are precise, data-driven, and give institutional-quality analysis.
+
+## LIVE MARKET DATA — ${sym} (${tf})
+**Price:** ${price} | **24h High:** ${high} | **24h Low:** ${low} | **Change:** ${chg}
+**Trade Score:** ${score}/100 | **TradingLab EMA55 Signal:** ${sig}
+${tlSig !== '—' ? '**Signal Detail:** ' + tlSig : ''}
+
+## TECHNICAL INDICATORS
+| Indicator | Value | Signal |
+|-----------|-------|--------|
+| RSI (14) | ${rsi} | ${rsiBadge} |
+| MACD | ${macd} | ${macdBadge} |
+| Bollinger %B | ${bb} | ${bbBadge} |
+| ADX (14) | ${adx} | ${adxBadge} |
+| Stochastic K/D | ${stoch} | — |
+| Williams %R | ${willR} | — |
+| CCI (20) | ${cci} | — |
+| MFI (14) | ${mfi} | — |
+| OBV | ${obv} | ${obvBadge} |
+| Parabolic SAR | ${psar} | — |
+| VWAP | ${vwap} | — |
+| Volume vs Avg | ${vol} | — |
+| ATR (14) | ${atr} | — |
+
+## EMA STACK
+EMA8: ${ema8} | EMA21: ${ema21} | EMA55: ${ema55} | EMA200: ${ema200}
+
+## ATR-BASED STRATEGY LEVELS
+Stop Loss (1.5×ATR): ${tlSL} | Take Profit (3×ATR): ${tlTP}
+
+## AI PREDICTION
+Direction: ${pred} (${conf} confidence)
+Entry Zone: ${entry} | SL: ${sl} | TP1: ${tp1} | TP2: ${tp2}
+
+## ICHIMOKU CLOUD
+Cloud Signal: ${ichiCloud}
+${ichiInterp !== '—' ? ichiInterp.slice(0,200) : ''}
+
+## MULTI-TIMEFRAME CONFLUENCE
+1H: ${mtf1h} | 4H: ${mtf4h} | 1D: ${mtf1d} | 1W: ${mtf1w}
+MTF Consensus: ${mtfCons}
+
+## PATTERN DETECTION
+Current Candle: ${patMain} | Overall: ${patOverall} | Advanced: ${advOverall}
+
+## SUPPORT & RESISTANCE
+${snr}
+
+## RISK MANAGEMENT
+Risk:Reward = ${rr} | Position Size = ${posSize} | Risk Amount = ${riskAmt}
+
+## TRADE CHECKLIST
+✅ Passed: ${chkOk}/8 | ❌ Failed: ${chkFail} | ⚠️ Warn: ${chkWarn}
+
+## MARKET SENTIMENT
+Fear & Greed Index: ${fngNum} — ${fng}
+
+---
+**ANALYST INSTRUCTIONS:** You are analyzing this data for an Indonesian crypto trader. Use IDR equivalents where helpful. Be specific with price levels. Structure your response with clear sections. When giving trade recommendations always include: Entry zone, Stop Loss, Take Profit 1 & 2, Position sizing guidance, and Risk warnings. Flag any conflicting signals between indicators.\`;
+  }
+
+  function _buildFullReportPrompt(sym) {
+    const ctx = _buildAiContext();
+    return ctx + \`
+
+## TASK: GENERATE FULL INSTITUTIONAL RESEARCH REPORT
+Write a comprehensive trading research report for ${sym} in this exact structure:
+
+### 1. EXECUTIVE SUMMARY
+2-3 sentence verdict on the current setup.
+
+### 2. TREND ANALYSIS
+Detail the primary trend, EMA stack alignment, and whether the setup favors bulls or bears.
+
+### 3. MOMENTUM & OSCILLATORS
+Interpret RSI, MACD histogram direction, Stochastic, Williams %R, CCI, MFI together.
+
+### 4. VOLUME & MONEY FLOW
+Analyze OBV, MFI, CMF, and volume relative to average.
+
+### 5. VOLATILITY & STRUCTURE
+ATR context, Bollinger Band squeeze/expansion, Keltner position.
+
+### 6. MULTI-TIMEFRAME ALIGNMENT
+Does higher timeframe confirm the setup? Confluence score.
+
+### 7. PATTERN & ICHIMOKU ANALYSIS
+Active patterns and Ichimoku cloud interpretation.
+
+### 8. TRADE PLAN
+Present three scenarios:
+- **Bull Case:** Entry, SL, TP1, TP2, trigger condition
+- **Bear Case:** Entry, SL, TP1, TP2, trigger condition  
+- **Neutral:** What to wait for before entering
+
+### 9. RISK ASSESSMENT
+Key risks to the trade thesis. Max position size recommendation.
+
+### 10. MARKET CONTEXT
+How does Fear & Greed and broader macro affect this setup?
+
+Be specific with price numbers. Use tables where helpful. Keep total length under 800 words.\`;
   }
 
   // ── AI provider config ─────────────────────────────────────────────
@@ -12495,6 +12729,7 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
 
     _aiTyping = false;
     if(btn) { btn.textContent = '⚡ SEND'; btn.disabled = false; }
+    _updateAiContextStatus();
   }
 
   function _aiErrorMessage() {
@@ -12536,45 +12771,186 @@ The user is an Indonesian crypto trader. Be concise, practical and actionable. G
     ].join('\n');
   }
 
+  function _renderMarkdown(text) {
+    // Full markdown renderer: tables, headers, bold, italic, code blocks, bullets, HR
+    let html = text;
+    // Code blocks (``` ... ```)
+    html = html.replace(/```([\s\S]*?)```/g, function(_,code){
+      return '<pre style="background:rgba(0,0,0,.5);border:1px solid rgba(0,229,255,.15);border-radius:6px;padding:10px 12px;overflow-x:auto;font-family:Share Tech Mono,monospace;font-size:.72rem;line-height:1.6;color:var(--accent);margin:8px 0">'+code.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</pre>';
+    });
+    // Markdown tables
+    html = html.replace(/((?:\|.*\|.*\n?)+)/g, function(match){
+      const rows = match.trim().split('\n').filter(r=>r.includes('|'));
+      if(rows.length < 2) return match;
+      let tableHtml = '<div style="overflow-x:auto;margin:10px 0"><table style="width:100%;border-collapse:collapse;font-family:Share Tech Mono,monospace;font-size:.65rem">';
+      rows.forEach(function(row, ri){
+        const cells = row.split('|').filter((_,ci)=>ci>0&&ci<row.split('|').length-1);
+        const isSep = cells.every(c=>c.trim().match(/^[-:]+$/));
+        if(isSep) return;
+        const isHead = ri===0;
+        tableHtml += '<tr style="border-bottom:1px solid rgba(255,255,255,.06)">';
+        cells.forEach(function(cell){
+          const td = isHead ? 'th' : 'td';
+          const style = isHead
+            ? 'padding:6px 10px;text-align:left;color:var(--muted);letter-spacing:1px;background:rgba(0,0,0,.3);font-weight:700'
+            : 'padding:6px 10px;text-align:left;color:var(--text)';
+          tableHtml += '<'+td+' style="'+style+'">'+cell.trim()+'</'+td+'>';
+        });
+        tableHtml += '</tr>';
+      });
+      tableHtml += '</table></div>';
+      return tableHtml;
+    });
+    // ### Headers
+    html = html.replace(/^### (.+)$/gm, '<div style="font-family:Orbitron,monospace;font-size:.68rem;font-weight:900;color:#c084fc;letter-spacing:2px;margin:14px 0 6px;padding-bottom:4px;border-bottom:1px solid rgba(192,132,252,.2)">$1</div>');
+    html = html.replace(/^## (.+)$/gm,  '<div style="font-family:Orbitron,monospace;font-size:.75rem;font-weight:900;color:var(--accent);letter-spacing:2px;margin:16px 0 8px;padding-bottom:5px;border-bottom:1px solid rgba(0,229,255,.2)">$1</div>');
+    html = html.replace(/^# (.+)$/gm,   '<div style="font-family:Orbitron,monospace;font-size:.85rem;font-weight:900;color:var(--text);letter-spacing:3px;margin:18px 0 10px">$1</div>');
+    // **bold** and *italic*
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong style="color:var(--accent)">$1</strong>');
+    html = html.replace(/\*(.+?)\*/g,   '<em style="color:var(--warn)">$1</em>');
+    // `inline code`
+    html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(0,229,255,.1);color:var(--accent);padding:1px 5px;border-radius:3px;font-family:Share Tech Mono,monospace;font-size:.8em">$1</code>');
+    // Bullet lists
+    html = html.replace(/^[•\-\*] (.+)$/gm, '<div style="display:flex;gap:8px;align-items:flex-start;margin:3px 0"><span style="color:var(--accent);flex-shrink:0;margin-top:2px">›</span><span>$1</span></div>');
+    // Numbered lists
+    html = html.replace(/^(\d+)\. (.+)$/gm, '<div style="display:flex;gap:8px;align-items:flex-start;margin:3px 0"><span style="color:var(--muted);font-family:Share Tech Mono,monospace;font-size:.75em;flex-shrink:0;margin-top:2px">$1.</span><span>$2</span></div>');
+    // Horizontal rules
+    html = html.replace(/^---+$/gm, '<hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:12px 0">');
+    // Line breaks
+    html = html.replace(/\n\n/g, '</p><p style="margin:8px 0">');
+    html = html.replace(/\n/g, '<br>');
+    return '<p style="margin:0">'+html+'</p>';
+  }
+
   function _appendAiMsg(role, text, id) {
     const wrap = document.getElementById('aiChatMessages');
     if(!wrap) return;
-    const isUser = role === 'user';
+    // Remove welcome message on first real message
+    const welcome = document.getElementById('ai-welcome-msg');
+    if(welcome && role !== 'typing') welcome.remove();
+
+    const isUser   = role === 'user';
     const isTyping = role === 'typing';
+    const isReport = role === 'report';
     const div = document.createElement('div');
     if(id) div.id = id;
-    div.style.cssText = `margin-bottom:12px;display:flex;flex-direction:column;align-items:${isUser?'flex-end':'flex-start'};`;
-    const formatted = isTyping ? '<span style="letter-spacing:4px;font-size:1.2rem">···</span>' : text
-      .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--accent)">$1</strong>')
-      .replace(/`([^`]+)`/g, '<code style="background:rgba(0,229,255,.12);color:var(--accent);padding:1px 5px;border-radius:3px;font-family:Share Tech Mono,monospace;font-size:.85em">$1</code>')
-      .replace(/\n/g, '<br>');
-    div.innerHTML = `
-      <div style="max-width:85%;padding:10px 14px;border-radius:${isUser?'12px 12px 3px 12px':'12px 12px 12px 3px'};
-        background:${isUser?'rgba(0,229,255,.1)':'rgba(192,132,252,.08)'};
-        border:1px solid ${isUser?'rgba(0,229,255,.25)':'rgba(192,132,252,.2)'};
-        font-size:.82rem;line-height:1.6;color:var(--text);">${formatted}</div>
-      <div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:3px;padding:0 4px;">
-        ${isUser?'You':'🤖 Claude'} · ${new Date().toLocaleTimeString()}
-      </div>`;
+    div.style.cssText = 'margin-bottom:14px;display:flex;flex-direction:column;align-items:'+(isUser?'flex-end':'flex-start')+';animation:msgSlide .25s ease';
+
+    let bodyHTML;
+    if(isTyping) {
+      bodyHTML = '<span style="display:inline-flex;gap:4px;padding:4px 0" class="ai-typing-dots"><span style="width:6px;height:6px;background:rgba(192,132,252,.6);border-radius:50%;animation:typDot .9s ease-in-out infinite"></span><span style="width:6px;height:6px;background:rgba(192,132,252,.6);border-radius:50%;animation:typDot .9s ease-in-out .2s infinite"></span><span style="width:6px;height:6px;background:rgba(192,132,252,.6);border-radius:50%;animation:typDot .9s ease-in-out .4s infinite"></span></span>';
+    } else if(isUser) {
+      bodyHTML = '<span>'+text.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')+'</span>';
+    } else {
+      bodyHTML = _renderMarkdown(text);
+    }
+
+    const maxW = isReport ? '100%' : '88%';
+    const bg   = isUser ? 'rgba(0,229,255,.07)' : isReport ? 'rgba(192,132,252,.05)' : 'rgba(192,132,252,.06)';
+    const border= isUser ? 'rgba(0,229,255,.2)' : 'rgba(192,132,252,.18)';
+    const radius= isUser ? '12px 12px 3px 12px' : '3px 12px 12px 12px';
+
+    div.innerHTML =
+      '<div style="max-width:'+maxW+';padding:'+(isReport?'16px 18px':'11px 15px')+';border-radius:'+radius+
+      ';background:'+bg+';border:1px solid '+border+';font-size:.85rem;line-height:1.65;color:var(--text)">'+
+      (isReport ? '<div style="font-family:Share Tech Mono,monospace;font-size:.5rem;color:rgba(192,132,252,.6);letter-spacing:2px;margin-bottom:10px">📋 RESEARCH REPORT · '+new Date().toLocaleTimeString()+'</div>' : '')+
+      bodyHTML+'</div>'+
+      '<div style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--muted);margin-top:4px;padding:0 5px">'+
+      (isUser?'You':'🤖 FinRobot')+' · '+new Date().toLocaleTimeString()+'</div>';
     wrap.appendChild(div);
     wrap.scrollTop = wrap.scrollHeight;
   }
 
   function aiQuickPrompt(type) {
     const sym = document.getElementById('symbolInput')?.value?.trim() || 'BTC';
+    const tf  = document.getElementById('chart-tf-label')?.textContent?.trim() || '4h';
     const prompts = {
-      analyze:  `Analyze the current ${sym} setup based on the live indicator data above. What's the overall picture and what should I watch for?`,
-      risk:     `Review the risk management for a ${sym} trade right now. Is the current indicator setup appropriate for entering, and what stop loss level would you recommend?`,
-      strategy: `Give me 3 specific, actionable tips for trading ${sym} using the EMA 55 cross strategy on this timeframe.`,
-      sentiment:`What does the current Fear & Greed index and market context suggest about timing a ${sym} trade right now?`,
-      entry:    `Based on current indicators for ${sym}, suggest a specific entry price zone, stop loss level, and 2 take profit targets with reasoning.`,
+      analyze:  `Analyze the current ${sym} (${tf}) setup. Cover: trend direction, key indicator confluence, strength of the setup, and 2 key levels to watch.`,
+      risk:     `Risk assessment for ${sym} now. Answer: (1) Is the setup quality sufficient to trade? (2) What's the max position size? (3) Where is the invalidation level? (4) What are the top 3 risks?`,
+      strategy: `Give me a step-by-step trade plan for ${sym} using the EMA55 strategy on ${tf}. Include: exact entry trigger, stop loss, TP1, TP2, and position sizing with 1% account risk.`,
+      sentiment:`Interpret the market sentiment for ${sym}: Fear & Greed, OBV trend, MFI, and volume profile. Is smart money accumulating or distributing?`,
+      entry:    `Provide a complete ${sym} trade setup: Entry zone, Stop Loss (with ATR basis), TP1, TP2, Risk:Reward ratio, and the 3 conditions that would invalidate this trade.`,
+      compare:  `Compare ${sym} across all available timeframes from the MTF data. Where are the confluences and conflicts? Which timeframe shows the strongest signal?`,
+      macro:    `Given the current Fear & Greed index, BTC dominance, and macro conditions visible in my data, how should I position ${sym} trades over the next 1-3 days?`,
     };
     const input = document.getElementById('aiChatInput');
     if(input) {
       input.value = prompts[type] || '';
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 140) + 'px';
       input.focus();
-      // Auto-send after a short delay so user sees the message appear
-      setTimeout(sendAiMessage, 100);
+      setTimeout(sendAiMessage, 80);
+    }
+  }
+
+  async function aiGenerateReport() {
+    const sym = document.getElementById('symbolInput')?.value?.trim() || 'BTC';
+    const score = document.getElementById('scoreNum')?.textContent || '—';
+    if(score === '—' || score === '') {
+      _appendAiMsg('assistant', '⚠️ Please fetch a symbol first so I have live indicator data to analyse.');
+      return;
+    }
+    // Show report being generated
+    _appendAiMsg('user', `📋 Generate full research report for ${sym}`);
+    _aiChatHistory.push({ role:'user', content: _buildFullReportPrompt(sym) });
+    _aiTyping = true;
+    const btn = document.getElementById('aiSendBtn');
+    if(btn) { btn.textContent = '⟳ ...'; btn.disabled = true; }
+    const typingId = 'ai-typing-' + Date.now();
+    _appendAiMsg('typing', '···', typingId);
+
+    const provider = document.getElementById('ai-provider')?.value || 'worker';
+    const model    = document.getElementById('ai-model')?.value || 'claude-sonnet-4-20250514';
+    const systemPrompt = _buildAiContext();
+    const h = { 'Content-Type':'application/json' };
+    if(_authToken) h['X-Session-Token'] = _authToken;
+    else if(DATA_SECRET) h['X-User-Secret'] = DATA_SECRET;
+
+    let reply = null;
+    try {
+      const payload = { model, max_tokens:2500, system:systemPrompt, messages:[{ role:'user', content: _buildFullReportPrompt(sym) }] };
+      const res = await fetch(DATA_WORKER_URL + '/ai', { method:'POST', headers:h, body:JSON.stringify(payload), signal:AbortSignal.timeout(60000) });
+      if(!res.ok) throw new Error(res.status + ': ' + (await res.text().catch(()=>'')).slice(0,120));
+      const data = await res.json();
+      if(data.content?.[0]?.text) reply = data.content[0].text;
+      else if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
+      else throw new Error('Empty response');
+    } catch(e) {
+      reply = '⚠️ Report generation failed: ' + e.message;
+    }
+
+    document.getElementById(typingId)?.remove();
+    if(reply) {
+      _appendAiMsg('report', reply);
+      _aiChatHistory.push({ role:'assistant', content: reply });
+      if(_aiChatHistory.length > 20) _aiChatHistory = _aiChatHistory.slice(-20);
+      const badge = document.getElementById('ai-status-badge');
+      if(badge) { badge.textContent = '✅ Report ready'; badge.style.color = 'var(--green)'; }
+    }
+    _aiTyping = false;
+    if(btn) { btn.textContent = '⚡ SEND'; btn.disabled = false; }
+  }
+
+  // Update context status panel
+  function _updateAiContextStatus() {
+    const sym   = document.getElementById('symbolInput')?.value?.trim() || '—';
+    const score = document.getElementById('scoreNum')?.textContent || '—';
+    const sig   = document.getElementById('tl-signal')?.textContent || '—';
+    const rsi   = document.getElementById('rsiVal')?.textContent || '—';
+    const macd  = document.getElementById('macdVal')?.textContent || '—';
+    const atr   = document.getElementById('tl-atr')?.textContent || '—';
+    document.getElementById('ai-ctx-sym')?.setAttribute('textContent', '');  // noop
+    const symEl  = document.getElementById('ai-ctx-sym');
+    const scoEl  = document.getElementById('ai-ctx-score');
+    const sigEl  = document.getElementById('ai-ctx-sig');
+    const indEl  = document.getElementById('ai-ctx-indicators');
+    if(symEl)  symEl.textContent  = 'Symbol: ' + sym;
+    if(scoEl)  scoEl.textContent  = 'Score: '  + score + '/100';
+    if(sigEl)  sigEl.style.color  = sig.includes('BUY') ? 'var(--green)' : sig.includes('SELL') ? 'var(--red)' : 'var(--warn)';
+    if(sigEl)  sigEl.textContent  = 'Signal: ' + sig;
+    if(indEl) {
+      indEl.style.color = 'rgba(0,229,255,.7)';
+      indEl.textContent = 'RSI:' + rsi + ' · MACD:' + macd.slice(0,8) + ' · ATR:' + atr;
     }
   }
 
