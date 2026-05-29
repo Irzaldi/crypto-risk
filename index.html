@@ -15201,12 +15201,16 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
 
   function authShowOverlay() {
     const overlay = document.getElementById('authOverlay');
-    if(overlay) { overlay.style.display = 'flex'; overlay.style.setProperty('display','flex','important'); }
-    // Check if URL has ?reset=TOKEN
-    const resetToken = new URLSearchParams(window.location.search).get('reset');
-    if(resetToken) {
-      authShowTab('reset');
-      window._pendingResetToken = resetToken;
+    if(overlay) {
+      overlay.style.display = 'flex';
+      // Ensure tab starts on login unless URL has ?reset=
+      const resetToken = new URLSearchParams(window.location.search).get('reset');
+      if(resetToken) {
+        authShowTab('reset');
+        window._pendingResetToken = resetToken;
+      } else {
+        authShowTab('login');
+      }
     }
   }
 
@@ -15216,17 +15220,31 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
   }
 
   function authShowTab(tab) {
-    ['login','signup','forgot','reset'].forEach(function(t) {
-      const form = document.getElementById('authForm' + t.charAt(0).toUpperCase() + t.slice(1));
-      const btn  = document.getElementById('authTab' + t.charAt(0).toUpperCase() + t.slice(1));
-      if(form) form.style.display = t === tab ? 'block' : 'none';
+    // Show the correct form, hide all others
+    ['Login','Signup','Forgot','Reset'].forEach(function(t) {
+      const form = document.getElementById('authForm' + t);
+      if(form) form.style.display = t.toLowerCase() === tab ? 'block' : 'none';
     });
-    // Update tab button styles
+    // Update the two visible tab buttons (Login / Signup)
     const loginTab  = document.getElementById('authTabLogin');
     const signupTab = document.getElementById('authTabSignup');
     const isLogin   = tab === 'login';
-    if(loginTab)  { loginTab.style.background  = isLogin  ? 'rgba(0,229,255,.15)' : 'transparent'; loginTab.style.color  = isLogin  ? '#00e5ff' : 'rgba(0,229,255,.5)'; }
-    if(signupTab) { signupTab.style.background = !isLogin ? 'rgba(0,229,255,.15)' : 'transparent'; signupTab.style.color = !isLogin ? '#00e5ff' : 'rgba(0,229,255,.5)'; }
+    const isSignup  = tab === 'signup';
+    // Dim both when on forgot/reset (neither tab is "active")
+    if(loginTab) {
+      loginTab.style.background = isLogin  ? 'rgba(0,229,255,.15)' : 'transparent';
+      loginTab.style.color      = isLogin  ? '#00e5ff' : 'rgba(0,229,255,.5)';
+    }
+    if(signupTab) {
+      signupTab.style.background = isSignup ? 'rgba(0,229,255,.15)' : 'transparent';
+      signupTab.style.color      = isSignup ? '#00e5ff' : 'rgba(0,229,255,.5)';
+    }
+    // Auto-focus first visible input field for better UX
+    const focusMap = { login:'authLoginEmail', signup:'authSignupName', forgot:'authForgotEmail', reset:'authResetPassword' };
+    setTimeout(function() {
+      const el = document.getElementById(focusMap[tab]);
+      if(el) el.focus();
+    }, 50);
   }
 
   function authShowForgot() { authShowTab('forgot'); }
@@ -15427,7 +15445,7 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
         _authSet(AUTH_USER_KEY, JSON.stringify(_authUser));
         _showUserMenu();
         // Sync data for this user
-        setTimeout(function() { _cloudEnabled = true; _checkCloud(); }, 800);
+        setTimeout(function() { _cloudEnabled = true; if(typeof _checkCloud === 'function') _checkCloud(); }, 800);
       } else {
         _authDel(AUTH_TOKEN_KEY);
         authShowOverlay();
@@ -15473,7 +15491,7 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
 
 
 <!-- ══ AUTH OVERLAY ═══════════════════════════════════════════════════════ -->
-<div id="authOverlay" style="display:none;position:fixed;inset:0;background:rgba(3,8,18,.97);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)">
+<div id="authOverlay" style="display:none;position:fixed;inset:0;background:rgba(3,8,18,.97);z-index:99999;align-items:center;justify-content:center;backdrop-filter:blur(8px)">
   <div style="background:#0d1117;border:1px solid rgba(0,229,255,.25);border-radius:16px;padding:32px;width:360px;max-width:92vw;font-family:'Share Tech Mono',monospace;box-shadow:0 24px 64px rgba(0,0,0,.8)">
     <!-- Logo -->
     <div style="text-align:center;margin-bottom:24px">
@@ -15492,7 +15510,9 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
       <div style="margin-bottom:12px">
         <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">EMAIL</div>
         <input id="authLoginEmail" type="email" placeholder="your@email.com" autocomplete="email"
-          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none;transition:border-color .2s,box-shadow .2s"
+          onfocus="this.style.borderColor='rgba(0,229,255,.6)';this.style.boxShadow='0 0 0 3px rgba(0,229,255,.1)'"
+          onblur="this.style.borderColor='rgba(0,229,255,.2)';this.style.boxShadow='none'"
           onkeydown="if(event.key==='Enter')document.getElementById('authLoginPassword').focus()">
       </div>
       <div style="margin-bottom:16px">
@@ -15500,9 +15520,15 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
           <span style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px">PASSWORD</span>
           <button onclick="authShowForgot()" style="background:none;border:none;color:rgba(0,229,255,.5);font-family:'Share Tech Mono',monospace;font-size:.5rem;cursor:pointer;padding:0;text-decoration:underline">Forgot password?</button>
         </div>
-        <input id="authLoginPassword" type="password" placeholder="••••••••" autocomplete="current-password"
-          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
-          onkeydown="if(event.key==='Enter')authLogin()">
+        <div style="position:relative">
+          <input id="authLoginPassword" type="password" placeholder="••••••••" autocomplete="current-password"
+            style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 40px 10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none;transition:border-color .2s,box-shadow .2s"
+            onfocus="this.style.borderColor='rgba(0,229,255,.6)';this.style.boxShadow='0 0 0 3px rgba(0,229,255,.1)'"
+            onblur="this.style.borderColor='rgba(0,229,255,.2)';this.style.boxShadow='none'"
+            onkeydown="if(event.key==='Enter')authLogin()">
+          <button type="button" onclick="const i=document.getElementById('authLoginPassword');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'"
+            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.8rem;color:rgba(0,229,255,.4);padding:0">👁</button>
+        </div>
       </div>
       <div id="authLoginError" style="display:none;color:#ff3355;font-size:.55rem;margin-bottom:12px;padding:8px;background:rgba(255,51,85,.08);border-radius:6px;border:1px solid rgba(255,51,85,.2)"></div>
       <button onclick="authLogin()" id="authLoginBtn"
@@ -15517,19 +15543,28 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
         <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">DISPLAY NAME</div>
         <input id="authSignupName" type="text" placeholder="Your name" autocomplete="name"
           style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          onkeydown="if(event.key==='Enter')document.getElementById('authSignupEmail').focus()"
           onkeydown="if(event.key==='Enter')document.getElementById('authSignupEmail').focus()">
       </div>
       <div style="margin-bottom:12px">
         <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">EMAIL</div>
         <input id="authSignupEmail" type="email" placeholder="your@email.com" autocomplete="email"
-          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none;transition:border-color .2s,box-shadow .2s"
+          onfocus="this.style.borderColor='rgba(0,229,255,.6)';this.style.boxShadow='0 0 0 3px rgba(0,229,255,.1)'"
+          onblur="this.style.borderColor='rgba(0,229,255,.2)';this.style.boxShadow='none'"
           onkeydown="if(event.key==='Enter')document.getElementById('authSignupPassword').focus()">
       </div>
       <div style="margin-bottom:16px">
         <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">PASSWORD (min 8 chars)</div>
-        <input id="authSignupPassword" type="password" placeholder="••••••••" autocomplete="new-password"
-          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
-          onkeydown="if(event.key==='Enter')authSignup()">
+        <div style="position:relative">
+          <input id="authSignupPassword" type="password" placeholder="••••••••" autocomplete="new-password"
+            style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 40px 10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none;transition:border-color .2s,box-shadow .2s"
+            onfocus="this.style.borderColor='rgba(0,229,255,.6)';this.style.boxShadow='0 0 0 3px rgba(0,229,255,.1)'"
+            onblur="this.style.borderColor='rgba(0,229,255,.2)';this.style.boxShadow='none'"
+            onkeydown="if(event.key==='Enter')authSignup()">
+          <button type="button" onclick="const i=document.getElementById('authSignupPassword');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈'"
+            style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:.8rem;color:rgba(0,229,255,.4);padding:0">👁</button>
+        </div>
       </div>
       <div id="authSignupError" style="display:none;color:#ff3355;font-size:.55rem;margin-bottom:12px;padding:8px;background:rgba(255,51,85,.08);border-radius:6px;border:1px solid rgba(255,51,85,.2)"></div>
       <button onclick="authSignup()" id="authSignupBtn"
@@ -15549,7 +15584,9 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
       <div style="margin-bottom:16px">
         <div style="font-size:.5rem;color:rgba(0,229,255,.6);letter-spacing:2px;margin-bottom:5px">EMAIL</div>
         <input id="authForgotEmail" type="email" placeholder="your@email.com"
-          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none"
+          style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:10px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.65rem;outline:none;transition:border-color .2s,box-shadow .2s"
+          onfocus="this.style.borderColor='rgba(0,229,255,.6)';this.style.boxShadow='0 0 0 3px rgba(0,229,255,.1)'"
+          onblur="this.style.borderColor='rgba(0,229,255,.2)';this.style.boxShadow='none'"
           onkeydown="if(event.key==='Enter')authForgotPassword()">
       </div>
       <div id="authForgotError" style="display:none;font-size:.55rem;margin-bottom:12px;padding:8px;border-radius:6px;border:1px solid"></div>
@@ -15600,7 +15637,7 @@ Be specific with price numbers. Use tables where helpful. Keep total length unde
 </div>
 
 <!-- Change password modal -->
-<div id="changePasswordModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99998;display:none;align-items:center;justify-content:center">
+<div id="changePasswordModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99998;align-items:center;justify-content:center">
   <div style="background:#0d1117;border:1px solid rgba(0,229,255,.25);border-radius:12px;padding:28px;width:320px;max-width:90vw;font-family:'Share Tech Mono',monospace">
     <div style="font-size:.65rem;letter-spacing:3px;color:#00e5ff;margin-bottom:20px">🔑 CHANGE PASSWORD</div>
     <input id="cpCurrent" type="password" placeholder="Current password" style="width:100%;box-sizing:border-box;background:rgba(0,229,255,.04);border:1px solid rgba(0,229,255,.2);color:#e0e8ff;padding:9px 12px;border-radius:6px;font-family:'Share Tech Mono',monospace;font-size:.62rem;outline:none;margin-bottom:10px">
