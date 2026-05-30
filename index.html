@@ -857,7 +857,7 @@ function installPWA() {
   .page-tab { padding:10px 24px; font-family:'Share Tech Mono',monospace; font-size:.65rem; letter-spacing:2px; text-transform:uppercase; color:var(--muted); background:none; border:none; border-bottom:2px solid transparent; margin-bottom:-2px; cursor:pointer; transition:all .2s; }
   .page-tab:hover { color:var(--accent); }
   .page-tab.active { color:var(--accent); border-bottom-color:var(--accent); background:rgba(0,229,255,.04); }
-  .page-content { display:none; opacity:0; }
+  .page-content { display:none; }
   .page-content.active { display:block; animation:pageReveal .2s ease forwards; }
   @keyframes pageReveal { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
 
@@ -1040,7 +1040,7 @@ function installPWA() {
     <button id="pwa-install-btn" onclick="installPWA()" style="display:none;align-items:center;gap:5px;padding:4px 10px;background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.3);color:var(--accent);border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer;letter-spacing:1px">
       📲 Install App
     </button>
-    <span id="sync-badge" title="Cloud sync status" style="font-family:'Share Tech Mono',monospace;font-size:.56rem;padding:4px 10px;border:1px solid var(--border);border-radius:20px;color:var(--muted);cursor:pointer" onclick="switchTab('settings-cloud')">💾 Local only</span>
+    <span id="sync-badge" title="Cloud sync status" style="font-family:'Share Tech Mono',monospace;font-size:.56rem;padding:4px 10px;border:1px solid var(--border);border-radius:20px;color:var(--muted);cursor:pointer" onclick="IS_MOBILE()&&_mobileBuilt?mobNav('more'):switchTab('analysis')">💾 Local only</span>
     <button id="lang-toggle" onclick="toggleLanguage()" style="padding:4px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer" title="Toggle language">🇮🇩 ID</button>
     <button onclick="_showKeyboardHelp()" style="padding:4px 10px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--muted);border-radius:20px;font-family:'Share Tech Mono',monospace;font-size:.54rem;cursor:pointer" title="Keyboard shortcuts (?)">⌨️ ?</button>
     <button class="theme-btn" onclick="toggleTheme()" id="themeBtn">☀️ LIGHT</button>
@@ -8465,15 +8465,47 @@ self.onmessage=function(e){
 
   const IS_MOBILE = () => window.innerWidth <= 480;
 
+  let _mobileBuilt = false;
+
   function initMobile() {
-    if (!IS_MOBILE()) return;
+    const isMob = IS_MOBILE();
 
-    document.getElementById('mobileNav').style.display = 'flex';
-    document.getElementById('mobileFab').style.display = 'flex';
+    if(isMob) {
+      document.getElementById('mobileNav').style.display = 'flex';
+      document.getElementById('mobileFab').style.display = 'flex';
+      document.querySelector('.page-tabs')?.style.setProperty('display','none','important');
+      if(!_mobileBuilt) {
+        buildMobileLayout();
+        _mobileBuilt = true;
+        mobNav('home');
+      }
+    } else {
+      // Restored to desktop — show desktop chrome, hide mobile chrome
+      document.getElementById('mobileNav').style.display = 'none';
+      document.getElementById('mobileFab').style.display = 'none';
+      document.querySelector('.page-tabs')?.style.removeProperty('display');
+      // If mobile layout was built, page-ai / page-market etc. may have lost
+      // their content. Restore them so desktop tabs work.
+      if(_mobileBuilt) {
+        _restoreDesktopPages();
+      }
+    }
+  }
 
-    if (document.getElementById('mob-page-home')) return;
-    buildMobileLayout();
-    mobNav('home');
+  function _restoreDesktopPages() {
+    // Pages whose .wrap was moved to mobile tabs — put them back
+    const pageIds = ['page-ai','page-market','page-scanner','page-fxstocks','page-onchain'];
+    pageIds.forEach(function(pid) {
+      const page = document.getElementById(pid);
+      if(!page) return;
+      // If page is empty (content was moved away), show a placeholder
+      if(page.children.length === 0 || (page.children.length === 1 && !page.querySelector('.wrap'))) {
+        page.innerHTML = '<div class="wrap" style="padding-top:20px;text-align:center"><div style="font-family:Share Tech Mono,monospace;font-size:.7rem;color:var(--muted);padding:40px 20px">' +
+          '⚠️ Please reload the page to use this tab on desktop.<br><br>' +
+          '<button onclick="location.reload()" style="padding:8px 20px;background:rgba(0,229,255,.1);border:1px solid var(--accent);color:var(--accent);border-radius:6px;font-family:Share Tech Mono,monospace;font-size:.65rem;cursor:pointer">↻ Reload Page</button>' +
+          '</div></div>';
+      }
+    });
   }
 
   function buildMobileLayout() {
@@ -8606,40 +8638,39 @@ self.onmessage=function(e){
     const journalEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#journalList')||p.querySelector('#tj-tbody'));
     if(journalEl) { const s=makeMobSection('📓 TRADE JOURNAL',false); journalEl.style.overflowX='auto'; s.body.appendChild(journalEl); analysisTab.appendChild(s.wrap); }
 
-    // ══ MARKET tab — use REAL page-market so updates work ════════════
-    // Market tab shows the actual desktop market page (no clone = live updates)
+    // ══ MARKET tab — add refresh button, keep original page-market intact ══
     const pageMarket = document.getElementById('page-market');
     if(pageMarket) {
-      // Add a refresh button at top
       const refreshBtn = document.createElement('button');
       refreshBtn.textContent = '⟳ Refresh Market Data';
       refreshBtn.style.cssText = 'width:100%;padding:10px;margin-bottom:10px;background:rgba(0,229,255,.1);border:1px solid var(--accent);color:var(--accent);font-family:Share Tech Mono,monospace;font-size:.65rem;border-radius:6px;cursor:pointer';
       refreshBtn.onclick = function(){ fetchMarketDashboard(true); };
       marketTab.appendChild(refreshBtn);
-      // Move inner wrap to market tab so IDs remain unique and updates work
+      // Clone market content for mobile (keep original for desktop switchTab)
       const mktInner = pageMarket.querySelector('.wrap');
       if(mktInner) {
-        mktInner.style.padding = '0';
-        mktInner.style.maxWidth = '100%';
-        marketTab.appendChild(mktInner);
+        const mktClone = mktInner.cloneNode(true);
+        mktClone.querySelectorAll('[id]').forEach(function(e){e.removeAttribute('id');});
+        mktClone.style.padding = '0'; mktClone.style.maxWidth = '100%';
+        marketTab.appendChild(mktClone);
       }
     }
 
     const fgEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#fgRing'));
     if(fgEl) { const s=makeMobSection('😱 FEAR & GREED',false); s.body.appendChild(fgEl); marketTab.appendChild(s.wrap); }
 
-    // Scanner — use actual page content
+    // Scanner — clone for mobile
     const pageScanner = document.getElementById('page-scanner');
     if(pageScanner) {
       const scanInner = pageScanner.querySelector('.wrap');
-      if(scanInner) { const s=makeMobSection('📡 SCANNER',false); scanInner.style.padding='0'; s.body.appendChild(scanInner); marketTab.appendChild(s.wrap); }
+      if(scanInner) { const scanClone=scanInner.cloneNode(true); scanClone.querySelectorAll('[id]').forEach(function(e){e.removeAttribute('id');}); const s=makeMobSection('📡 SCANNER',false); scanClone.style.padding='0'; s.body.appendChild(scanClone); marketTab.appendChild(s.wrap); }
     }
 
-    // Forex & Stocks — use actual page content
+    // Forex & Stocks — clone for mobile
     const pageFx = document.getElementById('page-fxstocks');
     if(pageFx) {
       const fxInner = pageFx.querySelector('.wrap');
-      if(fxInner) { const s=makeMobSection('💱 FOREX & STOCKS',false); fxInner.style.padding='0'; s.body.appendChild(fxInner); marketTab.appendChild(s.wrap); }
+      if(fxInner) { const fxClone=fxInner.cloneNode(true); fxClone.querySelectorAll('[id]').forEach(function(e){e.removeAttribute('id');}); const s=makeMobSection('💱 FOREX & STOCKS',false); fxClone.style.padding='0'; s.body.appendChild(fxClone); marketTab.appendChild(s.wrap); }
     }
 
     // ══ PORTFOLIO tab ════════════════════════════════════════════════
@@ -8649,11 +8680,21 @@ self.onmessage=function(e){
     const portPerfEl = [...document.querySelectorAll('.panel')].find(p=>p.querySelector('#portPerfChart'));
     if(portPerfEl) { const s=makeMobSection('📈 PERFORMANCE',false); s.body.appendChild(portPerfEl); portfolioTab.appendChild(s.wrap); }
 
-    // AI — use actual page so chat works
-    const pageAI = document.getElementById('page-ai');
-    if(pageAI) {
-      const aiInner = pageAI.querySelector('.wrap');
-      if(aiInner) { const s=makeMobSection('🤖 AI ASSISTANT',true); aiInner.style.padding='0'; s.body.appendChild(aiInner); portfolioTab.appendChild(s.wrap); }
+    // AI — on mobile, show a direct-link panel (cloning AI chat causes duplicate IDs
+    // which breaks getElementById lookups in sendAiMessage, aiGenerateReport, etc.)
+    {
+      const s = makeMobSection('🤖 AI ASSISTANT', true);
+      s.body.innerHTML = '<div style="padding:16px;font-family:Share Tech Mono,monospace;font-size:.65rem;line-height:2;color:var(--muted);text-align:center">' +
+        '<div style="color:#c084fc;font-size:.8rem;margin-bottom:10px">🤖 FinRobot AI</div>' +
+        'AI chat is fully available on desktop.<br>On mobile, use the quick actions below:' +
+        '<div style="display:flex;flex-direction:column;gap:6px;margin-top:12px">' +
+        '<button onclick="const inp=document.getElementById('aiChatInput');if(inp){inp.value='Analyze the current setup — trend, key indicators, and should I trade this?';sendAiMessage();}" style="padding:8px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.3);color:#c084fc;border-radius:6px;font-family:Share Tech Mono,monospace;font-size:.58rem;cursor:pointer">📊 Quick Analyze</button>' +
+        '<button onclick="const inp=document.getElementById('aiChatInput');if(inp){inp.value='Give me an entry plan with stop loss and take profit levels.';sendAiMessage();}" style="padding:8px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.3);color:#c084fc;border-radius:6px;font-family:Share Tech Mono,monospace;font-size:.58rem;cursor:pointer">📍 Entry Plan</button>' +
+        '<button onclick="aiGenerateReport()" style="padding:8px;background:rgba(192,132,252,.15);border:1px solid rgba(192,132,252,.4);color:#c084fc;border-radius:6px;font-family:Share Tech Mono,monospace;font-size:.58rem;cursor:pointer">📋 Full Report</button>' +
+        '</div>' +
+        '<div id="mob-ai-response" style="margin-top:12px;text-align:left;display:none;padding:10px;background:rgba(0,0,0,.3);border:1px solid rgba(192,132,252,.2);border-radius:8px;font-family:Rajdhani,sans-serif;font-size:.82rem;line-height:1.6;color:var(--text);max-height:300px;overflow-y:auto"></div>' +
+        '</div>';
+      portfolioTab.appendChild(s.wrap);
     }
 
     const socialEl = document.getElementById('socialSentimentPanel')?.closest('.panel');
@@ -8666,7 +8707,7 @@ self.onmessage=function(e){
     const pageOnchain = document.getElementById('page-onchain');
     if(pageOnchain) {
       const ocInner = pageOnchain.querySelector('.wrap');
-      if(ocInner) { const s=makeMobSection('🔎 ON-CHAIN & MACRO',false); ocInner.style.padding='0'; s.body.appendChild(ocInner); moreTab.appendChild(s.wrap); }
+      if(ocInner) { const ocClone=ocInner.cloneNode(true); ocClone.querySelectorAll('[id]').forEach(function(e){e.removeAttribute('id');}); const s=makeMobSection('🔎 ON-CHAIN & MACRO',false); ocClone.style.padding='0'; s.body.appendChild(ocClone); moreTab.appendChild(s.wrap); }
     }
 
     const riskEl = [...wrap.querySelectorAll('.panel')].find(p=>p.querySelector('#rmAccount'));
@@ -8801,9 +8842,9 @@ self.onmessage=function(e){
   }
 
   window.addEventListener('load', initMobile);
-  window.addEventListener('resize', ()=>{
+  window.addEventListener('resize', function() {
     clearTimeout(window._mobileResizeTimer);
-    window._mobileResizeTimer = setTimeout(initMobile, 200);
+    window._mobileResizeTimer = setTimeout(initMobile, 150);
   });
 
   // ══════════════════════════════════════════════════════════
@@ -8864,10 +8905,25 @@ self.onmessage=function(e){
   }
 
   function switchTab(name) {
+    // On mobile, redirect desktop tab clicks to the correct mobile nav tab
+    if(IS_MOBILE() && _mobileBuilt) {
+      const mobileTabMap = {
+        'ai':'portfolio', 'portfolio':'portfolio',
+        'market':'market', 'scanner':'market', 'fxstocks':'market', 'onchain':'more',
+        'analysis':'analysis'
+      };
+      const mobTarget = mobileTabMap[name] || 'home';
+      mobNav(mobTarget);
+      return;
+    }
+
     document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
-    document.getElementById('tab-' + name).classList.add('active');
-    document.getElementById('page-' + name).classList.add('active');
+    const tabEl  = document.getElementById('tab-' + name);
+    const pageEl = document.getElementById('page-' + name);
+    if(tabEl)  tabEl.classList.add('active');
+    if(!pageEl) { console.warn('switchTab: no page found for', name); return; }
+    pageEl.classList.add('active');
     window.scrollTo({top:0,behavior:'smooth'});
 
     // Pause timers for background tabs, resume for active tab
